@@ -1,0 +1,49 @@
+{
+  "name": "app-template",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write .",
+    "db:generate": "dotenv -e .env.local -- drizzle-kit generate",
+    "db:generate:custom": "dotenv -e .env.local -- drizzle-kit generate --custom",
+    "db:migrate": "dotenv -e .env.local -- tsx scripts/migrate.ts",
+    "db:rollback": "dotenv -e .env.local -- tsx scripts/rollback.ts",
+    "db:status": "dotenv -e .env.local -- drizzle-kit migrate --dry-run",
+    "db:generate:prod": "dotenv -e .env.prod -- drizzle-kit generate",
+    "db:migrate:prod": "dotenv -e .env.prod -- tsx scripts/migrate.ts",
+    "db:rollback:prod": "dotenv -e .env.prod -- tsx scripts/rollback.ts",
+    "db:status:prod": "dotenv -e .env.prod -- drizzle-kit migrate --dry-run"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "@supabase/ssr": "^0.5.0",
+    "drizzle-orm": "^0.38.0",
+    "postgres": "^3.4.0",
+    "@t3-oss/env-nextjs": "^0.11.0",
+    "zod": "^3.23.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.0",
+    "tailwind-merge": "^2.5.0",
+    "lucide-react": "^0.460.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "drizzle-kit": "^0.30.0",
+    "dotenv-cli": "^8.0.0",
+    "tsx": "^4.19.0",
+    "prettier": "^3.3.0",
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/postcss": "^4.0.0"
+  }
+}

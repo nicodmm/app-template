@@ -1,0 +1,1628 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>/* APP_NAME */ - UI Theme Preview</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: hsl(var(--background));
+        color: hsl(var(--foreground));
+        transition: all 0.3s ease;
+        line-height: 1.6;
+        min-height: 100vh;
+      }
+
+      /* Layout */
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 40px 20px;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 40px;
+        padding: 40px 20px;
+      }
+
+      .header h1 {
+        font-size: 3rem;
+        font-weight: 800;
+        margin-bottom: 16px;
+        color: hsl(var(--foreground));
+        background: linear-gradient(
+          135deg,
+          hsl(var(--primary)),
+          hsl(var(--primary) / 0.7)
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .header .subtitle {
+        font-size: 1.4rem;
+        font-weight: 600;
+        color: hsl(var(--foreground));
+        margin-bottom: 12px;
+      }
+
+      .header .instructions {
+        font-size: 1.1rem;
+        color: hsl(var(--muted-foreground));
+        max-width: 800px;
+        margin: 0 auto 20px auto;
+        background: hsl(var(--muted) / 0.5);
+        padding: 16px 24px;
+        border-radius: 12px;
+        border-left: 4px solid hsl(var(--primary));
+      }
+
+      /* Primary Color Selector */
+      .primary-selector {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 24px;
+        margin-bottom: 50px;
+        max-width: 1200px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .primary-card {
+        background: hsl(var(--card));
+        border: 3px solid hsl(var(--border));
+        border-radius: 16px;
+        padding: 32px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-align: center;
+      }
+
+      .primary-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+      }
+
+      .primary-card.active {
+        border-color: hsl(var(--primary));
+        box-shadow: 0 8px 32px hsl(var(--primary) / 0.3);
+        background: hsl(var(--primary) / 0.02);
+      }
+
+      .primary-preview {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        margin: 0 auto 20px;
+        border: 4px solid white;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      }
+
+      .primary-name {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: hsl(var(--card-foreground));
+        margin-bottom: 8px;
+      }
+
+      .primary-description {
+        font-size: 1rem;
+        color: hsl(var(--muted-foreground));
+        margin-bottom: 16px;
+        line-height: 1.5;
+      }
+
+      /* Variant Selector */
+      .variant-selector {
+        margin: 60px auto;
+        max-width: 1200px;
+        display: none;
+      }
+
+      .variant-selector.active {
+        display: block;
+        animation: fadeIn 0.5s ease;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .variant-section {
+        margin-bottom: 48px;
+      }
+
+      .variant-section h2 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 24px;
+        color: hsl(var(--foreground));
+        text-align: center;
+      }
+
+      .variant-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 24px;
+      }
+
+      .variant-card {
+        background: hsl(var(--card));
+        border: 2px solid hsl(var(--border));
+        border-radius: 12px;
+        padding: 24px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+      }
+
+      .variant-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        border-color: hsl(var(--primary));
+      }
+
+      .variant-card.selected {
+        border-color: hsl(var(--primary));
+        border-width: 3px;
+        box-shadow: 0 8px 32px hsl(var(--primary) / 0.2);
+      }
+
+      .variant-card.selected::before {
+        content: "✓ Selected";
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: hsl(var(--primary));
+        color: hsl(var(--primary-foreground));
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+
+      .variant-preview-bar {
+        height: 80px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        display: flex;
+        overflow: hidden;
+      }
+
+      .variant-preview-bar div {
+        flex: 1;
+      }
+
+      .variant-name {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: hsl(var(--foreground));
+        margin-bottom: 8px;
+      }
+
+      .variant-description {
+        font-size: 0.95rem;
+        color: hsl(var(--muted-foreground));
+        margin-bottom: 12px;
+      }
+
+      .variant-colors {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .color-chip {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        border: 2px solid hsl(var(--border));
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Component Examples - Compact Version */
+      .preview-section {
+        margin: 60px auto;
+        max-width: 1200px;
+        background: hsl(var(--card));
+        border-radius: 20px;
+        padding: 40px;
+        border: 1px solid hsl(var(--border));
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      }
+
+      .preview-section h2 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 30px;
+        color: hsl(var(--foreground));
+        text-align: center;
+      }
+
+      .component-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 24px;
+        margin-bottom: 40px;
+      }
+
+      .component-card {
+        background: hsl(var(--muted));
+        border: 1px solid hsl(var(--border));
+        border-radius: 12px;
+        padding: 20px;
+      }
+
+      .component-card h3 {
+        margin-bottom: 16px;
+        color: hsl(var(--foreground));
+        font-size: 1.1rem;
+      }
+
+      .btn {
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        margin: 8px 8px 8px 0;
+        border: none;
+        transition: all 0.2s ease;
+        font-size: 0.9rem;
+      }
+
+      .btn-primary {
+        background: hsl(var(--primary));
+        color: hsl(var(--primary-foreground));
+      }
+
+      .btn-success {
+        background: hsl(var(--success));
+        color: hsl(var(--success-foreground));
+      }
+
+      .btn-warning {
+        background: hsl(var(--warning));
+        color: hsl(var(--warning-foreground));
+      }
+
+      .btn-destructive {
+        background: hsl(var(--destructive));
+        color: hsl(var(--destructive-foreground));
+      }
+
+      .input {
+        width: 100%;
+        padding: 10px;
+        border: 2px solid hsl(var(--border));
+        border-radius: 6px;
+        background: hsl(var(--background));
+        color: hsl(var(--foreground));
+        margin: 8px 0;
+        font-size: 0.9rem;
+      }
+
+      .input:focus {
+        outline: none;
+        border-color: hsl(var(--primary));
+        box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+      }
+
+      /* Chat Demo */
+      .chat-demo {
+        border: 2px solid hsl(var(--border));
+        border-radius: 12px;
+        overflow: hidden;
+        background: hsl(var(--background));
+        margin-top: 40px;
+      }
+
+      .chat-header {
+        background: hsl(var(--muted));
+        padding: 16px 24px;
+        border-bottom: 1px solid hsl(var(--border));
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .chat-content {
+        display: flex;
+        height: 400px;
+      }
+
+      .chat-sidebar {
+        width: 220px;
+        background: hsl(var(--muted));
+        border-right: 1px solid hsl(var(--border));
+        padding: 16px;
+      }
+
+      .chat-messages {
+        flex: 1;
+        padding: 24px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .message {
+        max-width: 70%;
+        padding: 12px 16px;
+        border-radius: 18px;
+        font-size: 0.95rem;
+      }
+
+      .message-user {
+        background: hsl(var(--primary));
+        color: hsl(var(--primary-foreground));
+        align-self: flex-end;
+        border-radius: 18px 18px 4px 18px;
+      }
+
+      .message-ai {
+        background: hsl(var(--muted));
+        color: hsl(var(--foreground));
+        align-self: flex-start;
+        border-radius: 18px 18px 18px 4px;
+      }
+
+      /* CSS Variables for Each Theme Combination */
+      /* PRIMARY COLOR 1 - Light Variants */
+      .primary1-light1 {
+        /* SCHEME1_LIGHT1_VARS */
+        --primary: /* SCHEME1_PRIMARY_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: 0 0% 100%;
+        --foreground: 240 10% 3.9%;
+        --muted: 240 4.8% 95.9%;
+        --muted-foreground: 240 3.8% 46.1%;
+        --border: 240 5.9% 90%;
+        --card: 0 0% 100%;
+        --card-foreground: 240 10% 3.9%;
+        --success: /* SCHEME1_SUCCESS_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME1_WARNING_HSL */;
+        --warning-foreground: 240 10% 3.9%;
+        --destructive: /* SCHEME1_DESTRUCTIVE_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      .primary1-light2 {
+        /* SCHEME1_LIGHT2_VARS */
+        --primary: /* SCHEME1_PRIMARY_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: /* SCHEME1_LIGHT2_BG */;
+        --foreground: 240 10% 3.9%;
+        --muted: /* SCHEME1_LIGHT2_MUTED */;
+        --muted-foreground: 240 3.8% 46.1%;
+        --border: 240 5.9% 90%;
+        --card: 0 0% 100%;
+        --card-foreground: 240 10% 3.9%;
+        --success: /* SCHEME1_SUCCESS_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME1_WARNING_HSL */;
+        --warning-foreground: 240 10% 3.9%;
+        --destructive: /* SCHEME1_DESTRUCTIVE_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      .primary1-light3 {
+        /* SCHEME1_LIGHT3_VARS */
+        --primary: /* SCHEME1_PRIMARY_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: /* SCHEME1_LIGHT3_BG */;
+        --foreground: 240 10% 3.9%;
+        --muted: /* SCHEME1_LIGHT3_MUTED */;
+        --muted-foreground: 240 3.8% 46.1%;
+        --border: 240 5.9% 90%;
+        --card: 0 0% 100%;
+        --card-foreground: 240 10% 3.9%;
+        --success: /* SCHEME1_SUCCESS_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME1_WARNING_HSL */;
+        --warning-foreground: 240 10% 3.9%;
+        --destructive: /* SCHEME1_DESTRUCTIVE_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      /* PRIMARY COLOR 1 - Dark Variants */
+      .primary1-dark1 {
+        /* SCHEME1_DARK1_VARS - Pure Black */
+        --primary: /* SCHEME1_PRIMARY_DARK_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: 0 0% 3%;
+        --foreground: 0 0% 98%;
+        --muted: 0 0% 8%;
+        --muted-foreground: 0 0% 70%;
+        --border: 0 0% 12%;
+        --card: 0 0% 5%;
+        --card-foreground: 0 0% 98%;
+        --success: /* SCHEME1_SUCCESS_DARK_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME1_WARNING_DARK_HSL */;
+        --warning-foreground: 0 0% 98%;
+        --destructive: /* SCHEME1_DESTRUCTIVE_DARK_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      .primary1-dark2 {
+        /* SCHEME1_DARK2_VARS - Complementary Dark */
+        --primary: /* SCHEME1_PRIMARY_DARK_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: /* SCHEME1_DARK2_BG */;
+        --foreground: 0 0% 98%;
+        --muted: /* SCHEME1_DARK2_MUTED */;
+        --muted-foreground: /* SCHEME1_DARK2_MUTED_FG */;
+        --border: /* SCHEME1_DARK2_BORDER */;
+        --card: /* SCHEME1_DARK2_CARD */;
+        --card-foreground: 0 0% 98%;
+        --success: /* SCHEME1_SUCCESS_DARK_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME1_WARNING_DARK_HSL */;
+        --warning-foreground: 0 0% 98%;
+        --destructive: /* SCHEME1_DESTRUCTIVE_DARK_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      .primary1-dark3 {
+        /* SCHEME1_DARK3_VARS - Premium Slate */
+        --primary: /* SCHEME1_PRIMARY_DARK_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: 220 10% 10%;
+        --foreground: 0 0% 98%;
+        --muted: 220 8% 16%;
+        --muted-foreground: 220 5% 70%;
+        --border: 220 8% 20%;
+        --card: 220 10% 12%;
+        --card-foreground: 0 0% 98%;
+        --success: /* SCHEME1_SUCCESS_DARK_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME1_WARNING_DARK_HSL */;
+        --warning-foreground: 0 0% 98%;
+        --destructive: /* SCHEME1_DESTRUCTIVE_DARK_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      /* PRIMARY COLOR 2 - Light Variants */
+      .primary2-light1 {
+        /* SCHEME2_LIGHT1_VARS */
+        --primary: /* SCHEME2_PRIMARY_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: 0 0% 100%;
+        --foreground: 240 10% 3.9%;
+        --muted: 240 4.8% 95.9%;
+        --muted-foreground: 240 3.8% 46.1%;
+        --border: 240 5.9% 90%;
+        --card: 0 0% 100%;
+        --card-foreground: 240 10% 3.9%;
+        --success: /* SCHEME2_SUCCESS_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME2_WARNING_HSL */;
+        --warning-foreground: 240 10% 3.9%;
+        --destructive: /* SCHEME2_DESTRUCTIVE_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      .primary2-light2 {
+        /* SCHEME2_LIGHT2_VARS */
+        --primary: /* SCHEME2_PRIMARY_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: /* SCHEME2_LIGHT2_BG */;
+        --foreground: 240 10% 3.9%;
+        --muted: /* SCHEME2_LIGHT2_MUTED */;
+        --muted-foreground: 240 3.8% 46.1%;
+        --border: 240 5.9% 90%;
+        --card: 0 0% 100%;
+        --card-foreground: 240 10% 3.9%;
+        --success: /* SCHEME2_SUCCESS_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME2_WARNING_HSL */;
+        --warning-foreground: 240 10% 3.9%;
+        --destructive: /* SCHEME2_DESTRUCTIVE_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      .primary2-light3 {
+        /* SCHEME2_LIGHT3_VARS */
+        --primary: /* SCHEME2_PRIMARY_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: /* SCHEME2_LIGHT3_BG */;
+        --foreground: 240 10% 3.9%;
+        --muted: /* SCHEME2_LIGHT3_MUTED */;
+        --muted-foreground: 240 3.8% 46.1%;
+        --border: 240 5.9% 90%;
+        --card: 0 0% 100%;
+        --card-foreground: 240 10% 3.9%;
+        --success: /* SCHEME2_SUCCESS_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME2_WARNING_HSL */;
+        --warning-foreground: 240 10% 3.9%;
+        --destructive: /* SCHEME2_DESTRUCTIVE_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      /* PRIMARY COLOR 2 - Dark Variants */
+      .primary2-dark1 {
+        /* SCHEME2_DARK1_VARS - Pure Black */
+        --primary: /* SCHEME2_PRIMARY_DARK_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: 0 0% 3%;
+        --foreground: 0 0% 98%;
+        --muted: 0 0% 8%;
+        --muted-foreground: 0 0% 70%;
+        --border: 0 0% 12%;
+        --card: 0 0% 5%;
+        --card-foreground: 0 0% 98%;
+        --success: /* SCHEME2_SUCCESS_DARK_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME2_WARNING_DARK_HSL */;
+        --warning-foreground: 0 0% 98%;
+        --destructive: /* SCHEME2_DESTRUCTIVE_DARK_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      .primary2-dark2 {
+        /* SCHEME2_DARK2_VARS - Complementary Dark */
+        --primary: /* SCHEME2_PRIMARY_DARK_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: /* SCHEME2_DARK2_BG */;
+        --foreground: 0 0% 98%;
+        --muted: /* SCHEME2_DARK2_MUTED */;
+        --muted-foreground: /* SCHEME2_DARK2_MUTED_FG */;
+        --border: /* SCHEME2_DARK2_BORDER */;
+        --card: /* SCHEME2_DARK2_CARD */;
+        --card-foreground: 0 0% 98%;
+        --success: /* SCHEME2_SUCCESS_DARK_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME2_WARNING_DARK_HSL */;
+        --warning-foreground: 0 0% 98%;
+        --destructive: /* SCHEME2_DESTRUCTIVE_DARK_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      .primary2-dark3 {
+        /* SCHEME2_DARK3_VARS - Premium Slate */
+        --primary: /* SCHEME2_PRIMARY_DARK_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: 220 10% 10%;
+        --foreground: 0 0% 98%;
+        --muted: 220 8% 16%;
+        --muted-foreground: 220 5% 70%;
+        --border: 220 8% 20%;
+        --card: 220 10% 12%;
+        --card-foreground: 0 0% 98%;
+        --success: /* SCHEME2_SUCCESS_DARK_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME2_WARNING_DARK_HSL */;
+        --warning-foreground: 0 0% 98%;
+        --destructive: /* SCHEME2_DESTRUCTIVE_DARK_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      /* PRIMARY COLOR 3 - Light Variants */
+      .primary3-light1 {
+        /* SCHEME3_LIGHT1_VARS */
+        --primary: /* SCHEME3_PRIMARY_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: 0 0% 100%;
+        --foreground: 240 10% 3.9%;
+        --muted: 240 4.8% 95.9%;
+        --muted-foreground: 240 3.8% 46.1%;
+        --border: 240 5.9% 90%;
+        --card: 0 0% 100%;
+        --card-foreground: 240 10% 3.9%;
+        --success: /* SCHEME3_SUCCESS_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME3_WARNING_HSL */;
+        --warning-foreground: 240 10% 3.9%;
+        --destructive: /* SCHEME3_DESTRUCTIVE_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      .primary3-light2 {
+        /* SCHEME3_LIGHT2_VARS */
+        --primary: /* SCHEME3_PRIMARY_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: /* SCHEME3_LIGHT2_BG */;
+        --foreground: 240 10% 3.9%;
+        --muted: /* SCHEME3_LIGHT2_MUTED */;
+        --muted-foreground: 240 3.8% 46.1%;
+        --border: 240 5.9% 90%;
+        --card: 0 0% 100%;
+        --card-foreground: 240 10% 3.9%;
+        --success: /* SCHEME3_SUCCESS_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME3_WARNING_HSL */;
+        --warning-foreground: 240 10% 3.9%;
+        --destructive: /* SCHEME3_DESTRUCTIVE_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      .primary3-light3 {
+        /* SCHEME3_LIGHT3_VARS */
+        --primary: /* SCHEME3_PRIMARY_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: /* SCHEME3_LIGHT3_BG */;
+        --foreground: 240 10% 3.9%;
+        --muted: /* SCHEME3_LIGHT3_MUTED */;
+        --muted-foreground: 240 3.8% 46.1%;
+        --border: 240 5.9% 90%;
+        --card: 0 0% 100%;
+        --card-foreground: 240 10% 3.9%;
+        --success: /* SCHEME3_SUCCESS_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME3_WARNING_HSL */;
+        --warning-foreground: 240 10% 3.9%;
+        --destructive: /* SCHEME3_DESTRUCTIVE_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      /* PRIMARY COLOR 3 - Dark Variants */
+      .primary3-dark1 {
+        /* SCHEME3_DARK1_VARS - Pure Black */
+        --primary: /* SCHEME3_PRIMARY_DARK_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: 0 0% 3%;
+        --foreground: 0 0% 98%;
+        --muted: 0 0% 8%;
+        --muted-foreground: 0 0% 70%;
+        --border: 0 0% 12%;
+        --card: 0 0% 5%;
+        --card-foreground: 0 0% 98%;
+        --success: /* SCHEME3_SUCCESS_DARK_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME3_WARNING_DARK_HSL */;
+        --warning-foreground: 0 0% 98%;
+        --destructive: /* SCHEME3_DESTRUCTIVE_DARK_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      .primary3-dark2 {
+        /* SCHEME3_DARK2_VARS - Complementary Dark */
+        --primary: /* SCHEME3_PRIMARY_DARK_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: /* SCHEME3_DARK2_BG */;
+        --foreground: 0 0% 98%;
+        --muted: /* SCHEME3_DARK2_MUTED */;
+        --muted-foreground: /* SCHEME3_DARK2_MUTED_FG */;
+        --border: /* SCHEME3_DARK2_BORDER */;
+        --card: /* SCHEME3_DARK2_CARD */;
+        --card-foreground: 0 0% 98%;
+        --success: /* SCHEME3_SUCCESS_DARK_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME3_WARNING_DARK_HSL */;
+        --warning-foreground: 0 0% 98%;
+        --destructive: /* SCHEME3_DESTRUCTIVE_DARK_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+
+      .primary3-dark3 {
+        /* SCHEME3_DARK3_VARS - Premium Slate */
+        --primary: /* SCHEME3_PRIMARY_DARK_HSL */;
+        --primary-foreground: 0 0% 98%;
+        --background: 220 10% 10%;
+        --foreground: 0 0% 98%;
+        --muted: 220 8% 16%;
+        --muted-foreground: 220 5% 70%;
+        --border: 220 8% 20%;
+        --card: 220 10% 12%;
+        --card-foreground: 0 0% 98%;
+        --success: /* SCHEME3_SUCCESS_DARK_HSL */;
+        --success-foreground: 0 0% 98%;
+        --warning: /* SCHEME3_WARNING_DARK_HSL */;
+        --warning-foreground: 0 0% 98%;
+        --destructive: /* SCHEME3_DESTRUCTIVE_DARK_HSL */;
+        --destructive-foreground: 0 0% 98%;
+      }
+    </style>
+  </head>
+  <body class="primary1-light1">
+    <div class="container">
+      <div class="header">
+        <h1>Choose Your Brand Colors</h1>
+        <div class="subtitle">/* APP_NAME */</div>
+        <div class="instructions">
+          👇 Select a primary color below, then choose your preferred light or
+          dark mode variant. Each combination is instantly previewed with actual
+          UI components.
+        </div>
+      </div>
+
+      <!-- Primary Color Selection -->
+      <div class="primary-selector">
+        <div
+          class="primary-card active"
+          onclick="selectPrimary(1)"
+          id="primary1-card"
+        >
+          <div
+            class="primary-preview"
+            style="background: hsl(/* SCHEME1_PRIMARY_HSL */)"
+          ></div>
+          <div class="primary-name">/* SCHEME1_NAME */</div>
+          <div class="primary-description">/* SCHEME1_DESCRIPTION */</div>
+        </div>
+
+        <div class="primary-card" onclick="selectPrimary(2)" id="primary2-card">
+          <div
+            class="primary-preview"
+            style="background: hsl(/* SCHEME2_PRIMARY_HSL */)"
+          ></div>
+          <div class="primary-name">/* SCHEME2_NAME */</div>
+          <div class="primary-description">/* SCHEME2_DESCRIPTION */</div>
+        </div>
+
+        <div class="primary-card" onclick="selectPrimary(3)" id="primary3-card">
+          <div
+            class="primary-preview"
+            style="background: hsl(/* SCHEME3_PRIMARY_HSL */)"
+          ></div>
+          <div class="primary-name">/* SCHEME3_NAME */</div>
+          <div class="primary-description">/* SCHEME3_DESCRIPTION */</div>
+        </div>
+      </div>
+
+      <!-- Variant Selectors (One for Each Primary) -->
+      <!-- Primary 1 Variants -->
+      <div class="variant-selector active" id="primary1-variants">
+        <div class="variant-section">
+          <h2>✨ Light Mode Variants</h2>
+          <div class="variant-grid">
+            <div
+              class="variant-card selected"
+              onclick="selectVariant(1, 'light1')"
+              id="primary1-light1-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(0 0% 100%)"></div>
+                <div style="background: hsl(240 4.8% 95.9%)"></div>
+                <div style="background: hsl(/* SCHEME1_PRIMARY_HSL */)"></div>
+              </div>
+              <div class="variant-name">Pure White</div>
+              <div class="variant-description">
+                Clean, modern minimalism with maximum contrast
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_PRIMARY_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_SUCCESS_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_WARNING_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_DESTRUCTIVE_HSL */)"
+                ></div>
+              </div>
+            </div>
+
+            <div
+              class="variant-card"
+              onclick="selectVariant(1, 'light2')"
+              id="primary1-light2-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(/* SCHEME1_LIGHT2_BG */)"></div>
+                <div style="background: hsl(/* SCHEME1_LIGHT2_MUTED */)"></div>
+                <div style="background: hsl(/* SCHEME1_PRIMARY_HSL */)"></div>
+              </div>
+              <div class="variant-name">Warm Off-White</div>
+              <div class="variant-description">
+                Softer on eyes, subtle warmth for extended use
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_PRIMARY_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_SUCCESS_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_WARNING_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_DESTRUCTIVE_HSL */)"
+                ></div>
+              </div>
+            </div>
+
+            <div
+              class="variant-card"
+              onclick="selectVariant(1, 'light3')"
+              id="primary1-light3-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(/* SCHEME1_LIGHT3_BG */)"></div>
+                <div style="background: hsl(/* SCHEME1_LIGHT3_MUTED */)"></div>
+                <div style="background: hsl(/* SCHEME1_PRIMARY_HSL */)"></div>
+              </div>
+              <div class="variant-name">Subtle Brand Tint</div>
+              <div class="variant-description">
+                Background echoes primary color for brand cohesion
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_PRIMARY_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_SUCCESS_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_WARNING_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_DESTRUCTIVE_HSL */)"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="variant-section">
+          <h2>🌙 Dark Mode Variants</h2>
+          <div class="variant-grid">
+            <div
+              class="variant-card"
+              onclick="selectVariant(1, 'dark1')"
+              id="primary1-dark1-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(0 0% 3%)"></div>
+                <div style="background: hsl(0 0% 8%)"></div>
+                <div
+                  style="background: hsl(/* SCHEME1_PRIMARY_DARK_HSL */)"
+                ></div>
+              </div>
+              <div class="variant-name">Pure Black</div>
+              <div class="variant-description">
+                Modern, high contrast, OLED-friendly true black
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_PRIMARY_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_SUCCESS_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_WARNING_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_DESTRUCTIVE_DARK_HSL */)"
+                ></div>
+              </div>
+            </div>
+
+            <div
+              class="variant-card"
+              onclick="selectVariant(1, 'dark2')"
+              id="primary1-dark2-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(/* SCHEME1_DARK2_BG */)"></div>
+                <div style="background: hsl(/* SCHEME1_DARK2_MUTED */)"></div>
+                <div
+                  style="background: hsl(/* SCHEME1_PRIMARY_DARK_HSL */)"
+                ></div>
+              </div>
+              <div class="variant-name">Complementary Dark</div>
+              <div class="variant-description">
+                Brand-harmonized dark background with subtle tinting
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_PRIMARY_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_SUCCESS_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_WARNING_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_DESTRUCTIVE_DARK_HSL */)"
+                ></div>
+              </div>
+            </div>
+
+            <div
+              class="variant-card"
+              onclick="selectVariant(1, 'dark3')"
+              id="primary1-dark3-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(220 10% 10%)"></div>
+                <div style="background: hsl(220 8% 16%)"></div>
+                <div
+                  style="background: hsl(/* SCHEME1_PRIMARY_DARK_HSL */)"
+                ></div>
+              </div>
+              <div class="variant-name">Premium Slate</div>
+              <div class="variant-description">
+                Softer alternative to pure black, gentler on eyes
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_PRIMARY_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_SUCCESS_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_WARNING_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME1_DESTRUCTIVE_DARK_HSL */)"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Primary 2 Variants (Hidden by default) -->
+      <div class="variant-selector" id="primary2-variants">
+        <div class="variant-section">
+          <h2>✨ Light Mode Variants</h2>
+          <div class="variant-grid">
+            <div
+              class="variant-card"
+              onclick="selectVariant(2, 'light1')"
+              id="primary2-light1-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(0 0% 100%)"></div>
+                <div style="background: hsl(240 4.8% 95.9%)"></div>
+                <div style="background: hsl(/* SCHEME2_PRIMARY_HSL */)"></div>
+              </div>
+              <div class="variant-name">Pure White</div>
+              <div class="variant-description">
+                Clean, modern minimalism with maximum contrast
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_PRIMARY_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_SUCCESS_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_WARNING_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_DESTRUCTIVE_HSL */)"
+                ></div>
+              </div>
+            </div>
+
+            <div
+              class="variant-card"
+              onclick="selectVariant(2, 'light2')"
+              id="primary2-light2-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(/* SCHEME2_LIGHT2_BG */)"></div>
+                <div style="background: hsl(/* SCHEME2_LIGHT2_MUTED */)"></div>
+                <div style="background: hsl(/* SCHEME2_PRIMARY_HSL */)"></div>
+              </div>
+              <div class="variant-name">Warm Off-White</div>
+              <div class="variant-description">
+                Softer on eyes, subtle warmth for extended use
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_PRIMARY_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_SUCCESS_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_WARNING_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_DESTRUCTIVE_HSL */)"
+                ></div>
+              </div>
+            </div>
+
+            <div
+              class="variant-card"
+              onclick="selectVariant(2, 'light3')"
+              id="primary2-light3-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(/* SCHEME2_LIGHT3_BG */)"></div>
+                <div style="background: hsl(/* SCHEME2_LIGHT3_MUTED */)"></div>
+                <div style="background: hsl(/* SCHEME2_PRIMARY_HSL */)"></div>
+              </div>
+              <div class="variant-name">Subtle Brand Tint</div>
+              <div class="variant-description">
+                Background echoes primary color for brand cohesion
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_PRIMARY_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_SUCCESS_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_WARNING_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_DESTRUCTIVE_HSL */)"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="variant-section">
+          <h2>🌙 Dark Mode Variants</h2>
+          <div class="variant-grid">
+            <div
+              class="variant-card"
+              onclick="selectVariant(2, 'dark1')"
+              id="primary2-dark1-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(0 0% 3%)"></div>
+                <div style="background: hsl(0 0% 8%)"></div>
+                <div
+                  style="background: hsl(/* SCHEME2_PRIMARY_DARK_HSL */)"
+                ></div>
+              </div>
+              <div class="variant-name">Pure Black</div>
+              <div class="variant-description">
+                Modern, high contrast, OLED-friendly true black
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_PRIMARY_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_SUCCESS_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_WARNING_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_DESTRUCTIVE_DARK_HSL */)"
+                ></div>
+              </div>
+            </div>
+
+            <div
+              class="variant-card"
+              onclick="selectVariant(2, 'dark2')"
+              id="primary2-dark2-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(/* SCHEME2_DARK2_BG */)"></div>
+                <div style="background: hsl(/* SCHEME2_DARK2_MUTED */)"></div>
+                <div
+                  style="background: hsl(/* SCHEME2_PRIMARY_DARK_HSL */)"
+                ></div>
+              </div>
+              <div class="variant-name">Complementary Dark</div>
+              <div class="variant-description">
+                Brand-harmonized dark background with subtle tinting
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_PRIMARY_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_SUCCESS_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_WARNING_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_DESTRUCTIVE_DARK_HSL */)"
+                ></div>
+              </div>
+            </div>
+
+            <div
+              class="variant-card"
+              onclick="selectVariant(2, 'dark3')"
+              id="primary2-dark3-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(220 10% 10%)"></div>
+                <div style="background: hsl(220 8% 16%)"></div>
+                <div
+                  style="background: hsl(/* SCHEME2_PRIMARY_DARK_HSL */)"
+                ></div>
+              </div>
+              <div class="variant-name">Premium Slate</div>
+              <div class="variant-description">
+                Softer alternative to pure black, gentler on eyes
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_PRIMARY_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_SUCCESS_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_WARNING_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME2_DESTRUCTIVE_DARK_HSL */)"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Primary 3 Variants (Hidden by default) -->
+      <div class="variant-selector" id="primary3-variants">
+        <div class="variant-section">
+          <h2>✨ Light Mode Variants</h2>
+          <div class="variant-grid">
+            <div
+              class="variant-card"
+              onclick="selectVariant(3, 'light1')"
+              id="primary3-light1-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(0 0% 100%)"></div>
+                <div style="background: hsl(240 4.8% 95.9%)"></div>
+                <div style="background: hsl(/* SCHEME3_PRIMARY_HSL */)"></div>
+              </div>
+              <div class="variant-name">Pure White</div>
+              <div class="variant-description">
+                Clean, modern minimalism with maximum contrast
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_PRIMARY_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_SUCCESS_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_WARNING_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_DESTRUCTIVE_HSL */)"
+                ></div>
+              </div>
+            </div>
+
+            <div
+              class="variant-card"
+              onclick="selectVariant(3, 'light2')"
+              id="primary3-light2-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(/* SCHEME3_LIGHT2_BG */)"></div>
+                <div style="background: hsl(/* SCHEME3_LIGHT2_MUTED */)"></div>
+                <div style="background: hsl(/* SCHEME3_PRIMARY_HSL */)"></div>
+              </div>
+              <div class="variant-name">Warm Off-White</div>
+              <div class="variant-description">
+                Softer on eyes, subtle warmth for extended use
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_PRIMARY_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_SUCCESS_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_WARNING_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_DESTRUCTIVE_HSL */)"
+                ></div>
+              </div>
+            </div>
+
+            <div
+              class="variant-card"
+              onclick="selectVariant(3, 'light3')"
+              id="primary3-light3-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(/* SCHEME3_LIGHT3_BG */)"></div>
+                <div style="background: hsl(/* SCHEME3_LIGHT3_MUTED */)"></div>
+                <div style="background: hsl(/* SCHEME3_PRIMARY_HSL */)"></div>
+              </div>
+              <div class="variant-name">Subtle Brand Tint</div>
+              <div class="variant-description">
+                Background echoes primary color for brand cohesion
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_PRIMARY_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_SUCCESS_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_WARNING_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_DESTRUCTIVE_HSL */)"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="variant-section">
+          <h2>🌙 Dark Mode Variants</h2>
+          <div class="variant-grid">
+            <div
+              class="variant-card"
+              onclick="selectVariant(3, 'dark1')"
+              id="primary3-dark1-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(0 0% 3%)"></div>
+                <div style="background: hsl(0 0% 8%)"></div>
+                <div
+                  style="background: hsl(/* SCHEME3_PRIMARY_DARK_HSL */)"
+                ></div>
+              </div>
+              <div class="variant-name">Pure Black</div>
+              <div class="variant-description">
+                Modern, high contrast, OLED-friendly true black
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_PRIMARY_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_SUCCESS_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_WARNING_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_DESTRUCTIVE_DARK_HSL */)"
+                ></div>
+              </div>
+            </div>
+
+            <div
+              class="variant-card"
+              onclick="selectVariant(3, 'dark2')"
+              id="primary3-dark2-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(/* SCHEME3_DARK2_BG */)"></div>
+                <div style="background: hsl(/* SCHEME3_DARK2_MUTED */)"></div>
+                <div
+                  style="background: hsl(/* SCHEME3_PRIMARY_DARK_HSL */)"
+                ></div>
+              </div>
+              <div class="variant-name">Complementary Dark</div>
+              <div class="variant-description">
+                Brand-harmonized dark background with subtle tinting
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_PRIMARY_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_SUCCESS_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_WARNING_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_DESTRUCTIVE_DARK_HSL */)"
+                ></div>
+              </div>
+            </div>
+
+            <div
+              class="variant-card"
+              onclick="selectVariant(3, 'dark3')"
+              id="primary3-dark3-card"
+            >
+              <div class="variant-preview-bar">
+                <div style="background: hsl(220 10% 10%)"></div>
+                <div style="background: hsl(220 8% 16%)"></div>
+                <div
+                  style="background: hsl(/* SCHEME3_PRIMARY_DARK_HSL */)"
+                ></div>
+              </div>
+              <div class="variant-name">Premium Slate</div>
+              <div class="variant-description">
+                Softer alternative to pure black, gentler on eyes
+              </div>
+              <div class="variant-colors">
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_PRIMARY_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_SUCCESS_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_WARNING_DARK_HSL */)"
+                ></div>
+                <div
+                  class="color-chip"
+                  style="background: hsl(/* SCHEME3_DESTRUCTIVE_DARK_HSL */)"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Component Preview Section -->
+      <div class="preview-section">
+        <h2>Live Preview</h2>
+
+        <!-- Compact Component Grid -->
+        <div class="component-grid">
+          <div class="component-card">
+            <h3>Buttons</h3>
+            <button class="btn btn-primary">Primary</button>
+            <button class="btn btn-success">Success</button>
+            <button class="btn btn-warning">Warning</button>
+            <button class="btn btn-destructive">Error</button>
+          </div>
+
+          <div class="component-card">
+            <h3>Form Input</h3>
+            <input class="input" placeholder="Enter text..." />
+            <input class="input" type="email" placeholder="Email address" />
+          </div>
+
+          <div class="component-card">
+            <h3>Status Messages</h3>
+            <div
+              style="
+                padding: 10px;
+                background: hsl(var(--success) / 0.1);
+                border: 1px solid hsl(var(--success));
+                border-radius: 6px;
+                margin: 8px 0;
+                font-size: 0.9rem;
+                color: hsl(var(--success));
+              "
+            >
+              ✓ Success message
+            </div>
+            <div
+              style="
+                padding: 10px;
+                background: hsl(var(--destructive) / 0.1);
+                border: 1px solid hsl(var(--destructive));
+                border-radius: 6px;
+                margin: 8px 0;
+                font-size: 0.9rem;
+                color: hsl(var(--destructive));
+              "
+            >
+              ✗ Error message
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Demo -->
+        <div class="chat-demo">
+          <div class="chat-header">
+            <h3 style="margin: 0; color: hsl(var(--foreground))">
+              Chat Application
+            </h3>
+            <div
+              style="
+                padding: 6px 12px;
+                background: hsl(var(--primary));
+                color: hsl(var(--primary-foreground));
+                border-radius: 20px;
+                font-size: 0.85rem;
+                font-weight: 500;
+              "
+            >
+              AI Model
+            </div>
+          </div>
+
+          <div class="chat-content">
+            <div class="chat-sidebar">
+              <div
+                style="
+                  padding: 10px 12px;
+                  background: hsl(var(--primary) / 0.1);
+                  border: 1px solid hsl(var(--primary));
+                  border-radius: 6px;
+                  color: hsl(var(--primary));
+                  font-weight: 500;
+                  font-size: 0.9rem;
+                  margin-bottom: 8px;
+                "
+              >
+                💬 Chat
+              </div>
+              <div
+                style="
+                  padding: 10px 12px;
+                  color: hsl(var(--muted-foreground));
+                  font-size: 0.9rem;
+                  margin-bottom: 8px;
+                "
+              >
+                📄 Documents
+              </div>
+              <div
+                style="
+                  padding: 10px 12px;
+                  color: hsl(var(--muted-foreground));
+                  font-size: 0.9rem;
+                "
+              >
+                🕒 History
+              </div>
+            </div>
+
+            <div class="chat-messages">
+              <div class="message message-user">
+                Can you help me choose colors for my app?
+              </div>
+              <div class="message message-ai">
+                I'd be happy to help! For a professional yet modern feel, I'd
+                recommend starting with a strategic approach.
+              </div>
+              <div class="message message-user">
+                That makes sense. What about dark mode?
+              </div>
+              <div class="message message-ai">
+                Great question! Notice how this interface adapts to your
+                selected theme variant.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let currentPrimary = 1;
+      let currentVariant = "light1";
+
+      function selectPrimary(primary) {
+        currentPrimary = primary;
+
+        // Update primary card active states
+        document.querySelectorAll(".primary-card").forEach((card) => {
+          card.classList.remove("active");
+        });
+        document.getElementById(`primary${primary}-card`).classList.add("active");
+
+        // Show corresponding variant selector, hide others
+        document.querySelectorAll(".variant-selector").forEach((selector) => {
+          selector.classList.remove("active");
+        });
+        document
+          .getElementById(`primary${primary}-variants`)
+          .classList.add("active");
+
+        // Apply default variant (light1 of this primary)
+        selectVariant(primary, "light1");
+      }
+
+      function selectVariant(primary, variant) {
+        currentPrimary = primary;
+        currentVariant = variant;
+
+        // Update body class to apply theme
+        document.body.className = `primary${primary}-${variant}`;
+
+        // Update all variant card selected states for this primary
+        document
+          .querySelectorAll(`#primary${primary}-variants .variant-card`)
+          .forEach((card) => {
+            card.classList.remove("selected");
+          });
+        document
+          .getElementById(`primary${primary}-${variant}-card`)
+          .classList.add("selected");
+      }
+
+      // Initialize with primary 1, light variant 1
+      selectVariant(1, "light1");
+    </script>
+  </body>
+</html>
