@@ -96,8 +96,6 @@ export const syncSingleAdAccount = task({
         metaAdAccountId: metaId,
         accessToken,
         since: changeSince,
-        campaignMetaIds: Array.from(campaignMap.keys()),
-        adMetaIds: Array.from(adMap.keys()),
       });
 
       await pruneOldChangeEvents(payload.adAccountId);

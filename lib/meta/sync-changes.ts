@@ -171,13 +171,18 @@ async function ingestActivityRow(
   stats.inserted++;
 }
 
+// Meta's /act_{id}/activities default feed excludes certain categories. We call
+// it once without category (covers most changes) plus a targeted second call
+// for AD_REVIEW (ad status transitions like pending-review → active that are
+// otherwise filtered out). Other plausible categories (AD, AD_SET, CAMPAIGN,
+// ACCOUNT) are covered by the default feed — adding them yields duplicates.
+const EXTRA_CATEGORIES = ["AD_REVIEW"] as const;
+
 export async function fetchAndUpsertChangeEvents(params: {
   adAccountRowId: string;
   metaAdAccountId: string;
   accessToken: string;
   since: Date;
-  campaignMetaIds?: string[];
-  adMetaIds?: string[];
 }): Promise<number> {
   const sinceUnix = Math.floor(params.since.getTime() / 1000);
   const untilUnix = Math.floor(Date.now() / 1000);
@@ -191,51 +196,46 @@ export async function fetchAndUpsertChangeEvents(params: {
     kept: new Map(),
   };
 
-  const searchParams = {
-    fields: "event_type,event_time,object_id,object_type,object_name,actor_id,actor_name,extra_data",
-    since: sinceUnix,
-    until: untilUnix,
-    limit: 500,
-  };
+  const baseFields =
+    "event_type,event_time,object_id,object_type,object_name,actor_id,actor_name,extra_data";
 
-  // 1) Account-wide stream (catches account-level events that per-entity streams miss).
-  for await (const row of paginate<ActivityApiRow>(
-    `/${params.metaAdAccountId}/activities`,
-    { accessToken: params.accessToken, searchParams }
-  )) {
-    await ingestActivityRow(row, params.adAccountRowId, params.accessToken, parentCache, seenKeys, stats);
-  }
+  async function runFeed(category?: string): Promise<void> {
+    const searchParams: Record<string, string | number> = {
+      fields: baseFields,
+      since: sinceUnix,
+      until: untilUnix,
+      limit: 500,
+    };
+    if (category) searchParams.category = category;
 
-  // 2) Per-campaign streams — Meta's account-wide feed is incomplete for recent
-  // ad-level events (especially AD_REVIEW transitions). Per-entity activity
-  // endpoints return the complete history for each entity.
-  const campaignCount = params.campaignMetaIds?.length ?? 0;
-  for (const metaCampaignId of params.campaignMetaIds ?? []) {
     try {
       for await (const row of paginate<ActivityApiRow>(
-        `/${metaCampaignId}/activities`,
+        `/${params.metaAdAccountId}/activities`,
         { accessToken: params.accessToken, searchParams }
       )) {
-        await ingestActivityRow(row, params.adAccountRowId, params.accessToken, parentCache, seenKeys, stats);
+        await ingestActivityRow(
+          row,
+          params.adAccountRowId,
+          params.accessToken,
+          parentCache,
+          seenKeys,
+          stats
+        );
       }
     } catch (err) {
-      console.warn(`[sync-changes] failed to fetch activities for campaign ${metaCampaignId}`, err);
+      console.warn(
+        `[sync-changes] feed failed (category=${category ?? "default"})`,
+        err
+      );
     }
   }
 
-  // 3) Per-ad streams — for AD_REVIEW status changes and other ad-specific events.
-  const adCount = params.adMetaIds?.length ?? 0;
-  for (const metaAdId of params.adMetaIds ?? []) {
-    try {
-      for await (const row of paginate<ActivityApiRow>(
-        `/${metaAdId}/activities`,
-        { accessToken: params.accessToken, searchParams }
-      )) {
-        await ingestActivityRow(row, params.adAccountRowId, params.accessToken, parentCache, seenKeys, stats);
-      }
-    } catch (err) {
-      console.warn(`[sync-changes] failed to fetch activities for ad ${metaAdId}`, err);
-    }
+  // Default feed: covers most categories.
+  await runFeed();
+
+  // Extra category feeds for ones Meta excludes from the default response.
+  for (const cat of EXTRA_CATEGORIES) {
+    await runFeed(cat);
   }
 
   const fmt = (m: Map<string, number>) =>
@@ -245,8 +245,7 @@ export async function fetchAndUpsertChangeEvents(params: {
       .join(", ");
 
   console.warn(
-    `[sync-changes] sources=account+${campaignCount}camps+${adCount}ads ` +
-      `total=${stats.totalSeen} kept=${stats.inserted} ` +
+    `[sync-changes] total=${stats.totalSeen} kept=${stats.inserted} ` +
       `KEPT: ${stats.kept.size > 0 ? fmt(stats.kept) : "none"} | ` +
       `DROPPED: ${stats.dropped.size > 0 ? fmt(stats.dropped) : "none"}`
   );
