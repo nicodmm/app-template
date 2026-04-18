@@ -171,12 +171,27 @@ async function ingestActivityRow(
   stats.inserted++;
 }
 
-// Meta's /act_{id}/activities default feed excludes certain categories. We call
-// it once without category (covers most changes) plus a targeted second call
-// for AD_REVIEW (ad status transitions like pending-review → active that are
-// otherwise filtered out). Other plausible categories (AD, AD_SET, CAMPAIGN,
-// ACCOUNT) are covered by the default feed — adding them yields duplicates.
-const EXTRA_CATEGORIES = ["AD_REVIEW"] as const;
+// Meta's /act_{id}/activities default feed returns an incomplete subset —
+// empirically ~30 days of recent activity is excluded even when the since/until
+// window is correct. The endpoint's own error response reveals the full list of
+// valid categories: ACCOUNT, AD, AD_KEYWORDS, AD_SET, AUDIENCE, BID, BUDGET,
+// CAMPAIGN, DATE, STATUS, TARGETING. We iterate every one because different
+// categories surface different events (STATUS in particular covers "pending
+// review → active" transitions that are otherwise invisible to the public API).
+// Dedup via an in-process Set plus the UNIQUE constraint handles overlap.
+const ALL_CATEGORIES = [
+  "ACCOUNT",
+  "AD",
+  "AD_KEYWORDS",
+  "AD_SET",
+  "AUDIENCE",
+  "BID",
+  "BUDGET",
+  "CAMPAIGN",
+  "DATE",
+  "STATUS",
+  "TARGETING",
+] as const;
 
 export async function fetchAndUpsertChangeEvents(params: {
   adAccountRowId: string;
@@ -198,6 +213,7 @@ export async function fetchAndUpsertChangeEvents(params: {
 
   const baseFields =
     "event_type,event_time,object_id,object_type,object_name,actor_id,actor_name,extra_data";
+  const perCategoryCounts = new Map<string, number>();
 
   async function runFeed(category?: string): Promise<void> {
     const searchParams: Record<string, string | number> = {
@@ -208,6 +224,7 @@ export async function fetchAndUpsertChangeEvents(params: {
     };
     if (category) searchParams.category = category;
 
+    const beforeInserted = stats.inserted;
     try {
       for await (const row of paginate<ActivityApiRow>(
         `/${params.metaAdAccountId}/activities`,
@@ -222,6 +239,7 @@ export async function fetchAndUpsertChangeEvents(params: {
           stats
         );
       }
+      perCategoryCounts.set(category ?? "default", stats.inserted - beforeInserted);
     } catch (err) {
       console.warn(
         `[sync-changes] feed failed (category=${category ?? "default"})`,
@@ -230,11 +248,10 @@ export async function fetchAndUpsertChangeEvents(params: {
     }
   }
 
-  // Default feed: covers most categories.
+  // Default feed + one call per valid category. Most overlap with each other;
+  // dedup handles duplicates. Missing coverage is what we're targeting.
   await runFeed();
-
-  // Extra category feeds for ones Meta excludes from the default response.
-  for (const cat of EXTRA_CATEGORIES) {
+  for (const cat of ALL_CATEGORIES) {
     await runFeed(cat);
   }
 
@@ -244,8 +261,14 @@ export async function fetchAndUpsertChangeEvents(params: {
       .map(([t, n]) => `${t}(${n})`)
       .join(", ");
 
+  const perCatSummary = Array.from(perCategoryCounts.entries())
+    .filter(([, n]) => n > 0)
+    .map(([c, n]) => `${c}:${n}`)
+    .join(" ");
+
   console.warn(
     `[sync-changes] total=${stats.totalSeen} kept=${stats.inserted} ` +
+      `PER_CATEGORY_NEW: ${perCatSummary || "none"} | ` +
       `KEPT: ${stats.kept.size > 0 ? fmt(stats.kept) : "none"} | ` +
       `DROPPED: ${stats.dropped.size > 0 ? fmt(stats.dropped) : "none"}`
   );
