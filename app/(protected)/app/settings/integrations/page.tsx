@@ -7,6 +7,7 @@ import { metaConnections, metaAdAccounts, accounts } from "@/lib/drizzle/schema"
 import { getWorkspaceByUserId } from "@/lib/queries/workspace";
 import { DeleteButton } from "@/components/delete-button";
 import { AdAccountMappingForm } from "@/components/ad-account-mapping-form";
+import { BackfillButton } from "@/components/backfill-button";
 import { disconnectMetaConnection } from "@/app/actions/meta-connections";
 
 interface PageProps {
@@ -117,6 +118,7 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
                       )}
                     </p>
                   </div>
+                  {aa.accountId && <BackfillButton adAccountId={aa.id} />}
                 </div>
                 <AdAccountMappingForm
                   adAccountId={aa.id}

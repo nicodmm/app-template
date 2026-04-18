@@ -77,3 +77,23 @@ export async function updateAdAccountMapping(input: {
     await tasks.trigger("backfill-meta-ads", { adAccountId: input.adAccountId });
   }
 }
+
+export async function triggerBackfillForAdAccount(adAccountId: string): Promise<void> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceOrFail(userId);
+
+  const ad = await db
+    .select({ id: metaAdAccounts.id })
+    .from(metaAdAccounts)
+    .where(
+      and(
+        eq(metaAdAccounts.id, adAccountId),
+        eq(metaAdAccounts.workspaceId, workspace.id)
+      )
+    )
+    .limit(1);
+  if (ad.length === 0) throw new Error("Ad account no encontrado");
+
+  const { tasks } = await import("@trigger.dev/sdk/v3");
+  await tasks.trigger("backfill-meta-ads", { adAccountId });
+}
