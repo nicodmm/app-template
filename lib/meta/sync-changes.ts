@@ -1,7 +1,7 @@
 import { and, eq, lt } from "drizzle-orm";
 import { db } from "@/lib/drizzle/db";
 import { metaChangeEvents, metaCampaigns, metaAds } from "@/lib/drizzle/schema";
-import { metaGraphFetch } from "./client";
+import { metaGraphFetch, paginate } from "./client";
 
 // Maps Meta's raw event_type to our normalized {entityType, eventType} tuple.
 // Anything not in this map is dropped.
@@ -109,24 +109,31 @@ export async function fetchAndUpsertChangeEvents(
   since: Date
 ): Promise<number> {
   const sinceUnix = Math.floor(since.getTime() / 1000);
-  const result = await metaGraphFetch<{ data: ActivityApiRow[] }>(
+  const untilUnix = Math.floor(Date.now() / 1000);
+
+  const parentCache = new Map<string, AdSetParentCacheEntry>();
+  const droppedCounts = new Map<string, number>();
+  let upserts = 0;
+  let totalSeen = 0;
+
+  for await (const row of paginate<ActivityApiRow>(
     `/${metaAdAccountId}/activities`,
     {
       accessToken,
       searchParams: {
         fields: "event_type,event_time,object_id,object_type,object_name,actor_id,actor_name,extra_data",
         since: sinceUnix,
+        until: untilUnix,
         limit: 500,
       },
     }
-  );
-
-  const parentCache = new Map<string, AdSetParentCacheEntry>();
-  let upserts = 0;
-
-  for (const row of result.data) {
+  )) {
+    totalSeen++;
     const mapped = EVENT_MAP[row.event_type];
-    if (!mapped) continue;
+    if (!mapped) {
+      droppedCounts.set(row.event_type, (droppedCounts.get(row.event_type) ?? 0) + 1);
+      continue;
+    }
     if (!row.object_id || !row.event_time) continue;
 
     const entityType = mapped.entityType;
@@ -164,6 +171,16 @@ export async function fetchAndUpsertChangeEvents(
         ],
       });
     upserts++;
+  }
+
+  if (droppedCounts.size > 0) {
+    const summary = Array.from(droppedCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([t, n]) => `${t}(${n})`)
+      .join(", ");
+    console.warn(
+      `[sync-changes] dropped ${totalSeen - upserts}/${totalSeen} activities (unmapped event_types): ${summary}`
+    );
   }
 
   return upserts;
