@@ -111,7 +111,7 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
     getKpisWithComparison(state.adAccount.id, since, until),
     getCampaignsWithKpis(state.adAccount.id, since, until),
     getActiveAdsWithKpis(state.adAccount.id, since, until),
-    getChangeEventsForAdAccount(state.adAccount.id, changeSince, changeUntil, 20, 0),
+    getChangeEventsForAdAccount(state.adAccount.id, changeSince, changeUntil, 100, 0),
   ]);
 
   const currency = state.adAccount.currency;
