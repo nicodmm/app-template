@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS "account_health_history";
+DROP TABLE IF EXISTS "signals";
+DROP TABLE IF EXISTS "tasks";
+DROP TABLE IF EXISTS "transcripts";
+DROP TABLE IF EXISTS "accounts";
+DROP TABLE IF EXISTS "usage_tracking";
+DROP TABLE IF EXISTS "workspace_members";
+DROP TABLE IF EXISTS "workspaces";
+DROP TABLE IF EXISTS "users";
