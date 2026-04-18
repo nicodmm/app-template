@@ -1,7 +1,11 @@
 import { env } from "@/lib/env";
 import { metaGraphFetch } from "./client";
 
-const SCOPES = ["ads_read", "business_management"] as const;
+// ads_management is required to receive the full /activities feed.
+// Without it, Meta's public API silently filters out auto-generated events
+// (AD_REVIEW status transitions, recent system updates) that are otherwise
+// visible in Business Manager's Activity Log.
+const SCOPES = ["ads_read", "ads_management", "business_management"] as const;
 
 export function buildAuthorizeUrl(state: string): string {
   const params = new URLSearchParams({
