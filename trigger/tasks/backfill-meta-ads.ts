@@ -27,6 +27,6 @@ export const backfillMetaAds = task({
       customRange: { since, until },
     });
     if (!result.ok) throw new Error("backfill sync failed");
-    return { insightsUpserted: result.output.insightsUpserted };
+    return { insightsUpserted: result.output.campaignInsightsUpserted };
   },
 });

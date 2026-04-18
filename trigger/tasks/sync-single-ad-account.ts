@@ -7,6 +7,8 @@ import {
   fetchAndUpsertInsights,
   getAdAccountWithConnection,
 } from "@/lib/meta/sync-insights";
+import { fetchAndUpsertAds, fetchAndUpsertAdInsights } from "@/lib/meta/sync-ads";
+import { fetchAndUpsertChangeEvents, pruneOldChangeEvents } from "@/lib/meta/sync-changes";
 import { MetaApiError } from "@/lib/meta/client";
 
 function isoDate(d: Date): string {
@@ -18,11 +20,17 @@ interface SyncSingleInput {
   customRange?: { since: string; until: string };
 }
 
+interface SyncResult {
+  campaignInsightsUpserted: number;
+  adInsightsUpserted: number;
+  changeEventsUpserted: number;
+}
+
 export const syncSingleAdAccount = task({
   id: "sync-single-ad-account",
   retry: { maxAttempts: 3 },
-  maxDuration: 300,
-  run: async (payload: SyncSingleInput): Promise<{ insightsUpserted: number }> => {
+  maxDuration: 600,
+  run: async (payload: SyncSingleInput): Promise<SyncResult> => {
     const row = await getAdAccountWithConnection(payload.adAccountId);
     if (!row) throw new AbortTaskRunError("ad account not found");
     if (row.connectionStatus !== "active") {
@@ -30,7 +38,7 @@ export const syncSingleAdAccount = task({
         adAccountId: payload.adAccountId,
         status: row.connectionStatus,
       });
-      return { insightsUpserted: 0 };
+      return { campaignInsightsUpserted: 0, adInsightsUpserted: 0, changeEventsUpserted: 0 };
     }
 
     const accessToken = row.accessToken;
@@ -43,13 +51,20 @@ export const syncSingleAdAccount = task({
         accessToken
       );
 
+      const adMap = await fetchAndUpsertAds(
+        payload.adAccountId,
+        metaId,
+        accessToken,
+        campaignMap
+      );
+
       const today = new Date();
       const range = payload.customRange ?? {
         since: isoDate(new Date(today.getTime() - 3 * 86400000)),
         until: isoDate(today),
       };
 
-      const upserts = await fetchAndUpsertInsights({
+      const campaignInsightsUpserted = await fetchAndUpsertInsights({
         adAccountRowId: payload.adAccountId,
         metaAdAccountId: metaId,
         accessToken,
@@ -60,13 +75,43 @@ export const syncSingleAdAccount = task({
         campaignIdMap: campaignMap,
       });
 
+      const adInsightsUpserted = await fetchAndUpsertAdInsights({
+        adAccountRowId: payload.adAccountId,
+        metaAdAccountId: metaId,
+        accessToken,
+        since: range.since,
+        until: range.until,
+        conversionEvent: row.adAccount.conversionEvent,
+        isEcommerce: row.adAccount.isEcommerce,
+        adIdMap: adMap,
+        campaignIdMap: campaignMap,
+      });
+
+      // Change events: sync from last 25 hours to cover the hourly sync window
+      // with overlap (idempotent via UNIQUE). On first sync this yields recent
+      // events only; full 90-day backfill runs in backfill-meta-ads.
+      const changeSince = new Date(Date.now() - 25 * 3600 * 1000);
+      const changeEventsUpserted = await fetchAndUpsertChangeEvents(
+        payload.adAccountId,
+        metaId,
+        accessToken,
+        changeSince
+      );
+
+      await pruneOldChangeEvents(payload.adAccountId);
+
       await db
         .update(metaAdAccounts)
         .set({ lastSyncedAt: new Date() })
         .where(eq(metaAdAccounts.id, payload.adAccountId));
 
-      logger.info("sync complete", { adAccountId: payload.adAccountId, upserts });
-      return { insightsUpserted: upserts };
+      logger.info("sync complete", {
+        adAccountId: payload.adAccountId,
+        campaignInsightsUpserted,
+        adInsightsUpserted,
+        changeEventsUpserted,
+      });
+      return { campaignInsightsUpserted, adInsightsUpserted, changeEventsUpserted };
     } catch (err) {
       if (err instanceof MetaApiError && err.isAuthError()) {
         logger.error("token expired/revoked — marking connection expired", {
