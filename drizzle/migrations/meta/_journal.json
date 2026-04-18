@@ -43,6 +43,13 @@
       "when": 1776475556885,
       "tag": "0005_next_apocalypse",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776481174630,
+      "tag": "0006_equal_sasquatch",
+      "breakpoints": true
     }
   ]
 }

@@ -12,3 +12,6 @@ export * from "./meta_connections";
 export * from "./meta_ad_accounts";
 export * from "./meta_campaigns";
 export * from "./meta_insights_daily";
+export * from "./meta_ads";
+export * from "./meta_ad_insights_daily";
+export * from "./meta_change_events";
