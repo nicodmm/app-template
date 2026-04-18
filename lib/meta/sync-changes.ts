@@ -116,6 +116,7 @@ export async function fetchAndUpsertChangeEvents(
 
   const parentCache = new Map<string, AdSetParentCacheEntry>();
   const droppedCounts = new Map<string, number>();
+  const keptCounts = new Map<string, number>();
   let upserts = 0;
   let totalSeen = 0;
 
@@ -137,6 +138,7 @@ export async function fetchAndUpsertChangeEvents(
       droppedCounts.set(row.event_type, (droppedCounts.get(row.event_type) ?? 0) + 1);
       continue;
     }
+    keptCounts.set(row.event_type, (keptCounts.get(row.event_type) ?? 0) + 1);
     if (!row.object_id || !row.event_time) continue;
 
     const entityType = mapped.entityType;
@@ -176,15 +178,17 @@ export async function fetchAndUpsertChangeEvents(
     upserts++;
   }
 
-  if (droppedCounts.size > 0) {
-    const summary = Array.from(droppedCounts.entries())
+  const fmt = (m: Map<string, number>) =>
+    Array.from(m.entries())
       .sort((a, b) => b[1] - a[1])
       .map(([t, n]) => `${t}(${n})`)
       .join(", ");
-    console.warn(
-      `[sync-changes] dropped ${totalSeen - upserts}/${totalSeen} activities (unmapped event_types): ${summary}`
-    );
-  }
+
+  console.warn(
+    `[sync-changes] total=${totalSeen} kept=${upserts} ` +
+      `KEPT: ${keptCounts.size > 0 ? fmt(keptCounts) : "none"} | ` +
+      `DROPPED: ${droppedCounts.size > 0 ? fmt(droppedCounts) : "none"}`
+  );
 
   return upserts;
 }
