@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   LineChart,
   Line,
@@ -48,16 +48,24 @@ export function PaidMediaKpiChartModal({
   currency,
   metricLabels,
 }: Props) {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const chartParam = searchParams.get("chart") as MetricKey | null;
+  const urlChart = searchParams.get("chart") as MetricKey | null;
+  const [chartParam, setChartParam] = useState<MetricKey | null>(urlChart);
   const [data, setData] = useState<DailyWithPrevious | null>(null);
   const [, startTransition] = useTransition();
 
+  // Sync URL → local state (covers deep-linking and back/forward navigation)
+  useEffect(() => {
+    setChartParam(urlChart);
+  }, [urlChart]);
+
   const close = () => {
-    const qp = new URLSearchParams(searchParams);
-    qp.delete("chart");
-    router.push(`?${qp.toString()}`, { scroll: false });
+    setChartParam(null);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("chart");
+      window.history.replaceState(null, "", url.toString());
+    }
   };
 
   useEffect(() => {
@@ -144,7 +152,7 @@ export function PaidMediaKpiChartModal({
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={merged}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip
@@ -160,7 +168,7 @@ export function PaidMediaKpiChartModal({
                   type="monotone"
                   dataKey="current"
                   name="Actual"
-                  stroke="hsl(var(--primary))"
+                  stroke="var(--primary)"
                   strokeWidth={2}
                   dot={false}
                 />
@@ -168,7 +176,7 @@ export function PaidMediaKpiChartModal({
                   type="monotone"
                   dataKey="previous"
                   name="Período anterior"
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   strokeDasharray="4 4"
                   strokeWidth={2}
                   dot={false}

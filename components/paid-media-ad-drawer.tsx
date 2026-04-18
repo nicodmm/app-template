@@ -107,7 +107,7 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={merged}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip
@@ -120,14 +120,14 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
                   <Line
                     type="monotone"
                     dataKey="current"
-                    stroke="hsl(var(--primary))"
+                    stroke="var(--primary)"
                     strokeWidth={2}
                     dot={false}
                   />
                   <Line
                     type="monotone"
                     dataKey="previous"
-                    stroke="hsl(var(--muted-foreground))"
+                    stroke="var(--muted-foreground)"
                     strokeDasharray="4 4"
                     strokeWidth={2}
                     dot={false}
