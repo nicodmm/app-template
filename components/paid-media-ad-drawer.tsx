@@ -168,9 +168,24 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
 
         <div>
           <h3 className="text-sm font-medium mb-2">Creatividad</h3>
-          <p className="text-xs text-muted-foreground">
-            Creative ID: {ad.creativeId ?? "—"} (preview no disponible en esta versión)
-          </p>
+          {ad.thumbnailUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={ad.thumbnailUrl}
+              alt={ad.name}
+              loading="lazy"
+              className="rounded-md border border-border max-w-full max-h-64 object-contain bg-muted"
+            />
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Sin preview disponible para este anuncio.
+            </p>
+          )}
+          {ad.creativeId && (
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Creative ID: {ad.creativeId}
+            </p>
+          )}
         </div>
       </aside>
     </div>

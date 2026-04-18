@@ -1,0 +1,1 @@
+ALTER TABLE "meta_ads" ADD COLUMN "thumbnail_url" text;

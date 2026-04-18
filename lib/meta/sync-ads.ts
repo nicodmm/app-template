@@ -11,7 +11,7 @@ type AdApi = {
   name: string;
   status: string;
   campaign_id: string;
-  creative?: { id: string };
+  creative?: { id: string; thumbnail_url?: string };
 };
 
 type InsightAction = { action_type: string; value: string };
@@ -66,7 +66,7 @@ export async function fetchAndUpsertAds(
     {
       accessToken,
       searchParams: {
-        fields: "id,name,status,creative{id},campaign_id",
+        fields: "id,name,status,creative{id,thumbnail_url},campaign_id",
         limit: 500,
       },
     }
@@ -92,6 +92,7 @@ export async function fetchAndUpsertAds(
       name: ad.name,
       status: ad.status,
       creativeId: ad.creative?.id ?? null,
+      thumbnailUrl: ad.creative?.thumbnail_url ?? null,
       lastSyncedAt: now,
       updatedAt: now,
     };

@@ -295,6 +295,7 @@ export type AdRow = {
   campaignId: string;
   campaignName: string;
   creativeId: string | null;
+  thumbnailUrl: string | null;
   spend: number;
   impressions: number;
   clicks: number;
@@ -317,6 +318,7 @@ export async function getActiveAdsWithKpis(
       campaignId: metaAds.campaignId,
       campaignName: metaCampaigns.name,
       creativeId: metaAds.creativeId,
+      thumbnailUrl: metaAds.thumbnailUrl,
       spend: sql<number>`COALESCE(SUM(${metaAdInsightsDaily.spend}), 0)::int`,
       impressions: sql<number>`COALESCE(SUM(${metaAdInsightsDaily.impressions}), 0)::int`,
       clicks: sql<number>`COALESCE(SUM(${metaAdInsightsDaily.clicks}), 0)::int`,
@@ -346,6 +348,7 @@ export async function getActiveAdsWithKpis(
     campaignId: r.campaignId,
     campaignName: r.campaignName,
     creativeId: r.creativeId,
+    thumbnailUrl: r.thumbnailUrl,
     spend: r.spend,
     impressions: r.impressions,
     clicks: r.clicks,
