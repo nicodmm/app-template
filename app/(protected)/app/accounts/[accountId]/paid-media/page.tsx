@@ -1,0 +1,206 @@
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
+import { requireUserId } from "@/lib/auth";
+import { getWorkspaceByUserId } from "@/lib/queries/workspace";
+import { getAccountById } from "@/lib/queries/accounts";
+import {
+  getPaidMediaState,
+  getKpisWithComparison,
+  getCampaignsWithKpis,
+} from "@/lib/queries/paid-media";
+import { PaidMediaKpiCard } from "@/components/paid-media-kpi-card";
+import { PaidMediaPeriodSelector } from "@/components/paid-media-period-selector";
+import { PaidMediaCampaignsTable } from "@/components/paid-media-campaigns-table";
+import { PaidMediaReconnectBanner } from "@/components/paid-media-reconnect-banner";
+
+interface PageProps {
+  params: Promise<{ accountId: string }>;
+  searchParams: Promise<{ preset?: string; since?: string; until?: string }>;
+}
+
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function formatMoney(cents: number, currency: string): string {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
+}
+
+function timeAgo(d: Date | null): string {
+  if (!d) return "nunca";
+  const diff = Date.now() - new Date(d).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "hace segundos";
+  if (mins < 60) return `hace ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  return `hace ${hrs} h`;
+}
+
+export default async function PaidMediaPage({ params, searchParams }: PageProps) {
+  const userId = await requireUserId();
+  const { accountId } = await params;
+  const sp = await searchParams;
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) redirect("/auth/login");
+
+  const account = await getAccountById(accountId, workspace.id);
+  if (!account) notFound();
+
+  const state = await getPaidMediaState(workspace.id, accountId);
+  if (state.state !== "mapped") {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <Link
+          href={`/app/accounts/${accountId}`}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
+        >
+          <ChevronLeft size={15} />
+          {account.name}
+        </Link>
+        <div className="rounded-xl border border-border bg-card p-6">
+          <h1 className="text-lg font-semibold mb-2">Paid Media no configurado</h1>
+          <p className="text-sm text-muted-foreground mb-3">
+            {state.state === "no_connection"
+              ? "Conectá Meta Ads desde Integraciones para empezar."
+              : "Vinculá un ad account a esta cuenta."}
+          </p>
+          <Link
+            href={
+              state.state === "no_connection"
+                ? "/api/auth/meta/login"
+                : "/app/settings/integrations"
+            }
+            className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            {state.state === "no_connection" ? "Conectar Meta Ads" : "Ir a integraciones"}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const today = new Date();
+  let since: string;
+  let until: string;
+  if (sp.preset === "custom" && sp.since && sp.until) {
+    since = sp.since;
+    until = sp.until;
+  } else {
+    const days = sp.preset === "14" ? 14 : sp.preset === "30" ? 30 : 7;
+    since = isoDate(new Date(today.getTime() - (days - 1) * 86400000));
+    until = isoDate(today);
+  }
+
+  const [{ current, deltas }, campaigns] = await Promise.all([
+    getKpisWithComparison(state.adAccount.id, since, until),
+    getCampaignsWithKpis(state.adAccount.id, since, until),
+  ]);
+
+  const currency = state.adAccount.currency;
+
+  return (
+    <div className="p-6 max-w-6xl mx-auto">
+      <Link
+        href={`/app/accounts/${accountId}`}
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
+      >
+        <ChevronLeft size={15} />
+        {account.name}
+      </Link>
+
+      {state.connectionStatus === "expired" && (
+        <div className="mb-6">
+          <PaidMediaReconnectBanner />
+        </div>
+      )}
+
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold">Paid Media · {account.name}</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {state.adAccount.name} ({state.adAccount.metaAdAccountId}) · Sync{" "}
+            {timeAgo(state.adAccount.lastSyncedAt)}
+          </p>
+        </div>
+        <PaidMediaPeriodSelector />
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
+        <PaidMediaKpiCard
+          label="Spend"
+          value={formatMoney(current.spend, currency)}
+          delta={deltas.spend}
+        />
+        <PaidMediaKpiCard
+          label="Impresiones"
+          value={current.impressions.toLocaleString("es-AR")}
+          delta={deltas.impressions}
+        />
+        <PaidMediaKpiCard
+          label="Alcance"
+          value={current.reach.toLocaleString("es-AR")}
+          delta={deltas.reach}
+        />
+        <PaidMediaKpiCard
+          label="Clicks"
+          value={current.clicks.toLocaleString("es-AR")}
+          delta={deltas.clicks}
+        />
+        <PaidMediaKpiCard label="CTR" value={`${current.ctr.toFixed(2)}%`} delta={deltas.ctr} />
+        <PaidMediaKpiCard
+          label="CPM"
+          value={
+            current.impressions > 0
+              ? formatMoney(Math.round(current.cpm * 100), currency)
+              : "—"
+          }
+          delta={deltas.cpm}
+          invertColors
+        />
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-8">
+        <PaidMediaKpiCard
+          label="Conversiones"
+          value={current.conversions.toString()}
+          delta={deltas.conversions}
+        />
+        <PaidMediaKpiCard
+          label={state.adAccount.isEcommerce ? "CPA" : "CPL"}
+          value={
+            current.conversions > 0
+              ? formatMoney(Math.round(current.cpa * 100), currency)
+              : "—"
+          }
+          delta={deltas.cpa}
+          invertColors
+        />
+        <PaidMediaKpiCard
+          label="Frecuencia"
+          value={current.frequency.toFixed(2)}
+          delta={deltas.frequency}
+          invertColors
+        />
+        {state.adAccount.isEcommerce && (
+          <PaidMediaKpiCard
+            label="ROAS"
+            value={current.roas != null ? current.roas.toFixed(2) + "x" : "—"}
+            delta={deltas.roas}
+          />
+        )}
+      </div>
+
+      <h2 className="font-semibold mb-3">Campañas</h2>
+      <PaidMediaCampaignsTable
+        campaigns={campaigns}
+        currency={currency}
+        isEcommerce={state.adAccount.isEcommerce}
+      />
+    </div>
+  );
+}
