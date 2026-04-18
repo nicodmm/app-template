@@ -102,11 +102,16 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
     until = isoDate(today);
   }
 
+  // Change history uses a fixed 90-day window (independent from the KPI period selector)
+  // so users always see recent campaign changes regardless of which period they're analyzing.
+  const changeSince = isoDate(new Date(today.getTime() - 89 * 86400000));
+  const changeUntil = isoDate(today);
+
   const [{ current, deltas }, campaigns, ads, changeEvents] = await Promise.all([
     getKpisWithComparison(state.adAccount.id, since, until),
     getCampaignsWithKpis(state.adAccount.id, since, until),
     getActiveAdsWithKpis(state.adAccount.id, since, until),
-    getChangeEventsForAdAccount(state.adAccount.id, since, until, 20, 0),
+    getChangeEventsForAdAccount(state.adAccount.id, changeSince, changeUntil, 20, 0),
   ]);
 
   const currency = state.adAccount.currency;
