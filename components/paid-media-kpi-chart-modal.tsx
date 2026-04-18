@@ -19,16 +19,34 @@ interface Props {
   adAccountId: string;
   since: string;
   until: string;
+  currency: string;
   metricLabels: Partial<Record<MetricKey, string>>;
-  formatValue: (metric: MetricKey, value: number) => string;
+}
+
+function formatMoney(cents: number, currency: string): string {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
+}
+
+function formatMetricValue(metric: MetricKey, value: number, currency: string): string {
+  if (metric === "spend" || metric === "cpm" || metric === "cpa") {
+    return formatMoney(Math.round(value * 100), currency);
+  }
+  if (metric === "ctr") return `${value.toFixed(2)}%`;
+  if (metric === "frequency") return value.toFixed(2);
+  if (metric === "roas") return `${value.toFixed(2)}x`;
+  return Math.round(value).toLocaleString("es-AR");
 }
 
 export function PaidMediaKpiChartModal({
   adAccountId,
   since,
   until,
+  currency,
   metricLabels,
-  formatValue,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -90,8 +108,8 @@ export function PaidMediaKpiChartModal({
             <h2 className="text-lg font-semibold">{label}</h2>
             {data && (
               <p className="text-sm text-muted-foreground">
-                {formatValue(chartParam, data.totals.current)} actual ·{" "}
-                {formatValue(chartParam, data.totals.previous)} anterior
+                {formatMetricValue(chartParam, data.totals.current, currency)} actual ·{" "}
+                {formatMetricValue(chartParam, data.totals.previous, currency)} anterior
                 {data.totals.deltaPct != null && (
                   <>
                     {" "}
@@ -131,7 +149,9 @@ export function PaidMediaKpiChartModal({
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip
                   formatter={(v) =>
-                    typeof v === "number" ? formatValue(chartParam, v) : String(v)
+                    typeof v === "number"
+                      ? formatMetricValue(chartParam, v, currency)
+                      : String(v)
                   }
                   labelFormatter={(l) => l}
                 />

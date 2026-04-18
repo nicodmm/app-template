@@ -244,6 +244,7 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
         adAccountId={state.adAccount.id}
         since={since}
         until={until}
+        currency={currency}
         metricLabels={{
           spend: labels.spend,
           impressions: labels.impressions,
@@ -255,14 +256,6 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
           cpa: labels.cpa,
           frequency: labels.frequency,
           roas: labels.roas,
-        }}
-        formatValue={(metric, v) => {
-          if (["spend", "cpm", "cpa"].includes(metric))
-            return formatMoney(Math.round(v * 100), currency);
-          if (metric === "ctr") return `${v.toFixed(2)}%`;
-          if (metric === "frequency") return v.toFixed(2);
-          if (metric === "roas") return v.toFixed(2) + "x";
-          return Math.round(v).toLocaleString("es-AR");
         }}
       />
     </div>
