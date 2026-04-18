@@ -91,12 +91,14 @@ export const syncSingleAdAccount = task({
       // with overlap (idempotent via UNIQUE). On first sync this yields recent
       // events only; full 90-day backfill runs in backfill-meta-ads.
       const changeSince = new Date(Date.now() - 25 * 3600 * 1000);
-      const changeEventsUpserted = await fetchAndUpsertChangeEvents(
-        payload.adAccountId,
-        metaId,
+      const changeEventsUpserted = await fetchAndUpsertChangeEvents({
+        adAccountRowId: payload.adAccountId,
+        metaAdAccountId: metaId,
         accessToken,
-        changeSince
-      );
+        since: changeSince,
+        campaignMetaIds: Array.from(campaignMap.keys()),
+        adMetaIds: Array.from(adMap.keys()),
+      });
 
       await pruneOldChangeEvents(payload.adAccountId);
 

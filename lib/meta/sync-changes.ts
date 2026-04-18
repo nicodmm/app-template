@@ -105,77 +105,137 @@ function parseExtraData(raw: string | undefined): Record<string, unknown> {
   }
 }
 
-export async function fetchAndUpsertChangeEvents(
+type SyncStats = {
+  totalSeen: number;
+  inserted: number;
+  dropped: Map<string, number>;
+  kept: Map<string, number>;
+};
+
+async function ingestActivityRow(
+  row: ActivityApiRow,
   adAccountRowId: string,
-  metaAdAccountId: string,
   accessToken: string,
-  since: Date
-): Promise<number> {
-  const sinceUnix = Math.floor(since.getTime() / 1000);
+  parentCache: Map<string, AdSetParentCacheEntry>,
+  seenKeys: Set<string>,
+  stats: SyncStats
+): Promise<void> {
+  stats.totalSeen++;
+  const mapped = EVENT_MAP[row.event_type];
+  if (!mapped) {
+    stats.dropped.set(row.event_type, (stats.dropped.get(row.event_type) ?? 0) + 1);
+    return;
+  }
+  if (!row.object_id || !row.event_time) return;
+
+  const entityType = mapped.entityType;
+  const entityMetaId = row.object_id;
+  const eventType = mapped.eventType;
+  const occurredAt = new Date(row.event_time);
+
+  // In-process dedup across the multiple API sources (account-wide + per-entity).
+  const dedupeKey = `${entityMetaId}|${eventType}|${occurredAt.toISOString()}`;
+  if (seenKeys.has(dedupeKey)) return;
+  seenKeys.add(dedupeKey);
+
+  stats.kept.set(row.event_type, (stats.kept.get(row.event_type) ?? 0) + 1);
+
+  const eventData = parseExtraData(row.extra_data);
+  const entityLocalId = await resolveLocalId(entityType, entityMetaId, adAccountRowId);
+  let parentCampaignMetaId: string | null = null;
+  if (entityType === "ad_set") {
+    parentCampaignMetaId = await resolveAdSetParent(entityMetaId, accessToken, parentCache);
+  }
+
+  await db
+    .insert(metaChangeEvents)
+    .values({
+      adAccountId: adAccountRowId,
+      entityType,
+      entityMetaId,
+      entityLocalId,
+      eventType,
+      eventData,
+      rawActivity: row,
+      parentCampaignMetaId,
+      occurredAt,
+    })
+    .onConflictDoNothing({
+      target: [
+        metaChangeEvents.adAccountId,
+        metaChangeEvents.entityMetaId,
+        metaChangeEvents.eventType,
+        metaChangeEvents.occurredAt,
+      ],
+    });
+  stats.inserted++;
+}
+
+export async function fetchAndUpsertChangeEvents(params: {
+  adAccountRowId: string;
+  metaAdAccountId: string;
+  accessToken: string;
+  since: Date;
+  campaignMetaIds?: string[];
+  adMetaIds?: string[];
+}): Promise<number> {
+  const sinceUnix = Math.floor(params.since.getTime() / 1000);
   const untilUnix = Math.floor(Date.now() / 1000);
 
   const parentCache = new Map<string, AdSetParentCacheEntry>();
-  const droppedCounts = new Map<string, number>();
-  const keptCounts = new Map<string, number>();
-  let upserts = 0;
-  let totalSeen = 0;
+  const seenKeys = new Set<string>();
+  const stats: SyncStats = {
+    totalSeen: 0,
+    inserted: 0,
+    dropped: new Map(),
+    kept: new Map(),
+  };
 
+  const searchParams = {
+    fields: "event_type,event_time,object_id,object_type,object_name,actor_id,actor_name,extra_data",
+    since: sinceUnix,
+    until: untilUnix,
+    limit: 500,
+  };
+
+  // 1) Account-wide stream (catches account-level events that per-entity streams miss).
   for await (const row of paginate<ActivityApiRow>(
-    `/${metaAdAccountId}/activities`,
-    {
-      accessToken,
-      searchParams: {
-        fields: "event_type,event_time,object_id,object_type,object_name,actor_id,actor_name,extra_data",
-        since: sinceUnix,
-        until: untilUnix,
-        limit: 500,
-      },
-    }
+    `/${params.metaAdAccountId}/activities`,
+    { accessToken: params.accessToken, searchParams }
   )) {
-    totalSeen++;
-    const mapped = EVENT_MAP[row.event_type];
-    if (!mapped) {
-      droppedCounts.set(row.event_type, (droppedCounts.get(row.event_type) ?? 0) + 1);
-      continue;
+    await ingestActivityRow(row, params.adAccountRowId, params.accessToken, parentCache, seenKeys, stats);
+  }
+
+  // 2) Per-campaign streams — Meta's account-wide feed is incomplete for recent
+  // ad-level events (especially AD_REVIEW transitions). Per-entity activity
+  // endpoints return the complete history for each entity.
+  const campaignCount = params.campaignMetaIds?.length ?? 0;
+  for (const metaCampaignId of params.campaignMetaIds ?? []) {
+    try {
+      for await (const row of paginate<ActivityApiRow>(
+        `/${metaCampaignId}/activities`,
+        { accessToken: params.accessToken, searchParams }
+      )) {
+        await ingestActivityRow(row, params.adAccountRowId, params.accessToken, parentCache, seenKeys, stats);
+      }
+    } catch (err) {
+      console.warn(`[sync-changes] failed to fetch activities for campaign ${metaCampaignId}`, err);
     }
-    keptCounts.set(row.event_type, (keptCounts.get(row.event_type) ?? 0) + 1);
-    if (!row.object_id || !row.event_time) continue;
+  }
 
-    const entityType = mapped.entityType;
-    const entityMetaId = row.object_id;
-    const eventType = mapped.eventType;
-    const occurredAt = new Date(row.event_time);
-    const eventData = parseExtraData(row.extra_data);
-
-    const entityLocalId = await resolveLocalId(entityType, entityMetaId, adAccountRowId);
-
-    let parentCampaignMetaId: string | null = null;
-    if (entityType === "ad_set") {
-      parentCampaignMetaId = await resolveAdSetParent(entityMetaId, accessToken, parentCache);
+  // 3) Per-ad streams — for AD_REVIEW status changes and other ad-specific events.
+  const adCount = params.adMetaIds?.length ?? 0;
+  for (const metaAdId of params.adMetaIds ?? []) {
+    try {
+      for await (const row of paginate<ActivityApiRow>(
+        `/${metaAdId}/activities`,
+        { accessToken: params.accessToken, searchParams }
+      )) {
+        await ingestActivityRow(row, params.adAccountRowId, params.accessToken, parentCache, seenKeys, stats);
+      }
+    } catch (err) {
+      console.warn(`[sync-changes] failed to fetch activities for ad ${metaAdId}`, err);
     }
-
-    await db
-      .insert(metaChangeEvents)
-      .values({
-        adAccountId: adAccountRowId,
-        entityType,
-        entityMetaId,
-        entityLocalId,
-        eventType,
-        eventData,
-        rawActivity: row,
-        parentCampaignMetaId,
-        occurredAt,
-      })
-      .onConflictDoNothing({
-        target: [
-          metaChangeEvents.adAccountId,
-          metaChangeEvents.entityMetaId,
-          metaChangeEvents.eventType,
-          metaChangeEvents.occurredAt,
-        ],
-      });
-    upserts++;
   }
 
   const fmt = (m: Map<string, number>) =>
@@ -185,12 +245,13 @@ export async function fetchAndUpsertChangeEvents(
       .join(", ");
 
   console.warn(
-    `[sync-changes] total=${totalSeen} kept=${upserts} ` +
-      `KEPT: ${keptCounts.size > 0 ? fmt(keptCounts) : "none"} | ` +
-      `DROPPED: ${droppedCounts.size > 0 ? fmt(droppedCounts) : "none"}`
+    `[sync-changes] sources=account+${campaignCount}camps+${adCount}ads ` +
+      `total=${stats.totalSeen} kept=${stats.inserted} ` +
+      `KEPT: ${stats.kept.size > 0 ? fmt(stats.kept) : "none"} | ` +
+      `DROPPED: ${stats.dropped.size > 0 ? fmt(stats.dropped) : "none"}`
   );
 
-  return upserts;
+  return stats.inserted;
 }
 
 // Backfill retention: prune events older than 90 days to match insights retention.

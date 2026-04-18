@@ -90,14 +90,18 @@ export const backfillMetaAds = task({
         campaignIdMap: campaignMap,
       });
 
-      // Change events: backfill the full 90-day window (idempotent via UNIQUE constraint)
+      // Change events: backfill the full 90-day window (idempotent via UNIQUE constraint).
+      // Meta's account-wide /activities endpoint is incomplete, so we also iterate
+      // per-campaign and per-ad to pick up events the account feed misses.
       const changeSince = new Date(Date.now() - 90 * 86400000);
-      const changeEventsUpserted = await fetchAndUpsertChangeEvents(
-        payload.adAccountId,
-        metaId,
+      const changeEventsUpserted = await fetchAndUpsertChangeEvents({
+        adAccountRowId: payload.adAccountId,
+        metaAdAccountId: metaId,
         accessToken,
-        changeSince
-      );
+        since: changeSince,
+        campaignMetaIds: Array.from(campaignMap.keys()),
+        adMetaIds: Array.from(adMap.keys()),
+      });
 
       await pruneOldChangeEvents(payload.adAccountId);
 
