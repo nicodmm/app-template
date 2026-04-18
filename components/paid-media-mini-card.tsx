@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BarChart3 } from "lucide-react";
 import { getPaidMediaState, getKpisWithComparison } from "@/lib/queries/paid-media";
+import { getPaidMediaLabels } from "@/lib/meta/labels";
 import { PaidMediaKpiCard } from "./paid-media-kpi-card";
 import { PaidMediaReconnectBanner } from "./paid-media-reconnect-banner";
 
@@ -77,6 +78,7 @@ export async function PaidMediaMiniCard({ workspaceId, accountId }: PaidMediaMin
   const today = isoDate(new Date());
   const since = isoDate(new Date(Date.now() - 6 * 86400000));
   const { current, deltas } = await getKpisWithComparison(state.adAccount.id, since, today);
+  const labels = getPaidMediaLabels(state.adAccount.isEcommerce);
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 space-y-3">
@@ -97,7 +99,7 @@ export async function PaidMediaMiniCard({ workspaceId, accountId }: PaidMediaMin
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <PaidMediaKpiCard
-          label="Spend"
+          label={labels.spend}
           value={formatMoney(current.spend, state.adAccount.currency)}
           delta={deltas.spend}
         />
@@ -117,7 +119,7 @@ export async function PaidMediaMiniCard({ workspaceId, accountId }: PaidMediaMin
         />
         <PaidMediaKpiCard label="CTR" value={`${current.ctr.toFixed(2)}%`} delta={deltas.ctr} />
         <PaidMediaKpiCard
-          label="Conversiones"
+          label={labels.conversions}
           value={current.conversions.toString()}
           delta={deltas.conversions}
         />

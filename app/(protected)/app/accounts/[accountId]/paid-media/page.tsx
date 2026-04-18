@@ -9,6 +9,7 @@ import {
   getKpisWithComparison,
   getCampaignsWithKpis,
 } from "@/lib/queries/paid-media";
+import { getPaidMediaLabels } from "@/lib/meta/labels";
 import { PaidMediaKpiCard } from "@/components/paid-media-kpi-card";
 import { PaidMediaPeriodSelector } from "@/components/paid-media-period-selector";
 import { PaidMediaCampaignsTable } from "@/components/paid-media-campaigns-table";
@@ -102,6 +103,7 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
   ]);
 
   const currency = state.adAccount.currency;
+  const labels = getPaidMediaLabels(state.adAccount.isEcommerce);
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -132,28 +134,28 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
         <PaidMediaKpiCard
-          label="Spend"
+          label={labels.spend}
           value={formatMoney(current.spend, currency)}
           delta={deltas.spend}
         />
         <PaidMediaKpiCard
-          label="Impresiones"
+          label={labels.impressions}
           value={current.impressions.toLocaleString("es-AR")}
           delta={deltas.impressions}
         />
         <PaidMediaKpiCard
-          label="Alcance"
+          label={labels.reach}
           value={current.reach.toLocaleString("es-AR")}
           delta={deltas.reach}
         />
         <PaidMediaKpiCard
-          label="Clicks"
+          label={labels.clicks}
           value={current.clicks.toLocaleString("es-AR")}
           delta={deltas.clicks}
         />
-        <PaidMediaKpiCard label="CTR" value={`${current.ctr.toFixed(2)}%`} delta={deltas.ctr} />
+        <PaidMediaKpiCard label={labels.ctr} value={`${current.ctr.toFixed(2)}%`} delta={deltas.ctr} />
         <PaidMediaKpiCard
-          label="CPM"
+          label={labels.cpm}
           value={
             current.impressions > 0
               ? formatMoney(Math.round(current.cpm * 100), currency)
@@ -166,12 +168,12 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-8">
         <PaidMediaKpiCard
-          label="Conversiones"
+          label={labels.conversions}
           value={current.conversions.toString()}
           delta={deltas.conversions}
         />
         <PaidMediaKpiCard
-          label={state.adAccount.isEcommerce ? "CPA" : "CPL"}
+          label={labels.cpa}
           value={
             current.conversions > 0
               ? formatMoney(Math.round(current.cpa * 100), currency)
@@ -181,14 +183,14 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
           invertColors
         />
         <PaidMediaKpiCard
-          label="Frecuencia"
+          label={labels.frequency}
           value={current.frequency.toFixed(2)}
           delta={deltas.frequency}
           invertColors
         />
         {state.adAccount.isEcommerce && (
           <PaidMediaKpiCard
-            label="ROAS"
+            label={labels.roas}
             value={current.roas != null ? current.roas.toFixed(2) + "x" : "—"}
             delta={deltas.roas}
           />

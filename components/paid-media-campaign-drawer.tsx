@@ -13,10 +13,12 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { CampaignRow, CampaignTrendPoint } from "@/lib/queries/paid-media";
+import { getPaidMediaLabels } from "@/lib/meta/labels";
 
 interface PaidMediaCampaignDrawerProps {
   campaign: CampaignRow | null;
   currency: string;
+  isEcommerce: boolean;
   onClose: () => void;
 }
 
@@ -31,10 +33,12 @@ function formatMoney(cents: number, currency: string): string {
 export function PaidMediaCampaignDrawer({
   campaign,
   currency,
+  isEcommerce,
   onClose,
 }: PaidMediaCampaignDrawerProps) {
   const [trend, setTrend] = useState<CampaignTrendPoint[]>([]);
   const [loading, setLoading] = useState(false);
+  const labels = getPaidMediaLabels(isEcommerce);
 
   useEffect(() => {
     if (!campaign) return;
@@ -72,7 +76,7 @@ export function PaidMediaCampaignDrawer({
         <div className="p-5 space-y-5">
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <p className="text-xs text-muted-foreground">Spend</p>
+              <p className="text-xs text-muted-foreground">{labels.spend}</p>
               <p className="text-sm font-medium">{formatMoney(campaign.spend, currency)}</p>
             </div>
             <div>
@@ -80,7 +84,7 @@ export function PaidMediaCampaignDrawer({
               <p className="text-sm font-medium">{campaign.conversions}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">CPA</p>
+              <p className="text-xs text-muted-foreground">{labels.cpa}</p>
               <p className="text-sm font-medium">
                 {campaign.conversions > 0
                   ? formatMoney(Math.round(campaign.cpa * 100), currency)

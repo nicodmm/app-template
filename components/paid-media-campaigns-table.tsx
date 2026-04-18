@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { CampaignRow } from "@/lib/queries/paid-media";
+import { getPaidMediaLabels } from "@/lib/meta/labels";
 import { PaidMediaCampaignDrawer } from "./paid-media-campaign-drawer";
 
 type SortKey = keyof Pick<
@@ -33,6 +34,7 @@ export function PaidMediaCampaignsTable({
   const [sortKey, setSortKey] = useState<SortKey>("spend");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const labels = getPaidMediaLabels(isEcommerce);
 
   const filtered = useMemo(() => {
     const rows =
@@ -101,12 +103,12 @@ export function PaidMediaCampaignsTable({
             <tr>
               <Header k="name" label="Campaña" />
               <Header k="status" label="Estado" />
-              <Header k="spend" label="Spend" align="right" />
+              <Header k="spend" label={labels.spend} align="right" />
               <Header k="impressions" label="Impr." align="right" />
               <Header k="ctr" label="CTR" align="right" />
               <Header k="cpc" label="CPC" align="right" />
               <Header k="conversions" label="Conv." align="right" />
-              <Header k="cpa" label={isEcommerce ? "CPA" : "CPL"} align="right" />
+              <Header k="cpa" label={labels.cpa} align="right" />
               <Header k="frequency" label="Freq" align="right" />
             </tr>
           </thead>
@@ -156,6 +158,7 @@ export function PaidMediaCampaignsTable({
       <PaidMediaCampaignDrawer
         campaign={selectedCampaign}
         currency={currency}
+        isEcommerce={isEcommerce}
         onClose={() => setSelectedId(null)}
       />
     </div>
