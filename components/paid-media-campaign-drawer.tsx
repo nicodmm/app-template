@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { X } from "lucide-react";
 import {
   LineChart,
@@ -12,13 +12,17 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import type { CampaignRow, CampaignTrendPoint } from "@/lib/queries/paid-media";
+import type { CampaignRow, CampaignTrendPoint, AdRow, ChangeEventRow } from "@/lib/queries/paid-media";
 import { getPaidMediaLabels } from "@/lib/meta/labels";
+import { PaidMediaChangeTimeline } from "./paid-media-change-timeline";
+import { getCampaignDrawerData } from "@/app/actions/paid-media-drawer";
 
 interface PaidMediaCampaignDrawerProps {
   campaign: CampaignRow | null;
   currency: string;
   isEcommerce: boolean;
+  since: string;
+  until: string;
   onClose: () => void;
 }
 
@@ -34,10 +38,14 @@ export function PaidMediaCampaignDrawer({
   campaign,
   currency,
   isEcommerce,
+  since,
+  until,
   onClose,
 }: PaidMediaCampaignDrawerProps) {
   const [trend, setTrend] = useState<CampaignTrendPoint[]>([]);
   const [loading, setLoading] = useState(false);
+  const [drawerData, setDrawerData] = useState<{ ads: AdRow[]; changes: ChangeEventRow[] } | null>(null);
+  const [, startTransition] = useTransition();
   const labels = getPaidMediaLabels(isEcommerce);
 
   useEffect(() => {
@@ -51,6 +59,15 @@ export function PaidMediaCampaignDrawer({
       })
       .catch(() => setLoading(false));
   }, [campaign]);
+
+  useEffect(() => {
+    if (!campaign) { setDrawerData(null); return; }
+    setDrawerData(null);
+    startTransition(async () => {
+      const d = await getCampaignDrawerData(campaign.id, since, until);
+      setDrawerData(d);
+    });
+  }, [campaign, since, until]);
 
   if (!campaign) return null;
 
@@ -157,6 +174,51 @@ export function PaidMediaCampaignDrawer({
                 </ResponsiveContainer>
               )}
             </div>
+          </div>
+          <div className="mt-6">
+            <h3 className="text-sm font-medium mb-2">Anuncios de esta campaña</h3>
+            {drawerData === null ? (
+              <p className="text-xs text-muted-foreground">Cargando...</p>
+            ) : drawerData.ads.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Sin anuncios con actividad en el período.</p>
+            ) : (
+              <div className="rounded-lg border border-border bg-card overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="border-b border-border bg-muted/30 text-muted-foreground">
+                    <tr>
+                      <th className="px-2 py-2 text-left font-medium">Nombre</th>
+                      <th className="px-2 py-2 text-right font-medium">{labels.spend}</th>
+                      <th className="px-2 py-2 text-right font-medium">CTR</th>
+                      <th className="px-2 py-2 text-right font-medium">Conv.</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {drawerData.ads.map((ad) => (
+                      <tr key={ad.id}>
+                        <td className="px-2 py-2 max-w-[180px] truncate">{ad.name}</td>
+                        <td className="px-2 py-2 text-right">{formatMoney(ad.spend, currency)}</td>
+                        <td className="px-2 py-2 text-right">{ad.ctr.toFixed(2)}%</td>
+                        <td className="px-2 py-2 text-right">{ad.conversions}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6">
+            <h3 className="text-sm font-medium mb-2">Cambios recientes</h3>
+            {drawerData === null ? (
+              <p className="text-xs text-muted-foreground">Cargando...</p>
+            ) : drawerData.changes.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Sin cambios registrados.</p>
+            ) : (
+              <PaidMediaChangeTimeline
+                events={drawerData.changes}
+                totalAvailable={drawerData.changes.length}
+              />
+            )}
           </div>
         </div>
       </div>

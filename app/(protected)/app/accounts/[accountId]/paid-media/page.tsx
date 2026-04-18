@@ -8,6 +8,8 @@ import {
   getPaidMediaState,
   getKpisWithComparison,
   getCampaignsWithKpis,
+  getActiveAdsWithKpis,
+  getChangeEventsForAdAccount,
 } from "@/lib/queries/paid-media";
 import { getPaidMediaLabels } from "@/lib/meta/labels";
 import { PaidMediaKpiCard } from "@/components/paid-media-kpi-card";
@@ -15,6 +17,8 @@ import { PaidMediaPeriodSelector } from "@/components/paid-media-period-selector
 import { PaidMediaCampaignsTable } from "@/components/paid-media-campaigns-table";
 import { PaidMediaReconnectBanner } from "@/components/paid-media-reconnect-banner";
 import { PaidMediaKpiChartModal } from "@/components/paid-media-kpi-chart-modal";
+import { PaidMediaAdsTable } from "@/components/paid-media-ads-table";
+import { PaidMediaChangeTimeline } from "@/components/paid-media-change-timeline";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
@@ -98,9 +102,11 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
     until = isoDate(today);
   }
 
-  const [{ current, deltas }, campaigns] = await Promise.all([
+  const [{ current, deltas }, campaigns, ads, changeEvents] = await Promise.all([
     getKpisWithComparison(state.adAccount.id, since, until),
     getCampaignsWithKpis(state.adAccount.id, since, until),
+    getActiveAdsWithKpis(state.adAccount.id, since, until),
+    getChangeEventsForAdAccount(state.adAccount.id, since, until, 20, 0),
   ]);
 
   const currency = state.adAccount.currency;
@@ -217,7 +223,22 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
         campaigns={campaigns}
         currency={currency}
         isEcommerce={state.adAccount.isEcommerce}
+        since={since}
+        until={until}
       />
+
+      <h2 className="font-semibold mb-3 mt-8">Anuncios activos</h2>
+      <PaidMediaAdsTable
+        ads={ads}
+        currency={currency}
+        isEcommerce={state.adAccount.isEcommerce}
+        adAccountId={state.adAccount.id}
+        since={since}
+        until={until}
+      />
+
+      <h2 className="font-semibold mb-3 mt-8">Historial de cambios</h2>
+      <PaidMediaChangeTimeline events={changeEvents} totalAvailable={changeEvents.length} />
 
       <PaidMediaKpiChartModal
         adAccountId={state.adAccount.id}

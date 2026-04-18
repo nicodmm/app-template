@@ -15,6 +15,8 @@ interface PaidMediaCampaignsTableProps {
   campaigns: CampaignRow[];
   currency: string;
   isEcommerce: boolean;
+  since: string;
+  until: string;
 }
 
 function formatMoney(cents: number, currency: string): string {
@@ -29,6 +31,8 @@ export function PaidMediaCampaignsTable({
   campaigns,
   currency,
   isEcommerce,
+  since,
+  until,
 }: PaidMediaCampaignsTableProps) {
   const [statusFilter, setStatusFilter] = useState<"all" | "ACTIVE" | "PAUSED">("all");
   const [sortKey, setSortKey] = useState<SortKey>("spend");
@@ -159,6 +163,8 @@ export function PaidMediaCampaignsTable({
         campaign={selectedCampaign}
         currency={currency}
         isEcommerce={isEcommerce}
+        since={since}
+        until={until}
         onClose={() => setSelectedId(null)}
       />
     </div>
