@@ -26,6 +26,9 @@ const EVENT_MAP: Record<string, { entityType: "campaign" | "ad_set" | "ad"; even
   update_ad_creative: { entityType: "ad", eventType: "ad_creative_change" },
   update_ad_run_status: { entityType: "ad", eventType: "ad_run_status_change" },
   delete_ad: { entityType: "ad", eventType: "ad_deleted" },
+  // Creative asset changes (very common on dynamic ads)
+  edit_images: { entityType: "ad", eventType: "ad_images_edited" },
+  add_images: { entityType: "ad", eventType: "ad_images_added" },
 };
 
 type ActivityApiRow = {

@@ -56,6 +56,8 @@ function describeEvent(event: ChangeEventRow): string {
     case "ad_status_change": return `estado: ${oldV ?? "?"} → ${newV ?? "?"}`;
     case "ad_run_status_change": return `ejecución: ${oldV ?? "?"} → ${newV ?? "?"}`;
     case "ad_creative_change": return "creatividad modificada";
+    case "ad_images_edited": return "imágenes del anuncio editadas";
+    case "ad_images_added": return "imágenes nuevas agregadas";
     default: return event.eventType;
   }
 }
