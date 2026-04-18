@@ -14,10 +14,11 @@ import { PaidMediaKpiCard } from "@/components/paid-media-kpi-card";
 import { PaidMediaPeriodSelector } from "@/components/paid-media-period-selector";
 import { PaidMediaCampaignsTable } from "@/components/paid-media-campaigns-table";
 import { PaidMediaReconnectBanner } from "@/components/paid-media-reconnect-banner";
+import { PaidMediaKpiChartModal } from "@/components/paid-media-kpi-chart-modal";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
-  searchParams: Promise<{ preset?: string; since?: string; until?: string }>;
+  searchParams: Promise<{ preset?: string; since?: string; until?: string; chart?: string }>;
 }
 
 function isoDate(d: Date): string {
@@ -137,23 +138,32 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
           label={labels.spend}
           value={formatMoney(current.spend, currency)}
           delta={deltas.spend}
+          metricKey="spend"
         />
         <PaidMediaKpiCard
           label={labels.impressions}
           value={current.impressions.toLocaleString("es-AR")}
           delta={deltas.impressions}
+          metricKey="impressions"
         />
         <PaidMediaKpiCard
           label={labels.reach}
           value={current.reach.toLocaleString("es-AR")}
           delta={deltas.reach}
+          metricKey="reach"
         />
         <PaidMediaKpiCard
           label={labels.clicks}
           value={current.clicks.toLocaleString("es-AR")}
           delta={deltas.clicks}
+          metricKey="clicks"
         />
-        <PaidMediaKpiCard label={labels.ctr} value={`${current.ctr.toFixed(2)}%`} delta={deltas.ctr} />
+        <PaidMediaKpiCard
+          label={labels.ctr}
+          value={`${current.ctr.toFixed(2)}%`}
+          delta={deltas.ctr}
+          metricKey="ctr"
+        />
         <PaidMediaKpiCard
           label={labels.cpm}
           value={
@@ -163,6 +173,7 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
           }
           delta={deltas.cpm}
           invertColors
+          metricKey="cpm"
         />
       </div>
 
@@ -171,6 +182,7 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
           label={labels.conversions}
           value={current.conversions.toString()}
           delta={deltas.conversions}
+          metricKey="conversions"
         />
         <PaidMediaKpiCard
           label={labels.cpa}
@@ -181,18 +193,21 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
           }
           delta={deltas.cpa}
           invertColors
+          metricKey="cpa"
         />
         <PaidMediaKpiCard
           label={labels.frequency}
           value={current.frequency.toFixed(2)}
           delta={deltas.frequency}
           invertColors
+          metricKey="frequency"
         />
         {state.adAccount.isEcommerce && (
           <PaidMediaKpiCard
             label={labels.roas}
             value={current.roas != null ? current.roas.toFixed(2) + "x" : "—"}
             delta={deltas.roas}
+            metricKey="roas"
           />
         )}
       </div>
@@ -202,6 +217,32 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
         campaigns={campaigns}
         currency={currency}
         isEcommerce={state.adAccount.isEcommerce}
+      />
+
+      <PaidMediaKpiChartModal
+        adAccountId={state.adAccount.id}
+        since={since}
+        until={until}
+        metricLabels={{
+          spend: labels.spend,
+          impressions: labels.impressions,
+          reach: labels.reach,
+          clicks: labels.clicks,
+          conversions: labels.conversions,
+          ctr: labels.ctr,
+          cpm: labels.cpm,
+          cpa: labels.cpa,
+          frequency: labels.frequency,
+          roas: labels.roas,
+        }}
+        formatValue={(metric, v) => {
+          if (["spend", "cpm", "cpa"].includes(metric))
+            return formatMoney(Math.round(v * 100), currency);
+          if (metric === "ctr") return `${v.toFixed(2)}%`;
+          if (metric === "frequency") return v.toFixed(2);
+          if (metric === "roas") return v.toFixed(2) + "x";
+          return Math.round(v).toLocaleString("es-AR");
+        }}
       />
     </div>
   );
