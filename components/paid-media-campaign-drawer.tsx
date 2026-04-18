@@ -9,13 +9,20 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
-import type { CampaignRow, CampaignTrendPoint, AdRow, ChangeEventRow } from "@/lib/queries/paid-media";
+import type {
+  CampaignRow,
+  AdRow,
+  ChangeEventRow,
+  DailyWithPrevious,
+  MetricKey,
+} from "@/lib/queries/paid-media";
 import { getPaidMediaLabels } from "@/lib/meta/labels";
+import { formatMetricValue, formatMoney } from "@/lib/meta/format";
 import { PaidMediaChangeTimeline } from "./paid-media-change-timeline";
 import { getCampaignDrawerData } from "@/app/actions/paid-media-drawer";
+import { getCampaignChartData } from "@/app/actions/paid-media-chart";
 
 interface PaidMediaCampaignDrawerProps {
   campaign: CampaignRow | null;
@@ -26,14 +33,6 @@ interface PaidMediaCampaignDrawerProps {
   onClose: () => void;
 }
 
-function formatMoney(cents: number, currency: string): string {
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
-}
-
 export function PaidMediaCampaignDrawer({
   campaign,
   currency,
@@ -42,23 +41,25 @@ export function PaidMediaCampaignDrawer({
   until,
   onClose,
 }: PaidMediaCampaignDrawerProps) {
-  const [trend, setTrend] = useState<CampaignTrendPoint[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [trend, setTrend] = useState<DailyWithPrevious | null>(null);
+  const [selectedMetric, setSelectedMetric] = useState<MetricKey>("spend");
   const [drawerData, setDrawerData] = useState<{ ads: AdRow[]; changes: ChangeEventRow[] } | null>(null);
   const [, startTransition] = useTransition();
   const labels = getPaidMediaLabels(isEcommerce);
 
+  // Reset metric when switching to a different campaign
   useEffect(() => {
-    if (!campaign) return;
-    setLoading(true);
-    fetch(`/api/paid-media/campaign-trend?campaignId=${campaign.id}`)
-      .then((r) => r.json())
-      .then((data: { trend: CampaignTrendPoint[] }) => {
-        setTrend([...data.trend].reverse());
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [campaign]);
+    if (campaign) setSelectedMetric("spend");
+  }, [campaign?.id]);
+
+  useEffect(() => {
+    if (!campaign) { setTrend(null); return; }
+    setTrend(null);
+    startTransition(async () => {
+      const d = await getCampaignChartData(campaign.id, since, until, selectedMetric);
+      setTrend(d);
+    });
+  }, [campaign, since, until, selectedMetric]);
 
   useEffect(() => {
     if (!campaign) { setDrawerData(null); return; }
@@ -71,20 +72,31 @@ export function PaidMediaCampaignDrawer({
 
   if (!campaign) return null;
 
+  const merged =
+    trend?.current.map((c, i) => ({
+      date: c.date,
+      current: c.value,
+      previous: trend.previous[i]?.value ?? null,
+    })) ?? [];
+
   return (
     <>
       <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-full sm:w-[500px] bg-background border-l border-border z-50 overflow-y-auto">
-        <div className="p-5 border-b border-border sticky top-0 bg-background flex items-start justify-between gap-3">
+      <div className="fixed right-0 top-0 h-full w-full sm:w-[560px] bg-background border-l border-border z-50 overflow-y-auto">
+        <div className="p-5 border-b border-border sticky top-0 bg-background flex items-start justify-between gap-3 z-10">
           <div>
             <h3 className="font-semibold text-sm">{campaign.name}</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
               {campaign.status} · {campaign.objective ?? "—"}
+              {campaign.dailyBudget != null && (
+                <> · presupuesto {formatMoney(campaign.dailyBudget, currency)}/día</>
+              )}
             </p>
           </div>
           <button
             onClick={onClose}
             className="shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Cerrar"
           >
             <X size={16} />
           </button>
@@ -92,82 +104,83 @@ export function PaidMediaCampaignDrawer({
 
         <div className="p-5 space-y-5">
           <div className="grid grid-cols-3 gap-2">
-            <div>
-              <p className="text-xs text-muted-foreground">{labels.spend}</p>
-              <p className="text-sm font-medium">{formatMoney(campaign.spend, currency)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Conv.</p>
-              <p className="text-sm font-medium">{campaign.conversions}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">{labels.cpa}</p>
-              <p className="text-sm font-medium">
-                {campaign.conversions > 0
+            <Stat
+              label={labels.spend}
+              value={formatMoney(campaign.spend, currency)}
+              active={selectedMetric === "spend"}
+              onClick={() => setSelectedMetric("spend")}
+            />
+            <Stat
+              label={labels.impressions}
+              value={campaign.impressions.toLocaleString("es-AR")}
+              active={selectedMetric === "impressions"}
+              onClick={() => setSelectedMetric("impressions")}
+            />
+            <Stat
+              label={labels.clicks}
+              value={campaign.clicks.toLocaleString("es-AR")}
+              active={selectedMetric === "clicks"}
+              onClick={() => setSelectedMetric("clicks")}
+            />
+            <Stat
+              label={labels.ctr}
+              value={`${campaign.ctr.toFixed(2)}%`}
+              active={selectedMetric === "ctr"}
+              onClick={() => setSelectedMetric("ctr")}
+            />
+            <Stat
+              label={labels.conversions}
+              value={String(campaign.conversions)}
+              active={selectedMetric === "conversions"}
+              onClick={() => setSelectedMetric("conversions")}
+            />
+            <Stat
+              label={labels.cpa}
+              value={
+                campaign.conversions > 0
                   ? formatMoney(Math.round(campaign.cpa * 100), currency)
-                  : "—"}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">CTR</p>
-              <p className="text-sm font-medium">{campaign.ctr.toFixed(2)}%</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">CPC</p>
-              <p className="text-sm font-medium">
-                {campaign.clicks > 0
-                  ? formatMoney(Math.round(campaign.cpc * 100), currency)
-                  : "—"}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Freq</p>
-              <p className="text-sm font-medium">{campaign.frequency.toFixed(2)}</p>
-            </div>
-            <div className="col-span-3">
-              <p className="text-xs text-muted-foreground">Daily budget</p>
-              <p className="text-sm font-medium">
-                {campaign.dailyBudget != null
-                  ? formatMoney(campaign.dailyBudget, currency)
-                  : "sin tope diario"}
-              </p>
-            </div>
+                  : "—"
+              }
+              active={selectedMetric === "cpa"}
+              onClick={() => setSelectedMetric("cpa")}
+            />
           </div>
 
           <div>
-            <h4 className="text-xs font-medium text-muted-foreground mb-2">Últimos 30 días</h4>
+            <h4 className="text-sm font-medium mb-2">
+              {(labels as Record<string, string>)[selectedMetric] ?? selectedMetric} diario
+            </h4>
             <div className="h-[220px]">
-              {loading ? (
-                <p className="text-xs text-muted-foreground">Cargando...</p>
-              ) : trend.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Sin datos.</p>
+              {!trend ? (
+                <p className="text-xs text-muted-foreground">Cargando…</p>
+              ) : merged.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Sin datos en el período.</p>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trend}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={(d: string) => d.slice(5)}
-                      fontSize={10}
+                  <LineChart data={merged}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} />
+                    <Tooltip
+                      formatter={(v) =>
+                        typeof v === "number"
+                          ? formatMetricValue(selectedMetric, v, currency)
+                          : String(v)
+                      }
                     />
-                    <YAxis yAxisId="spend" orientation="left" fontSize={10} />
-                    <YAxis yAxisId="conv" orientation="right" fontSize={10} />
-                    <Tooltip />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
                     <Line
-                      yAxisId="spend"
                       type="monotone"
-                      dataKey="spend"
-                      name="Spend (cents)"
-                      stroke="#6366f1"
+                      dataKey="current"
+                      stroke="var(--primary)"
+                      strokeWidth={2}
                       dot={false}
                     />
                     <Line
-                      yAxisId="conv"
                       type="monotone"
-                      dataKey="conversions"
-                      name="Conv."
-                      stroke="#10b981"
+                      dataKey="previous"
+                      stroke="var(--muted-foreground)"
+                      strokeDasharray="4 4"
+                      strokeWidth={2}
                       dot={false}
                     />
                   </LineChart>
@@ -175,42 +188,38 @@ export function PaidMediaCampaignDrawer({
               )}
             </div>
           </div>
-          <div className="mt-6">
+
+          <div>
             <h3 className="text-sm font-medium mb-2">Anuncios de esta campaña</h3>
             {drawerData === null ? (
-              <p className="text-xs text-muted-foreground">Cargando...</p>
+              <p className="text-xs text-muted-foreground">Cargando…</p>
             ) : drawerData.ads.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Sin anuncios con actividad en el período.</p>
+              <p className="text-xs text-muted-foreground">
+                Sin anuncios con actividad en el período.
+              </p>
             ) : (
-              <div className="rounded-lg border border-border bg-card overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="border-b border-border bg-muted/30 text-muted-foreground">
-                    <tr>
-                      <th className="px-2 py-2 text-left font-medium">Nombre</th>
-                      <th className="px-2 py-2 text-right font-medium">{labels.spend}</th>
-                      <th className="px-2 py-2 text-right font-medium">CTR</th>
-                      <th className="px-2 py-2 text-right font-medium">Conv.</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {drawerData.ads.map((ad) => (
-                      <tr key={ad.id}>
-                        <td className="px-2 py-2 max-w-[180px] truncate">{ad.name}</td>
-                        <td className="px-2 py-2 text-right">{formatMoney(ad.spend, currency)}</td>
-                        <td className="px-2 py-2 text-right">{ad.ctr.toFixed(2)}%</td>
-                        <td className="px-2 py-2 text-right">{ad.conversions}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ul className="rounded-lg border border-border bg-card divide-y divide-border">
+                {drawerData.ads.map((ad) => (
+                  <li key={ad.id} className="p-2 flex items-center gap-3">
+                    <Thumbnail src={ad.thumbnailUrl} alt={ad.name} size={40} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium truncate">{ad.name}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {formatMoney(ad.spend, currency)} · {ad.ctr.toFixed(2)}%{" "}
+                        {labels.ctr.toLowerCase()} · {ad.conversions}{" "}
+                        {labels.conversions.toLowerCase()}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 
-          <div className="mt-6">
+          <div>
             <h3 className="text-sm font-medium mb-2">Cambios recientes</h3>
             {drawerData === null ? (
-              <p className="text-xs text-muted-foreground">Cargando...</p>
+              <p className="text-xs text-muted-foreground">Cargando…</p>
             ) : drawerData.changes.length === 0 ? (
               <p className="text-xs text-muted-foreground">Sin cambios registrados.</p>
             ) : (
@@ -223,5 +232,58 @@ export function PaidMediaCampaignDrawer({
         </div>
       </div>
     </>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  active,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-left rounded-lg border p-2 transition-colors ${
+        active
+          ? "border-primary bg-primary/5"
+          : "border-border bg-background hover:bg-accent/30"
+      }`}
+    >
+      <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
+      <div className="text-sm font-semibold">{value}</div>
+    </button>
+  );
+}
+
+function Thumbnail({ src, alt, size }: { src: string | null; alt: string; size: number }) {
+  if (!src) {
+    return (
+      <div
+        className="rounded-md bg-muted flex items-center justify-center text-muted-foreground text-xs flex-shrink-0"
+        style={{ width: size, height: size }}
+        aria-label="Sin preview"
+      >
+        🖼️
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      width={size}
+      height={size}
+      loading="lazy"
+      className="rounded-md object-cover bg-muted flex-shrink-0"
+      style={{ width: size, height: size }}
+    />
   );
 }

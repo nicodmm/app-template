@@ -498,6 +498,61 @@ export async function getKpiDailyWithPrevious(
   };
 }
 
+export async function getCampaignDailyWithPrevious(
+  adAccountId: string,
+  campaignId: string,
+  since: string,
+  until: string,
+  metric: MetricKey
+): Promise<DailyWithPrevious> {
+  const days = rangeDays(since, until);
+  const prevUntil = isoShift(since, -1);
+  const prevSince = isoShift(since, -days);
+
+  async function fetchCampaignDailyRows(s: string, u: string) {
+    return db
+      .select({
+        date: metaInsightsDaily.date,
+        spend: sql<number>`COALESCE(SUM(${metaInsightsDaily.spend}), 0)::int`,
+        impressions: sql<number>`COALESCE(SUM(${metaInsightsDaily.impressions}), 0)::int`,
+        reach: sql<number>`COALESCE(SUM(${metaInsightsDaily.reach}), 0)::int`,
+        clicks: sql<number>`COALESCE(SUM(${metaInsightsDaily.clicks}), 0)::int`,
+        conversions: sql<number>`COALESCE(SUM(${metaInsightsDaily.conversions}), 0)::int`,
+        conversionValue: sql<number | null>`SUM(${metaInsightsDaily.conversionValue})::int`,
+        frequency: sql<number>`COALESCE(AVG(${metaInsightsDaily.frequency}), 0)::float`,
+      })
+      .from(metaInsightsDaily)
+      .where(
+        and(
+          eq(metaInsightsDaily.adAccountId, adAccountId),
+          eq(metaInsightsDaily.campaignId, campaignId),
+          gte(metaInsightsDaily.date, s),
+          lte(metaInsightsDaily.date, u)
+        )
+      )
+      .groupBy(metaInsightsDaily.date)
+      .orderBy(metaInsightsDaily.date);
+  }
+
+  const [currentRows, previousRows] = await Promise.all([
+    fetchCampaignDailyRows(since, until),
+    fetchCampaignDailyRows(prevSince, prevUntil),
+  ]);
+
+  const current = currentRows.map((r) => ({ date: r.date, value: projectMetric(r, metric) }));
+  const previous = previousRows.map((r) => ({ date: r.date, value: projectMetric(r, metric) }));
+  const totalCurrent = current.reduce((a, b) => a + b.value, 0);
+  const totalPrevious = previous.reduce((a, b) => a + b.value, 0);
+  const deltaPct =
+    totalPrevious === 0
+      ? totalCurrent === 0
+        ? 0
+        : null
+      : ((totalCurrent - totalPrevious) / totalPrevious) * 100;
+
+  return { current, previous, totals: { current: totalCurrent, previous: totalPrevious, deltaPct } };
+}
+
 // ---------------------------------------------------------------------------
 // Task 8: Change events
 // ---------------------------------------------------------------------------
