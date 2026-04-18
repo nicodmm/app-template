@@ -29,11 +29,13 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
   const labels = getPaidMediaLabels(isEcommerce);
   const [trend, setTrend] = useState<DailyWithPrevious | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>("spend");
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [, startTransition] = useTransition();
 
   // Reset metric when switching to a different ad
   useEffect(() => {
     if (ad) setSelectedMetric("spend");
+    setPreviewOpen(false);
   }, [ad?.id]);
 
   useEffect(() => {
@@ -47,10 +49,14 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
 
   useEffect(() => {
     if (!ad) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (previewOpen) setPreviewOpen(false);
+      else onClose();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [ad, onClose]);
+  }, [ad, onClose, previewOpen]);
 
   if (!ad) return null;
 
@@ -169,13 +175,23 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
         <div>
           <h3 className="text-sm font-medium mb-2">Creatividad</h3>
           {ad.thumbnailUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={ad.thumbnailUrl}
-              alt={ad.name}
-              loading="lazy"
-              className="rounded-md border border-border max-w-full max-h-64 object-contain bg-muted"
-            />
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(true)}
+              className="block group relative"
+              aria-label="Ver creatividad en grande"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={ad.thumbnailUrl}
+                alt={ad.name}
+                loading="lazy"
+                className="rounded-md border border-border max-w-full max-h-64 object-contain bg-muted"
+              />
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/30 rounded-md transition-opacity text-white text-xs font-medium">
+                Ampliar
+              </div>
+            </button>
           ) : (
             <p className="text-xs text-muted-foreground">
               Sin preview disponible para este anuncio.
@@ -188,6 +204,36 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
           )}
         </div>
       </aside>
+
+      {previewOpen && ad.thumbnailUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-6"
+          onClick={(e) => {
+            e.stopPropagation();
+            setPreviewOpen(false);
+          }}
+          role="dialog"
+          aria-modal="true"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={ad.thumbnailUrl}
+            alt={ad.name}
+            className="max-w-[92vw] max-h-[92vh] object-contain rounded-md shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPreviewOpen(false);
+            }}
+            className="absolute top-4 right-4 rounded-md bg-white/90 text-black px-3 py-1.5 text-sm font-medium hover:bg-white"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
     </div>
   );
 }
