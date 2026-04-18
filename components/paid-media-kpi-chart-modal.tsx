@@ -13,6 +13,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { getKpiChartData } from "@/app/actions/paid-media-chart";
+import { formatMetricValue } from "@/lib/meta/format";
 import type { DailyWithPrevious, MetricKey } from "@/lib/queries/paid-media";
 
 interface Props {
@@ -21,24 +22,6 @@ interface Props {
   until: string;
   currency: string;
   metricLabels: Partial<Record<MetricKey, string>>;
-}
-
-function formatMoney(cents: number, currency: string): string {
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
-}
-
-function formatMetricValue(metric: MetricKey, value: number, currency: string): string {
-  if (metric === "spend" || metric === "cpm" || metric === "cpa") {
-    return formatMoney(Math.round(value * 100), currency);
-  }
-  if (metric === "ctr") return `${value.toFixed(2)}%`;
-  if (metric === "frequency") return value.toFixed(2);
-  if (metric === "roas") return `${value.toFixed(2)}x`;
-  return Math.round(value).toLocaleString("es-AR");
 }
 
 export function PaidMediaKpiChartModal({

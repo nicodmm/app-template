@@ -12,7 +12,8 @@ import {
 } from "recharts";
 import { getAdChartData } from "@/app/actions/paid-media-chart";
 import { getPaidMediaLabels } from "@/lib/meta/labels";
-import type { AdRow, DailyWithPrevious } from "@/lib/queries/paid-media";
+import { formatMetricValue, formatMoney } from "@/lib/meta/format";
+import type { AdRow, DailyWithPrevious, MetricKey } from "@/lib/queries/paid-media";
 
 interface Props {
   ad: AdRow | null;
@@ -24,27 +25,25 @@ interface Props {
   until: string;
 }
 
-function formatMoney(cents: number, currency: string): string {
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
-}
-
 export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcommerce, since, until }: Props) {
   const labels = getPaidMediaLabels(isEcommerce);
   const [trend, setTrend] = useState<DailyWithPrevious | null>(null);
+  const [selectedMetric, setSelectedMetric] = useState<MetricKey>("spend");
   const [, startTransition] = useTransition();
+
+  // Reset metric when switching to a different ad
+  useEffect(() => {
+    if (ad) setSelectedMetric("spend");
+  }, [ad?.id]);
 
   useEffect(() => {
     if (!ad) { setTrend(null); return; }
     setTrend(null);
     startTransition(async () => {
-      const d = await getAdChartData(adAccountId, ad.id, since, until, "spend");
+      const d = await getAdChartData(adAccountId, ad.id, since, until, selectedMetric);
       setTrend(d);
     });
-  }, [ad, adAccountId, since, until]);
+  }, [ad, adAccountId, since, until, selectedMetric]);
 
   useEffect(() => {
     if (!ad) return;
@@ -86,19 +85,48 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
         </div>
 
         <div className="grid grid-cols-3 gap-2 mb-6">
-          <Stat label={labels.spend} value={formatMoney(ad.spend, currency)} />
-          <Stat label={labels.impressions} value={ad.impressions.toLocaleString("es-AR")} />
-          <Stat label={labels.clicks} value={ad.clicks.toLocaleString("es-AR")} />
-          <Stat label={labels.ctr} value={`${ad.ctr.toFixed(2)}%`} />
-          <Stat label={labels.conversions} value={String(ad.conversions)} />
+          <Stat
+            label={labels.spend}
+            value={formatMoney(ad.spend, currency)}
+            active={selectedMetric === "spend"}
+            onClick={() => setSelectedMetric("spend")}
+          />
+          <Stat
+            label={labels.impressions}
+            value={ad.impressions.toLocaleString("es-AR")}
+            active={selectedMetric === "impressions"}
+            onClick={() => setSelectedMetric("impressions")}
+          />
+          <Stat
+            label={labels.clicks}
+            value={ad.clicks.toLocaleString("es-AR")}
+            active={selectedMetric === "clicks"}
+            onClick={() => setSelectedMetric("clicks")}
+          />
+          <Stat
+            label={labels.ctr}
+            value={`${ad.ctr.toFixed(2)}%`}
+            active={selectedMetric === "ctr"}
+            onClick={() => setSelectedMetric("ctr")}
+          />
+          <Stat
+            label={labels.conversions}
+            value={String(ad.conversions)}
+            active={selectedMetric === "conversions"}
+            onClick={() => setSelectedMetric("conversions")}
+          />
           <Stat
             label={labels.cpa}
             value={ad.conversions > 0 ? formatMoney(Math.round(ad.cpa * 100), currency) : "—"}
+            active={selectedMetric === "cpa"}
+            onClick={() => setSelectedMetric("cpa")}
           />
         </div>
 
         <div className="mb-6">
-          <h3 className="text-sm font-medium mb-2">{labels.spend} diario</h3>
+          <h3 className="text-sm font-medium mb-2">
+            {(labels as Record<string, string>)[selectedMetric] ?? selectedMetric} diario
+          </h3>
           <div className="h-52">
             {!trend ? (
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -113,7 +141,7 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
                   <Tooltip
                     formatter={(v) =>
                       typeof v === "number"
-                        ? formatMoney(Math.round(v * 100), currency)
+                        ? formatMetricValue(selectedMetric, v, currency)
                         : String(v)
                     }
                   />
@@ -149,11 +177,29 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  active,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  active?: boolean;
+  onClick?: () => void;
+}) {
   return (
-    <div className="rounded-lg border border-border bg-background p-2">
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-left rounded-lg border p-2 transition-colors ${
+        active
+          ? "border-primary bg-primary/5"
+          : "border-border bg-background hover:bg-accent/30"
+      }`}
+    >
       <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
       <div className="text-sm font-semibold">{value}</div>
-    </div>
+    </button>
   );
 }
