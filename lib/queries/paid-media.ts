@@ -227,7 +227,10 @@ export async function getCampaignsWithKpis(
       )
     )
     .where(eq(metaCampaigns.adAccountId, adAccountId))
-    .groupBy(metaCampaigns.id);
+    .groupBy(metaCampaigns.id)
+    .having(
+      sql`COALESCE(SUM(${metaInsightsDaily.spend}), 0) > 0 OR COALESCE(SUM(${metaInsightsDaily.conversions}), 0) > 0`
+    );
 
   return rows.map((r) => ({
     id: r.id,
