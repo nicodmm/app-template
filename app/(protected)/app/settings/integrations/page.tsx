@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { requireUserId } from "@/lib/auth";
 import { db } from "@/lib/drizzle/db";
-import { metaConnections, metaAdAccounts, accounts } from "@/lib/drizzle/schema";
+import { metaConnections, metaAdAccounts, accounts, crmConnections } from "@/lib/drizzle/schema";
 import { getWorkspaceByUserId } from "@/lib/queries/workspace";
 import { DeleteButton } from "@/components/delete-button";
 import { AdAccountMappingForm } from "@/components/ad-account-mapping-form";
@@ -20,13 +20,26 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
   const workspace = await getWorkspaceByUserId(userId);
   if (!workspace) redirect("/auth/login");
 
-  const [connections, adAccounts, planiAccounts] = await Promise.all([
+  const [connections, adAccounts, planiAccounts, crmRows] = await Promise.all([
     db.select().from(metaConnections).where(eq(metaConnections.workspaceId, workspace.id)),
     db.select().from(metaAdAccounts).where(eq(metaAdAccounts.workspaceId, workspace.id)),
     db
       .select({ id: accounts.id, name: accounts.name })
       .from(accounts)
       .where(eq(accounts.workspaceId, workspace.id)),
+    db
+      .select({
+        id: crmConnections.id,
+        provider: crmConnections.provider,
+        externalCompanyDomain: crmConnections.externalCompanyDomain,
+        status: crmConnections.status,
+        accountId: crmConnections.accountId,
+        accountName: accounts.name,
+        catalogsConfiguredAt: crmConnections.catalogsConfiguredAt,
+      })
+      .from(crmConnections)
+      .innerJoin(accounts, eq(crmConnections.accountId, accounts.id))
+      .where(eq(crmConnections.workspaceId, workspace.id)),
   ]);
 
   return (
@@ -132,6 +145,57 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
           </div>
         </div>
       )}
+
+      <section className="mt-8">
+        <h2 className="text-lg font-semibold mb-3">CRM</h2>
+        {crmRows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Todavía no conectaste ningún CRM. Entrá a la página de un cliente → pestaña CRM → "Conectar".
+          </p>
+        ) : (
+          <div className="rounded-md border border-border overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50">
+                <tr className="text-left text-muted-foreground">
+                  <th className="py-2 px-3 font-normal">Cliente</th>
+                  <th className="py-2 px-3 font-normal">Proveedor</th>
+                  <th className="py-2 px-3 font-normal">Instancia</th>
+                  <th className="py-2 px-3 font-normal">Status</th>
+                  <th className="py-2 px-3 font-normal">Configurar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {crmRows.map((r) => (
+                  <tr key={r.id} className="border-t border-border">
+                    <td className="py-2 px-3 font-medium">{r.accountName}</td>
+                    <td className="py-2 px-3">{r.provider}</td>
+                    <td className="py-2 px-3">{r.externalCompanyDomain ?? "—"}</td>
+                    <td className="py-2 px-3">
+                      <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] uppercase ${
+                        r.status === "active"
+                          ? "bg-green-500/15 text-green-700"
+                          : r.status === "expired"
+                          ? "bg-yellow-500/15 text-yellow-700"
+                          : "bg-red-500/15 text-red-700"
+                      }`}>
+                        {r.status}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3">
+                      <Link
+                        href={`/app/accounts/${r.accountId}/crm/setup`}
+                        className="text-xs underline hover:no-underline"
+                      >
+                        {r.catalogsConfiguredAt ? "Editar" : "Configurar"}
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
