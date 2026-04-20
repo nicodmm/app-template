@@ -24,6 +24,7 @@ interface SyncSingleInput {
 interface SyncResult {
   campaignInsightsUpserted: number;
   adInsightsUpserted: number;
+  assetInsightsUpserted: number;
   changeEventsUpserted: number;
 }
 
@@ -39,7 +40,12 @@ export const syncSingleAdAccount = task({
         adAccountId: payload.adAccountId,
         status: row.connectionStatus,
       });
-      return { campaignInsightsUpserted: 0, adInsightsUpserted: 0, changeEventsUpserted: 0 };
+      return {
+        campaignInsightsUpserted: 0,
+        adInsightsUpserted: 0,
+        assetInsightsUpserted: 0,
+        changeEventsUpserted: 0,
+      };
     }
 
     const accessToken = row.accessToken;
@@ -88,7 +94,7 @@ export const syncSingleAdAccount = task({
         campaignIdMap: campaignMap,
       });
 
-      await fetchAndUpsertAssetInsights({
+      const assetInsightsUpserted = await fetchAndUpsertAssetInsights({
         adAccountRowId: payload.adAccountId,
         metaAdAccountId: metaId,
         accessToken,
@@ -121,9 +127,15 @@ export const syncSingleAdAccount = task({
         adAccountId: payload.adAccountId,
         campaignInsightsUpserted,
         adInsightsUpserted,
+        assetInsightsUpserted,
         changeEventsUpserted,
       });
-      return { campaignInsightsUpserted, adInsightsUpserted, changeEventsUpserted };
+      return {
+        campaignInsightsUpserted,
+        adInsightsUpserted,
+        assetInsightsUpserted,
+        changeEventsUpserted,
+      };
     } catch (err) {
       if (err instanceof MetaApiError && err.isAuthError()) {
         logger.error("token expired/revoked — marking connection expired", {
