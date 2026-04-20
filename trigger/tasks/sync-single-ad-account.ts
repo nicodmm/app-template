@@ -8,6 +8,7 @@ import {
   getAdAccountWithConnection,
 } from "@/lib/meta/sync-insights";
 import { fetchAndUpsertAds, fetchAndUpsertAdInsights } from "@/lib/meta/sync-ads";
+import { fetchAndUpsertAssetInsights } from "@/lib/meta/sync-asset-variants";
 import { fetchAndUpsertChangeEvents, pruneOldChangeEvents } from "@/lib/meta/sync-changes";
 import { MetaApiError } from "@/lib/meta/client";
 
@@ -85,6 +86,17 @@ export const syncSingleAdAccount = task({
         isEcommerce: row.adAccount.isEcommerce,
         adIdMap: adMap,
         campaignIdMap: campaignMap,
+      });
+
+      await fetchAndUpsertAssetInsights({
+        adAccountRowId: payload.adAccountId,
+        metaAdAccountId: metaId,
+        accessToken,
+        since: range.since,
+        until: range.until,
+        conversionEvent: row.adAccount.conversionEvent,
+        isEcommerce: row.adAccount.isEcommerce,
+        adIdMap: adMap,
       });
 
       // Change events: sync from last 25 hours to cover the hourly sync window
