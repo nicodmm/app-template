@@ -36,12 +36,13 @@ export function AdAccountMappingForm({
   const [isEcommerce, setIsEcommerce] = useState(currentIsEcommerce);
   const [conversionEvent, setConversionEvent] = useState(currentConversionEvent);
   const [saved, setSaved] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   function save() {
     startTransition(async () => {
-      await updateAdAccountMapping({
+      const result = await updateAdAccountMapping({
         adAccountId,
         accountId: accountId || null,
         isEcommerce,
@@ -50,6 +51,10 @@ export function AdAccountMappingForm({
       setSaved(true);
       router.refresh();
       setTimeout(() => setSaved(false), 2000);
+      if (result.triggeredBackfill) {
+        setSyncing(true);
+        setTimeout(() => setSyncing(false), 10000);
+      }
     });
   }
 
@@ -105,6 +110,12 @@ export function AdAccountMappingForm({
       >
         {isPending ? "Guardando..." : saved ? "✓ Guardado" : "Guardar"}
       </button>
+
+      {syncing && (
+        <span className="text-xs text-muted-foreground">
+          Sincronizando 90 días de datos… puede tardar unos minutos. La página se actualizará sola.
+        </span>
+      )}
     </div>
   );
 }

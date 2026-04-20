@@ -6,7 +6,7 @@ import {
   metaAdAccounts,
   metaConnections,
 } from "@/lib/drizzle/schema";
-import { metaGraphFetch } from "./client";
+import { metaGraphFetch, paginate } from "./client";
 
 type CampaignApi = {
   id: string;
@@ -133,7 +133,8 @@ export async function fetchAndUpsertInsights(params: {
   isEcommerce: boolean;
   campaignIdMap: Map<string, string>;
 }): Promise<number> {
-  const result = await metaGraphFetch<{ data: InsightApiRow[] }>(
+  let upserts = 0;
+  for await (const row of paginate<InsightApiRow>(
     `/${params.metaAdAccountId}/insights`,
     {
       accessToken: params.accessToken,
@@ -145,10 +146,7 @@ export async function fetchAndUpsertInsights(params: {
         limit: 500,
       },
     }
-  );
-
-  let upserts = 0;
-  for (const row of result.data) {
+  )) {
     if (!row.campaign_id || !row.date_start) continue;
     const localCampaignId = params.campaignIdMap.get(row.campaign_id);
     if (!localCampaignId) continue;

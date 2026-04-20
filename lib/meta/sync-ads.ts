@@ -4,7 +4,7 @@ import {
   metaAds,
   metaAdInsightsDaily,
 } from "@/lib/drizzle/schema";
-import { metaGraphFetch } from "./client";
+import { paginate } from "./client";
 import { resolveImageUrlsByHash } from "./images";
 import {
   moneyToCents,
@@ -46,23 +46,21 @@ export async function fetchAndUpsertAds(
   accessToken: string,
   campaignIdMap: Map<string, string>
 ): Promise<Map<string, string>> {
-  const result = await metaGraphFetch<{ data: AdApi[] }>(
-    `/${metaAdAccountId}/ads`,
-    {
-      accessToken,
-      searchParams: {
-        fields:
-          "id,name,status,creative{id,thumbnail_url,image_url,image_hash},campaign_id",
-        limit: 500,
-      },
-    }
-  );
+  const ads: AdApi[] = [];
+  for await (const ad of paginate<AdApi>(`/${metaAdAccountId}/ads`, {
+    accessToken,
+    searchParams: {
+      fields:
+        "id,name,status,creative{id,thumbnail_url,image_url,image_hash},campaign_id",
+      limit: 500,
+    },
+  })) {
+    ads.push(ad);
+  }
 
   const hashesToResolve = Array.from(
     new Set(
-      result.data
-        .map((ad) => ad.creative?.image_hash)
-        .filter((h): h is string => !!h)
+      ads.map((ad) => ad.creative?.image_hash).filter((h): h is string => !!h)
     )
   );
   const resolvedByHash = await resolveImageUrlsByHash(
@@ -74,7 +72,7 @@ export async function fetchAndUpsertAds(
   const metaToLocalId = new Map<string, string>();
   const now = new Date();
 
-  for (const ad of result.data) {
+  for (const ad of ads) {
     const localCampaignId = campaignIdMap.get(ad.campaign_id);
     if (!localCampaignId) continue; // campaign not synced yet, skip
 
@@ -124,7 +122,8 @@ export async function fetchAndUpsertAdInsights(params: {
   adIdMap: Map<string, string>; // metaAdId -> localAdId
   campaignIdMap: Map<string, string>; // metaCampaignId -> localCampaignId
 }): Promise<number> {
-  const result = await metaGraphFetch<{ data: AdInsightApiRow[] }>(
+  let upserts = 0;
+  for await (const row of paginate<AdInsightApiRow>(
     `/${params.metaAdAccountId}/insights`,
     {
       accessToken: params.accessToken,
@@ -137,10 +136,7 @@ export async function fetchAndUpsertAdInsights(params: {
         limit: 500,
       },
     }
-  );
-
-  let upserts = 0;
-  for (const row of result.data) {
+  )) {
     if (!row.ad_id || !row.campaign_id || !row.date_start) continue;
     const localAdId = params.adIdMap.get(row.ad_id);
     const localCampaignId = params.campaignIdMap.get(row.campaign_id);

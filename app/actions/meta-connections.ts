@@ -32,7 +32,7 @@ export async function updateAdAccountMapping(input: {
   accountId: string | null;
   isEcommerce: boolean;
   conversionEvent: string;
-}): Promise<void> {
+}): Promise<{ triggeredBackfill: boolean }> {
   const userId = await requireUserId();
   const workspace = await getWorkspaceOrFail(userId);
 
@@ -48,9 +48,10 @@ export async function updateAdAccountMapping(input: {
     .limit(1);
   if (ad.length === 0) throw new Error("Ad account no encontrado");
 
-  const wasUnmapped = ad[0].currentAccountId === null;
+  const previousAccountId = ad[0].currentAccountId;
   const isNowMapped = input.accountId !== null;
-  const newlyMapped = wasUnmapped && isNowMapped;
+  const accountChanged = previousAccountId !== input.accountId;
+  const shouldBackfill = isNowMapped && accountChanged;
 
   await db
     .update(metaAdAccounts)
@@ -72,10 +73,16 @@ export async function updateAdAccountMapping(input: {
   revalidatePath("/app/settings/integrations");
   if (input.accountId) revalidatePath(`/app/accounts/${input.accountId}`);
 
-  if (newlyMapped) {
+  if (shouldBackfill) {
     const { tasks } = await import("@trigger.dev/sdk/v3");
-    await tasks.trigger("backfill-meta-ads", { adAccountId: input.adAccountId });
+    await tasks.trigger(
+      "backfill-meta-ads",
+      { adAccountId: input.adAccountId },
+      { idempotencyKey: `backfill:${input.adAccountId}:${input.accountId}`, idempotencyKeyTTL: "1h" }
+    );
   }
+
+  return { triggeredBackfill: shouldBackfill };
 }
 
 export async function triggerBackfillForAdAccount(adAccountId: string): Promise<void> {
