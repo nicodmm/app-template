@@ -8,6 +8,8 @@ import {
   metaAds,
   metaAdInsightsDaily,
   metaChangeEvents,
+  metaAdAssetVariants,
+  metaAdAssetInsightsDaily,
 } from "@/lib/drizzle/schema";
 
 export type PaidMediaConnectionState =
@@ -763,4 +765,67 @@ export async function getAdDailyWithPrevious(
       : ((totalCurrent - totalPrevious) / totalPrevious) * 100;
 
   return { current, previous, totals: { current: totalCurrent, previous: totalPrevious, deltaPct } };
+}
+
+// ---------------------------------------------------------------------------
+// Task 6: Asset variants per ad
+// ---------------------------------------------------------------------------
+
+export type AssetVariantRow = {
+  id: string;
+  metaAssetHash: string;
+  name: string | null;
+  imageUrl: string | null;
+  thumbnailUrl: string | null;
+  spend: number;        // cents
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  ctr: number;          // percent
+  cpa: number;          // currency units (not cents)
+};
+
+export async function getAssetVariantsForAd(
+  adId: string,
+  since: string,
+  until: string
+): Promise<AssetVariantRow[]> {
+  const rows = await db
+    .select({
+      id: metaAdAssetVariants.id,
+      metaAssetHash: metaAdAssetVariants.metaAssetHash,
+      name: metaAdAssetVariants.name,
+      imageUrl: metaAdAssetVariants.imageUrl,
+      thumbnailUrl: metaAdAssetVariants.thumbnailUrl,
+      spend: sql<number>`COALESCE(SUM(${metaAdAssetInsightsDaily.spend}), 0)::int`,
+      impressions: sql<number>`COALESCE(SUM(${metaAdAssetInsightsDaily.impressions}), 0)::int`,
+      clicks: sql<number>`COALESCE(SUM(${metaAdAssetInsightsDaily.clicks}), 0)::int`,
+      conversions: sql<number>`COALESCE(SUM(${metaAdAssetInsightsDaily.conversions}), 0)::int`,
+    })
+    .from(metaAdAssetVariants)
+    .innerJoin(
+      metaAdAssetInsightsDaily,
+      and(
+        eq(metaAdAssetInsightsDaily.assetVariantId, metaAdAssetVariants.id),
+        gte(metaAdAssetInsightsDaily.date, since),
+        lte(metaAdAssetInsightsDaily.date, until)
+      )
+    )
+    .where(eq(metaAdAssetVariants.adId, adId))
+    .groupBy(metaAdAssetVariants.id)
+    .orderBy(sql`COALESCE(SUM(${metaAdAssetInsightsDaily.spend}), 0) DESC`);
+
+  return rows.map((r) => ({
+    id: r.id,
+    metaAssetHash: r.metaAssetHash,
+    name: r.name,
+    imageUrl: r.imageUrl,
+    thumbnailUrl: r.thumbnailUrl,
+    spend: r.spend,
+    impressions: r.impressions,
+    clicks: r.clicks,
+    conversions: r.conversions,
+    ctr: r.impressions > 0 ? (r.clicks / r.impressions) * 100 : 0,
+    cpa: r.conversions > 0 ? r.spend / r.conversions / 100 : 0,
+  }));
 }
