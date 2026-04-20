@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { env } from "@/lib/env";
 import { randomUUID } from "crypto";
+import type { CrmProviderId } from "./types";
 
 const STATE_ALG = "HS256";
 const STATE_EXPIRY = "10m";
@@ -9,7 +10,7 @@ export interface CrmOAuthState {
   accountId: string;
   workspaceId: string;
   userId: string;
-  provider: string;
+  provider: CrmProviderId;
   nonce: string;
 }
 
@@ -42,5 +43,14 @@ export async function verifyOAuthState(token: string): Promise<CrmOAuthState> {
   ) {
     throw new Error("Invalid state payload");
   }
-  return { accountId, workspaceId, userId, provider, nonce };
+  const VALID_PROVIDERS: readonly CrmProviderId[] = [
+    "pipedrive",
+    "hubspot",
+    "kommo",
+    "dynamics",
+  ];
+  if (!VALID_PROVIDERS.includes(provider as CrmProviderId)) {
+    throw new Error("Invalid state payload");
+  }
+  return { accountId, workspaceId, userId, provider: provider as CrmProviderId, nonce };
 }
