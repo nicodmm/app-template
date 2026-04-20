@@ -15,3 +15,5 @@ export * from "./meta_insights_daily";
 export * from "./meta_ads";
 export * from "./meta_ad_insights_daily";
 export * from "./meta_change_events";
+export * from "./meta_ad_asset_variants";
+export * from "./meta_ad_asset_insights_daily";

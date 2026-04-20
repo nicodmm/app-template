@@ -10,6 +10,8 @@ export function getPaidMediaLabels(isEcommerce: boolean) {
     cpm: "CPM",
     frequency: "Frecuencia",
     roas: "ROAS",
+    assetVariants: "Variantes por imagen",
+    assetName: "Nombre",
   } as const;
 }
 

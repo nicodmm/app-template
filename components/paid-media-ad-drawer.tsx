@@ -14,6 +14,7 @@ import { getAdChartData } from "@/app/actions/paid-media-chart";
 import { getPaidMediaLabels } from "@/lib/meta/labels";
 import { formatMetricValue, formatMoney } from "@/lib/meta/format";
 import type { AdRow, DailyWithPrevious, MetricKey } from "@/lib/queries/paid-media";
+import { PaidMediaAssetVariantsSection } from "./paid-media-asset-variants-section";
 
 interface Props {
   ad: AdRow | null;
@@ -29,13 +30,13 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
   const labels = getPaidMediaLabels(isEcommerce);
   const [trend, setTrend] = useState<DailyWithPrevious | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>("spend");
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   // Reset metric when switching to a different ad
   useEffect(() => {
     if (ad) setSelectedMetric("spend");
-    setPreviewOpen(false);
+    setPreviewUrl(null);
   }, [ad?.id]);
 
   useEffect(() => {
@@ -51,12 +52,12 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
     if (!ad) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (previewOpen) setPreviewOpen(false);
+      if (previewUrl) setPreviewUrl(null);
       else onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [ad, onClose, previewOpen]);
+  }, [ad, onClose, previewUrl]);
 
   if (!ad) return null;
 
@@ -172,18 +173,30 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
           </div>
         </div>
 
+        <PaidMediaAssetVariantsSection
+          adId={ad.id}
+          since={since}
+          until={until}
+          currency={currency}
+          isEcommerce={isEcommerce}
+          onRowClick={setPreviewUrl}
+        />
+
         <div>
           <h3 className="text-sm font-medium mb-2">Creatividad</h3>
-          {ad.thumbnailUrl ? (
+          {ad.thumbnailUrl || ad.imageUrl ? (
             <button
               type="button"
-              onClick={() => setPreviewOpen(true)}
+              onClick={() => {
+                const full = ad.imageUrl ?? ad.thumbnailUrl;
+                if (full) setPreviewUrl(full);
+              }}
               className="block group relative"
               aria-label="Ver creatividad en grande"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={ad.thumbnailUrl}
+                src={ad.thumbnailUrl ?? ad.imageUrl ?? ""}
                 alt={ad.name}
                 loading="lazy"
                 className="rounded-md border border-border max-w-full max-h-64 object-contain bg-muted"
@@ -205,19 +218,19 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
         </div>
       </aside>
 
-      {previewOpen && ad.thumbnailUrl && (
+      {previewUrl && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-6"
           onClick={(e) => {
             e.stopPropagation();
-            setPreviewOpen(false);
+            setPreviewUrl(null);
           }}
           role="dialog"
           aria-modal="true"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={ad.thumbnailUrl}
+            src={previewUrl}
             alt={ad.name}
             className="max-w-[92vw] max-h-[92vh] object-contain rounded-md shadow-2xl"
             onClick={(e) => e.stopPropagation()}
@@ -226,7 +239,7 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              setPreviewOpen(false);
+              setPreviewUrl(null);
             }}
             className="absolute top-4 right-4 rounded-md bg-white/90 text-black px-3 py-1.5 text-sm font-medium hover:bg-white"
           >

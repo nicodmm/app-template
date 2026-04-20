@@ -50,6 +50,27 @@
       "when": 1776481174630,
       "tag": "0006_equal_sasquatch",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776484831610,
+      "tag": "0007_military_natasha_romanoff",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776646392367,
+      "tag": "0008_square_scourge",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1776654259522,
+      "tag": "0009_material_talon",
+      "breakpoints": true
     }
   ]
 }

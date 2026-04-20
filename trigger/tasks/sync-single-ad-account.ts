@@ -8,6 +8,7 @@ import {
   getAdAccountWithConnection,
 } from "@/lib/meta/sync-insights";
 import { fetchAndUpsertAds, fetchAndUpsertAdInsights } from "@/lib/meta/sync-ads";
+import { fetchAndUpsertAssetInsights } from "@/lib/meta/sync-asset-variants";
 import { fetchAndUpsertChangeEvents, pruneOldChangeEvents } from "@/lib/meta/sync-changes";
 import { MetaApiError } from "@/lib/meta/client";
 
@@ -23,6 +24,7 @@ interface SyncSingleInput {
 interface SyncResult {
   campaignInsightsUpserted: number;
   adInsightsUpserted: number;
+  assetInsightsUpserted: number;
   changeEventsUpserted: number;
 }
 
@@ -38,7 +40,12 @@ export const syncSingleAdAccount = task({
         adAccountId: payload.adAccountId,
         status: row.connectionStatus,
       });
-      return { campaignInsightsUpserted: 0, adInsightsUpserted: 0, changeEventsUpserted: 0 };
+      return {
+        campaignInsightsUpserted: 0,
+        adInsightsUpserted: 0,
+        assetInsightsUpserted: 0,
+        changeEventsUpserted: 0,
+      };
     }
 
     const accessToken = row.accessToken;
@@ -87,6 +94,17 @@ export const syncSingleAdAccount = task({
         campaignIdMap: campaignMap,
       });
 
+      const assetInsightsUpserted = await fetchAndUpsertAssetInsights({
+        adAccountRowId: payload.adAccountId,
+        metaAdAccountId: metaId,
+        accessToken,
+        since: range.since,
+        until: range.until,
+        conversionEvent: row.adAccount.conversionEvent,
+        isEcommerce: row.adAccount.isEcommerce,
+        adIdMap: adMap,
+      });
+
       // Change events: sync from last 25 hours to cover the hourly sync window
       // with overlap (idempotent via UNIQUE). On first sync this yields recent
       // events only; full 90-day backfill runs in backfill-meta-ads.
@@ -109,9 +127,15 @@ export const syncSingleAdAccount = task({
         adAccountId: payload.adAccountId,
         campaignInsightsUpserted,
         adInsightsUpserted,
+        assetInsightsUpserted,
         changeEventsUpserted,
       });
-      return { campaignInsightsUpserted, adInsightsUpserted, changeEventsUpserted };
+      return {
+        campaignInsightsUpserted,
+        adInsightsUpserted,
+        assetInsightsUpserted,
+        changeEventsUpserted,
+      };
     } catch (err) {
       if (err instanceof MetaApiError && err.isAuthError()) {
         logger.error("token expired/revoked — marking connection expired", {
