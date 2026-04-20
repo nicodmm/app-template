@@ -20,6 +20,7 @@ import { SignalsPanel } from "@/components/signals-panel";
 import { HealthHistoryTimeline } from "@/components/health-history-timeline";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { PaidMediaMiniCard } from "@/components/paid-media-mini-card";
+import { CrmMiniCard } from "@/components/crm-mini-card";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
@@ -191,6 +192,11 @@ export default async function AccountDetailPage({
       {/* Paid Media mini-card */}
       <div className="mb-6">
         <PaidMediaMiniCard workspaceId={workspace.id} accountId={accountId} />
+      </div>
+
+      {/* CRM mini-card */}
+      <div className="mb-6">
+        <CrmMiniCard workspaceId={workspace.id} accountId={accountId} />
       </div>
 
       {/* Transcript Upload */}

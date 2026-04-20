@@ -1,0 +1,1 @@
+ALTER TABLE "crm_stages" ADD COLUMN "is_proposal_stage" boolean DEFAULT false NOT NULL;

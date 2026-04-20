@@ -12,6 +12,7 @@ export const crmStages = pgTable(
     name: text("name").notNull(),
     orderNr: integer("order_nr").notNull().default(0),
     isSynced: boolean("is_synced").notNull().default(false),
+    isProposalStage: boolean("is_proposal_stage").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

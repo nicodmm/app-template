@@ -10,7 +10,14 @@ interface Pipeline {
   externalId: string;
   name: string;
   isSynced: boolean;
-  stages: { id: string; externalId: string; name: string; orderNr: number; isSynced: boolean }[];
+  stages: {
+    id: string;
+    externalId: string;
+    name: string;
+    orderNr: number;
+    isSynced: boolean;
+    isProposalStage: boolean;
+  }[];
 }
 
 interface Props {
@@ -34,6 +41,16 @@ export function CrmMappingForm({
   );
   const [stageIds, setStageIds] = useState<Set<string>>(
     new Set(pipelines.flatMap((p) => p.stages.filter((s) => s.isSynced).map((s) => s.id)))
+  );
+  const [proposalByPipeline, setProposalByPipeline] = useState<Record<string, string>>(
+    () => {
+      const out: Record<string, string> = {};
+      for (const p of pipelines) {
+        const s = p.stages.find((x) => x.isProposalStage);
+        if (s) out[p.id] = s.id;
+      }
+      return out;
+    }
   );
   const [sourceFieldType, setSourceFieldType] = useState<"channel" | "custom">(
     sourceConfig?.sourceFieldType ?? "channel"
@@ -60,6 +77,10 @@ export function CrmMappingForm({
         pipeline.stages.forEach((s) => nextStages.delete(s.id));
         setStageIds(nextStages);
       }
+      // Clear proposal stage for this pipeline
+      const nextProposals = { ...proposalByPipeline };
+      delete nextProposals[id];
+      setProposalByPipeline(nextProposals);
     } else {
       next.add(id);
     }
@@ -68,8 +89,29 @@ export function CrmMappingForm({
 
   function toggleStage(id: string) {
     const next = new Set(stageIds);
-    next.has(id) ? next.delete(id) : next.add(id);
+    if (next.has(id)) {
+      next.delete(id);
+      // If this stage was the proposal stage for its pipeline, clear it
+      const pipelineId = pipelines.find((p) => p.stages.some((s) => s.id === id))?.id;
+      if (pipelineId && proposalByPipeline[pipelineId] === id) {
+        const nextProposals = { ...proposalByPipeline };
+        delete nextProposals[pipelineId];
+        setProposalByPipeline(nextProposals);
+      }
+    } else {
+      next.add(id);
+    }
     setStageIds(next);
+  }
+
+  function setProposalStage(pipelineId: string, stageId: string | null) {
+    const nextProposals = { ...proposalByPipeline };
+    if (stageId === null) {
+      delete nextProposals[pipelineId];
+    } else {
+      nextProposals[pipelineId] = stageId;
+    }
+    setProposalByPipeline(nextProposals);
   }
 
   function save() {
@@ -79,6 +121,7 @@ export function CrmMappingForm({
         connectionId,
         syncedPipelineIds: Array.from(pipelineIds),
         syncedStageIds: Array.from(stageIds),
+        proposalStageIds: Object.values(proposalByPipeline),
         sourceFieldType,
         sourceFieldKey,
       });
@@ -156,6 +199,52 @@ export function CrmMappingForm({
               </div>
             </div>
           ))}
+        </section>
+      )}
+
+      {selectedPipelines.length > 0 && (
+        <section>
+          <h2 className="text-sm font-medium mb-1">Stage de propuesta (opcional)</h2>
+          <p className="text-xs text-muted-foreground mb-2">
+            Marcá el stage que representa &ldquo;propuesta enviada&rdquo; en cada pipeline. Se usa para el KPI de Propuestas en el resumen del cliente.
+          </p>
+          {selectedPipelines.map((p) => {
+            const syncedStages = p.stages.filter((s) => stageIds.has(s.id));
+            return (
+              <div key={p.id} className="mb-3">
+                <div className="text-xs font-medium mb-1">{p.name}</div>
+                <div className="space-y-1 pl-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name={`proposal-${p.id}`}
+                      checked={!proposalByPipeline[p.id]}
+                      onChange={() => setProposalStage(p.id, null)}
+                      disabled={isPending}
+                    />
+                    <span className="text-muted-foreground">Ninguno</span>
+                  </label>
+                  {syncedStages.length === 0 && (
+                    <p className="text-xs text-muted-foreground italic pl-4">
+                      Seleccioná stages arriba para elegir uno como propuesta.
+                    </p>
+                  )}
+                  {syncedStages.map((s) => (
+                    <label key={s.id} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name={`proposal-${p.id}`}
+                        checked={proposalByPipeline[p.id] === s.id}
+                        onChange={() => setProposalStage(p.id, s.id)}
+                        disabled={isPending}
+                      />
+                      <span>{s.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </section>
       )}
 

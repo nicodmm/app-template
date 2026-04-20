@@ -39,6 +39,7 @@ export async function updateCrmMapping(input: {
   connectionId: string;
   syncedPipelineIds: string[];    // local uuids
   syncedStageIds: string[];       // local uuids, subset of stages of synced pipelines
+  proposalStageIds: string[];     // local uuids; at most one per pipeline (enforced client-side)
   sourceFieldType: "channel" | "custom";
   sourceFieldKey: string;
 }): Promise<{ triggeredBackfill: boolean }> {
@@ -75,6 +76,7 @@ export async function updateCrmMapping(input: {
       .update(crmStages)
       .set({
         isSynced: input.syncedStageIds.includes(s.id),
+        isProposalStage: input.proposalStageIds.includes(s.id),
         updatedAt: new Date(),
       })
       .where(eq(crmStages.id, s.id));

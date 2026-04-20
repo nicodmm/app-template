@@ -150,7 +150,7 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
         <h2 className="text-lg font-semibold mb-3">CRM</h2>
         {crmRows.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Todavía no conectaste ningún CRM. Entrá a la página de un cliente → pestaña CRM → "Conectar".
+            Todavía no conectaste ningún CRM. Entrá a la página de un cliente → sección CRM → &ldquo;Conectar Pipedrive&rdquo;.
           </p>
         ) : (
           <div className="rounded-md border border-border overflow-x-auto">

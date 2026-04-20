@@ -90,7 +90,14 @@ export interface MappingPageData {
     externalId: string;
     name: string;
     isSynced: boolean;
-    stages: { id: string; externalId: string; name: string; orderNr: number; isSynced: boolean }[];
+    stages: {
+      id: string;
+      externalId: string;
+      name: string;
+      orderNr: number;
+      isSynced: boolean;
+      isProposalStage: boolean;
+    }[];
   }[];
   sourceConfig: { sourceFieldType: "channel" | "custom"; sourceFieldKey: string } | null;
 }
@@ -114,6 +121,7 @@ export async function getMappingPageData(connectionId: string): Promise<MappingP
       name: crmStages.name,
       orderNr: crmStages.orderNr,
       isSynced: crmStages.isSynced,
+      isProposalStage: crmStages.isProposalStage,
     })
     .from(crmStages);
 
@@ -135,6 +143,7 @@ export async function getMappingPageData(connectionId: string): Promise<MappingP
           name: s.name,
           orderNr: s.orderNr,
           isSynced: s.isSynced,
+          isProposalStage: s.isProposalStage,
         })),
     })),
     sourceConfig: cfg.length > 0
@@ -407,4 +416,84 @@ export async function getCrmFilterOptions(connectionId: string): Promise<CrmFilt
     .innerJoin(crmPipelines, eq(crmStages.pipelineId, crmPipelines.id))
     .where(and(eq(crmPipelines.connectionId, connectionId), eq(crmStages.isSynced, true)));
   return { sources, stages };
+}
+
+export interface CrmMiniCardKpis {
+  oportunidades: number;
+  propuestas: number;
+  valuePipeline: CurrencyBucket[];
+  wonLast30d: number;
+  lastSyncedAt: Date | null;
+}
+
+export async function getCrmMiniCardKpis(connectionId: string): Promise<CrmMiniCardKpis> {
+  const proposalStages = await db
+    .select({ id: crmStages.id })
+    .from(crmStages)
+    .innerJoin(crmPipelines, eq(crmStages.pipelineId, crmPipelines.id))
+    .where(
+      and(
+        eq(crmPipelines.connectionId, connectionId),
+        eq(crmStages.isProposalStage, true)
+      )
+    );
+  const proposalStageIds = proposalStages.map((s) => s.id);
+
+  const [openRow] = await db
+    .select({ c: count() })
+    .from(crmDeals)
+    .where(and(eq(crmDeals.connectionId, connectionId), eq(crmDeals.status, "open")));
+
+  let propuestasCount = 0;
+  if (proposalStageIds.length > 0) {
+    const [row] = await db
+      .select({ c: count() })
+      .from(crmDeals)
+      .where(
+        and(
+          eq(crmDeals.connectionId, connectionId),
+          eq(crmDeals.status, "open"),
+          inArray(crmDeals.stageId, proposalStageIds)
+        )
+      );
+    propuestasCount = row.c;
+  }
+
+  const openBuckets = await db
+    .select({
+      currency: crmDeals.currency,
+      total: sql<number>`COALESCE(SUM(${crmDeals.value}),0)::float`,
+    })
+    .from(crmDeals)
+    .where(and(eq(crmDeals.connectionId, connectionId), eq(crmDeals.status, "open")))
+    .groupBy(crmDeals.currency);
+
+  const since30 = new Date(Date.now() - 30 * 86400_000);
+  const [wonRow] = await db
+    .select({ c: count() })
+    .from(crmDeals)
+    .where(
+      and(
+        eq(crmDeals.connectionId, connectionId),
+        eq(crmDeals.status, "won"),
+        isNotNull(crmDeals.wonTime),
+        gte(crmDeals.wonTime, since30)
+      )
+    );
+
+  const [connRow] = await db
+    .select({ lastSyncedAt: crmConnections.lastSyncedAt })
+    .from(crmConnections)
+    .where(eq(crmConnections.id, connectionId))
+    .limit(1);
+
+  return {
+    oportunidades: openRow.c,
+    propuestas: propuestasCount,
+    valuePipeline: openBuckets
+      .filter((b) => b.currency && b.total > 0)
+      .map((b) => ({ currency: b.currency!, total: b.total })),
+    wonLast30d: wonRow.c,
+    lastSyncedAt: connRow?.lastSyncedAt ?? null,
+  };
 }
