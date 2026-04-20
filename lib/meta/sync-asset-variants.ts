@@ -4,7 +4,8 @@ import {
   metaAdAssetVariants,
   metaAdAssetInsightsDaily,
 } from "@/lib/drizzle/schema";
-import { metaGraphFetch } from "./client";
+import { paginate } from "./client";
+import { resolveImageUrlsByHash } from "./images";
 import {
   moneyToCents,
   intOrZero,
@@ -43,7 +44,13 @@ export async function fetchAndUpsertAssetInsights(params: {
   isEcommerce: boolean;
   adIdMap: Map<string, string>; // metaAdId -> localAdId
 }): Promise<number> {
-  const result = await metaGraphFetch<{ data: AssetInsightApiRow[] }>(
+  const now = new Date();
+  const variantCache = new Map<string, string>(); // key: `${localAdId}::${hash}` -> variantId
+  const seenHashes = new Set<string>();
+  let variantUpserts = 0;
+  let insightUpserts = 0;
+
+  for await (const row of paginate<AssetInsightApiRow>(
     `/${params.metaAdAccountId}/insights`,
     {
       accessToken: params.accessToken,
@@ -53,18 +60,11 @@ export async function fetchAndUpsertAssetInsights(params: {
         time_increment: 1,
         time_range: JSON.stringify({ since: params.since, until: params.until }),
         fields:
-          "ad_id,image_asset,spend,impressions,reach,clicks,frequency,actions,action_values",
+          "ad_id,spend,impressions,reach,clicks,frequency,actions,action_values",
         limit: 500,
       },
     }
-  );
-
-  const now = new Date();
-  const variantCache = new Map<string, string>(); // key: `${localAdId}::${hash}` -> variantId
-  let variantUpserts = 0;
-  let insightUpserts = 0;
-
-  for (const row of result.data) {
+  )) {
     if (!row.ad_id || !row.date_start) continue;
     const localAdId = params.adIdMap.get(row.ad_id);
     if (!localAdId) continue;
@@ -72,6 +72,7 @@ export async function fetchAndUpsertAssetInsights(params: {
     const asset = row.image_asset;
     if (!asset?.hash) continue; // non-DCO ad rows have no image_asset
 
+    seenHashes.add(asset.hash);
     const cacheKey = `${localAdId}::${asset.hash}`;
     let variantId = variantCache.get(cacheKey);
 
@@ -153,8 +154,24 @@ export async function fetchAndUpsertAssetInsights(params: {
     insightUpserts++;
   }
 
+  // Resolve image URLs in batch (Meta insights breakdowns don't include URLs)
+  if (seenHashes.size > 0) {
+    const resolved = await resolveImageUrlsByHash(
+      params.metaAdAccountId,
+      params.accessToken,
+      Array.from(seenHashes)
+    );
+    for (const [hash, img] of resolved.entries()) {
+      if (!img.url && !img.thumbnailUrl) continue;
+      await db
+        .update(metaAdAssetVariants)
+        .set({ imageUrl: img.url, thumbnailUrl: img.thumbnailUrl, lastSyncedAt: now })
+        .where(eq(metaAdAssetVariants.metaAssetHash, hash));
+    }
+  }
+
   console.log(
-    `[sync-asset-variants] ad_account=${params.metaAdAccountId} variants_upserted=${variantUpserts} daily_rows_upserted=${insightUpserts}`
+    `[sync-asset-variants] ad_account=${params.metaAdAccountId} variants_upserted=${variantUpserts} daily_rows_upserted=${insightUpserts} urls_resolved=${seenHashes.size}`
   );
   return insightUpserts;
 }

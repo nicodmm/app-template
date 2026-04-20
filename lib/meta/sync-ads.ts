@@ -5,6 +5,7 @@ import {
   metaAdInsightsDaily,
 } from "@/lib/drizzle/schema";
 import { metaGraphFetch } from "./client";
+import { resolveImageUrlsByHash } from "./images";
 import {
   moneyToCents,
   intOrZero,
@@ -18,7 +19,12 @@ type AdApi = {
   name: string;
   status: string;
   campaign_id: string;
-  creative?: { id: string; thumbnail_url?: string };
+  creative?: {
+    id: string;
+    thumbnail_url?: string;
+    image_url?: string;
+    image_hash?: string;
+  };
 };
 
 type AdInsightApiRow = {
@@ -45,10 +51,24 @@ export async function fetchAndUpsertAds(
     {
       accessToken,
       searchParams: {
-        fields: "id,name,status,creative{id,thumbnail_url},campaign_id",
+        fields:
+          "id,name,status,creative{id,thumbnail_url,image_url,image_hash},campaign_id",
         limit: 500,
       },
     }
+  );
+
+  const hashesToResolve = Array.from(
+    new Set(
+      result.data
+        .map((ad) => ad.creative?.image_hash)
+        .filter((h): h is string => !!h)
+    )
+  );
+  const resolvedByHash = await resolveImageUrlsByHash(
+    metaAdAccountId,
+    accessToken,
+    hashesToResolve
   );
 
   const metaToLocalId = new Map<string, string>();
@@ -64,6 +84,10 @@ export async function fetchAndUpsertAds(
       .where(and(eq(metaAds.adAccountId, adAccountRowId), eq(metaAds.metaAdId, ad.id)))
       .limit(1);
 
+    const resolved = ad.creative?.image_hash
+      ? resolvedByHash.get(ad.creative.image_hash)
+      : undefined;
+
     const values = {
       adAccountId: adAccountRowId,
       campaignId: localCampaignId,
@@ -71,7 +95,8 @@ export async function fetchAndUpsertAds(
       name: ad.name,
       status: ad.status,
       creativeId: ad.creative?.id ?? null,
-      thumbnailUrl: ad.creative?.thumbnail_url ?? null,
+      thumbnailUrl: ad.creative?.thumbnail_url ?? resolved?.thumbnailUrl ?? null,
+      imageUrl: ad.creative?.image_url ?? resolved?.url ?? null,
       lastSyncedAt: now,
       updatedAt: now,
     };

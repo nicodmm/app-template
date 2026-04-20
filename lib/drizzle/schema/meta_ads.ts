@@ -17,6 +17,7 @@ export const metaAds = pgTable(
     status: text("status").notNull().default("ACTIVE"),
     creativeId: text("creative_id"),
     thumbnailUrl: text("thumbnail_url"),
+    imageUrl: text("image_url"),
     lastSyncedAt: timestamp("last_synced_at").notNull().defaultNow(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),

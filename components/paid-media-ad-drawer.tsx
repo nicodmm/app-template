@@ -184,16 +184,19 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
 
         <div>
           <h3 className="text-sm font-medium mb-2">Creatividad</h3>
-          {ad.thumbnailUrl ? (
+          {ad.thumbnailUrl || ad.imageUrl ? (
             <button
               type="button"
-              onClick={() => ad.thumbnailUrl && setPreviewUrl(ad.thumbnailUrl)}
+              onClick={() => {
+                const full = ad.imageUrl ?? ad.thumbnailUrl;
+                if (full) setPreviewUrl(full);
+              }}
               className="block group relative"
               aria-label="Ver creatividad en grande"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={ad.thumbnailUrl}
+                src={ad.thumbnailUrl ?? ad.imageUrl ?? ""}
                 alt={ad.name}
                 loading="lazy"
                 className="rounded-md border border-border max-w-full max-h-64 object-contain bg-muted"
