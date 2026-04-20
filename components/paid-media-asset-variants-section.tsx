@@ -28,11 +28,22 @@ export function PaidMediaAssetVariantsSection({
   const [, startTransition] = useTransition();
 
   useEffect(() => {
+    let cancelled = false;
     setRows(null);
     startTransition(async () => {
-      const data = await getAssetVariantsForAdAction(adId, since, until);
-      setRows(data);
+      try {
+        const data = await getAssetVariantsForAdAction(adId, since, until);
+        if (!cancelled) setRows(data);
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[PaidMediaAssetVariantsSection] failed to load variants", err);
+          setRows([]);
+        }
+      }
     });
+    return () => {
+      cancelled = true;
+    };
   }, [adId, since, until]);
 
   if (rows === null) return null; // loading: render nothing (no flicker)
