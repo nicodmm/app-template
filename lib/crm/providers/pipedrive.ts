@@ -248,6 +248,8 @@ export const pipedriveProvider: CrmProvider = {
           if (d.status !== "open" && d.status !== "won") continue;
           const updateTime = parsePipedriveTimestamp(d.update_time);
           if (params.updatedSince && updateTime < params.updatedSince) continue;
+          const addTime = parsePipedriveTimestamp(d.add_time);
+          if (params.addedSince && addTime < params.addedSince) continue;
           if (
             d.status === "open" &&
             !params.openStageExternalIds.includes(String(d.stage_id))
@@ -277,7 +279,7 @@ export const pipedriveProvider: CrmProvider = {
             ownerName: d.owner_name ?? null,
             personName: d.person_name ?? null,
             orgName: d.org_name ?? null,
-            addTime: parsePipedriveTimestamp(d.add_time),
+            addTime,
             updateTime,
             wonTime: d.won_time ? parsePipedriveTimestamp(d.won_time) : null,
             rawData: d as Record<string, unknown>,

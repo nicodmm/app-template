@@ -418,6 +418,183 @@ export async function getCrmFilterOptions(connectionId: string): Promise<CrmFilt
   return { sources, stages };
 }
 
+export interface FunnelRow {
+  stageId: string;
+  stageName: string;
+  pipelineName: string;
+  orderNr: number;
+  openCount: number;
+  isProposalStage: boolean;
+}
+
+export async function getCrmFunnel(
+  connectionId: string,
+  since: Date,
+  until: Date
+): Promise<{ rows: FunnelRow[]; wonInPeriod: number }> {
+  const stages = await db
+    .select({
+      id: crmStages.id,
+      name: crmStages.name,
+      orderNr: crmStages.orderNr,
+      isProposalStage: crmStages.isProposalStage,
+      pipelineId: crmStages.pipelineId,
+      pipelineName: crmPipelines.name,
+    })
+    .from(crmStages)
+    .innerJoin(crmPipelines, eq(crmStages.pipelineId, crmPipelines.id))
+    .where(
+      and(
+        eq(crmPipelines.connectionId, connectionId),
+        eq(crmPipelines.isSynced, true),
+        eq(crmStages.isSynced, true)
+      )
+    )
+    .orderBy(crmPipelines.name, crmStages.orderNr);
+
+  const openByStage = await db
+    .select({
+      stageId: crmDeals.stageId,
+      c: count(),
+    })
+    .from(crmDeals)
+    .where(and(eq(crmDeals.connectionId, connectionId), eq(crmDeals.status, "open")))
+    .groupBy(crmDeals.stageId);
+
+  const countMap = new Map<string, number>();
+  for (const r of openByStage) if (r.stageId) countMap.set(r.stageId, r.c);
+
+  const [wonRow] = await db
+    .select({ c: count() })
+    .from(crmDeals)
+    .where(
+      and(
+        eq(crmDeals.connectionId, connectionId),
+        eq(crmDeals.status, "won"),
+        isNotNull(crmDeals.wonTime),
+        gte(crmDeals.wonTime, since),
+        lte(crmDeals.wonTime, until)
+      )
+    );
+
+  return {
+    rows: stages.map((s) => ({
+      stageId: s.id,
+      stageName: s.name,
+      pipelineName: s.pipelineName,
+      orderNr: s.orderNr,
+      openCount: countMap.get(s.id) ?? 0,
+      isProposalStage: s.isProposalStage,
+    })),
+    wonInPeriod: wonRow.c,
+  };
+}
+
+export interface CycleTimeStats {
+  avgDays: number | null;
+  medianDays: number | null;
+  wonCount: number;
+}
+
+export async function getCrmAvgCloseDays(
+  connectionId: string,
+  since: Date,
+  until: Date
+): Promise<CycleTimeStats> {
+  const rows = await db
+    .select({ addTime: crmDeals.addTime, wonTime: crmDeals.wonTime })
+    .from(crmDeals)
+    .where(
+      and(
+        eq(crmDeals.connectionId, connectionId),
+        eq(crmDeals.status, "won"),
+        isNotNull(crmDeals.wonTime),
+        gte(crmDeals.wonTime, since),
+        lte(crmDeals.wonTime, until)
+      )
+    );
+
+  if (rows.length === 0) return { avgDays: null, medianDays: null, wonCount: 0 };
+
+  const days = rows
+    .map((r) => (r.wonTime!.getTime() - r.addTime.getTime()) / 86400_000)
+    .filter((d) => d >= 0)
+    .sort((a, b) => a - b);
+
+  const avg = days.reduce((a, b) => a + b, 0) / days.length;
+  const median =
+    days.length % 2 === 0
+      ? (days[days.length / 2 - 1] + days[days.length / 2]) / 2
+      : days[Math.floor(days.length / 2)];
+
+  return {
+    avgDays: Math.round(avg * 10) / 10,
+    medianDays: Math.round(median * 10) / 10,
+    wonCount: rows.length,
+  };
+}
+
+export interface StalledDeal {
+  id: string;
+  externalId: string;
+  title: string;
+  value: number | null;
+  currency: string | null;
+  stageName: string | null;
+  ownerName: string | null;
+  daysStalled: number;
+  updateTime: Date;
+}
+
+export async function getCrmStalledDeals(
+  connectionId: string,
+  thresholdDays = 14,
+  limit = 5
+): Promise<StalledDeal[]> {
+  const cutoff = new Date(Date.now() - thresholdDays * 86400_000);
+  const rows = await db
+    .select({
+      id: crmDeals.id,
+      externalId: crmDeals.externalId,
+      title: crmDeals.title,
+      value: crmDeals.value,
+      currency: crmDeals.currency,
+      stageId: crmDeals.stageId,
+      ownerName: crmDeals.ownerName,
+      updateTime: crmDeals.updateTime,
+    })
+    .from(crmDeals)
+    .where(
+      and(
+        eq(crmDeals.connectionId, connectionId),
+        eq(crmDeals.status, "open"),
+        lte(crmDeals.updateTime, cutoff)
+      )
+    )
+    .orderBy(crmDeals.updateTime)
+    .limit(limit);
+
+  const stageRows = await db
+    .select({ id: crmStages.id, name: crmStages.name })
+    .from(crmStages)
+    .innerJoin(crmPipelines, eq(crmStages.pipelineId, crmPipelines.id))
+    .where(eq(crmPipelines.connectionId, connectionId));
+  const stageNameById = new Map(stageRows.map((s) => [s.id, s.name]));
+
+  const now = Date.now();
+  return rows.map((r) => ({
+    id: r.id,
+    externalId: r.externalId,
+    title: r.title,
+    value: r.value ? parseFloat(r.value) : null,
+    currency: r.currency,
+    stageName: r.stageId ? stageNameById.get(r.stageId) ?? null : null,
+    ownerName: r.ownerName,
+    daysStalled: Math.floor((now - r.updateTime.getTime()) / 86400_000),
+    updateTime: r.updateTime,
+  }));
+}
+
 export interface CrmMiniCardKpis {
   oportunidades: number;
   propuestas: number;

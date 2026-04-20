@@ -3,7 +3,11 @@ import { task, logger, AbortTaskRunError } from "@trigger.dev/sdk/v3";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/drizzle/db";
 import { crmConnections } from "@/lib/drizzle/schema";
-import { fetchAndUpsertCatalogs, fetchAndUpsertDeals } from "@/lib/crm/sync";
+import {
+  fetchAndUpsertCatalogs,
+  fetchAndUpsertDeals,
+  BACKFILL_WINDOW_MONTHS,
+} from "@/lib/crm/sync";
 
 export const backfillCrmAccount = task({
   id: "backfill-crm-account",
@@ -26,7 +30,14 @@ export const backfillCrmAccount = task({
     }
 
     await fetchAndUpsertCatalogs(connection.id);
-    const { upserted, deleted } = await fetchAndUpsertDeals(connection.id, null);
+    const addedSince = new Date();
+    addedSince.setMonth(addedSince.getMonth() - BACKFILL_WINDOW_MONTHS);
+    logger.info("backfill window", {
+      connectionId: connection.id,
+      addedSince: addedSince.toISOString(),
+      months: BACKFILL_WINDOW_MONTHS,
+    });
+    const { upserted, deleted } = await fetchAndUpsertDeals(connection.id, null, addedSince);
 
     await db
       .update(crmConnections)

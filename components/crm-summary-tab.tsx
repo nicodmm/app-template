@@ -1,6 +1,14 @@
 // components/crm-summary-tab.tsx
 import { CrmKpiCards } from "./crm-kpi-cards";
-import type { CrmKpis, SourceBreakdownRow, CurrencyBucket } from "@/lib/queries/crm";
+import { CrmFunnelSection } from "./crm-funnel-section";
+import type {
+  CrmKpis,
+  SourceBreakdownRow,
+  CurrencyBucket,
+  FunnelRow,
+  CycleTimeStats,
+  StalledDeal,
+} from "@/lib/queries/crm";
 
 function moneyRow(buckets: CurrencyBucket[]): string {
   if (buckets.length === 0) return "—";
@@ -20,9 +28,15 @@ function moneyRow(buckets: CurrencyBucket[]): string {
 export function CrmSummaryTab({
   kpis,
   breakdown,
+  funnel,
+  cycleTime,
+  stalled,
 }: {
   kpis: CrmKpis;
   breakdown: SourceBreakdownRow[];
+  funnel: { rows: FunnelRow[]; wonInPeriod: number };
+  cycleTime: CycleTimeStats;
+  stalled: StalledDeal[];
 }) {
   return (
     <div>
@@ -60,6 +74,7 @@ export function CrmSummaryTab({
           </tbody>
         </table>
       </div>
+      <CrmFunnelSection funnel={funnel} cycleTime={cycleTime} stalled={stalled} />
     </div>
   );
 }

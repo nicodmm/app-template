@@ -3,9 +3,18 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { CrmSummaryTab } from "./crm-summary-tab";
 import { CrmDealsTab } from "./crm-deals-tab";
-import type { CrmKpis, SourceBreakdownRow, CrmDealListRow, CrmFilterOptions } from "@/lib/queries/crm";
+import type {
+  CrmKpis,
+  SourceBreakdownRow,
+  CrmDealListRow,
+  CrmFilterOptions,
+  FunnelRow,
+  CycleTimeStats,
+  StalledDeal,
+} from "@/lib/queries/crm";
 
 interface Props {
   accountId: string;
@@ -23,6 +32,9 @@ interface Props {
   tab: "resumen" | "deals";
   kpis: CrmKpis;
   breakdown: SourceBreakdownRow[];
+  funnel: { rows: FunnelRow[]; wonInPeriod: number };
+  cycleTime: CycleTimeStats;
+  stalled: StalledDeal[];
   filterOptions: CrmFilterOptions;
   dealPage: { deals: CrmDealListRow[]; totalPages: number };
   page: number;
@@ -34,6 +46,9 @@ interface Props {
 export function CrmDashboard(props: Props) {
   const router = useRouter();
   const sp = useSearchParams();
+  const [customOpen, setCustomOpen] = useState(props.preset === "custom");
+  const [sinceDraft, setSinceDraft] = useState(props.since);
+  const [untilDraft, setUntilDraft] = useState(props.until);
 
   function setTab(tab: "resumen" | "deals") {
     const next = new URLSearchParams(sp.toString());
@@ -46,6 +61,17 @@ export function CrmDashboard(props: Props) {
     next.set("preset", preset);
     next.delete("since");
     next.delete("until");
+    setCustomOpen(false);
+    router.push(`?${next.toString()}`);
+  }
+
+  function applyCustom() {
+    if (!sinceDraft || !untilDraft) return;
+    if (new Date(sinceDraft) > new Date(untilDraft)) return;
+    const next = new URLSearchParams(sp.toString());
+    next.set("since", sinceDraft);
+    next.set("until", untilDraft);
+    next.delete("preset");
     router.push(`?${next.toString()}`);
   }
 
@@ -74,7 +100,7 @@ export function CrmDashboard(props: Props) {
         </div>
       )}
 
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         <div className="inline-flex rounded-md border border-border">
           {(["7", "30", "90"] as const).map((p) => (
             <button
@@ -85,7 +111,44 @@ export function CrmDashboard(props: Props) {
               {p}d
             </button>
           ))}
+          <button
+            onClick={() => setCustomOpen((v) => !v)}
+            className={`px-3 py-1 text-xs border-l border-border ${
+              props.preset === "custom" || customOpen
+                ? "bg-accent"
+                : "bg-transparent hover:bg-accent/30"
+            }`}
+          >
+            Personalizado
+          </button>
         </div>
+        {customOpen && (
+          <div className="inline-flex items-center gap-2 rounded-md border border-border px-2 py-1">
+            <input
+              type="date"
+              value={sinceDraft}
+              onChange={(e) => setSinceDraft(e.target.value)}
+              className="bg-transparent text-xs outline-none"
+              max={untilDraft}
+            />
+            <span className="text-xs text-muted-foreground">→</span>
+            <input
+              type="date"
+              value={untilDraft}
+              onChange={(e) => setUntilDraft(e.target.value)}
+              className="bg-transparent text-xs outline-none"
+              min={sinceDraft}
+              max={new Date().toISOString().slice(0, 10)}
+            />
+            <button
+              type="button"
+              onClick={applyCustom}
+              className="rounded bg-primary px-2 py-0.5 text-xs text-primary-foreground hover:bg-primary/90"
+            >
+              Aplicar
+            </button>
+          </div>
+        )}
         <div className="text-xs text-muted-foreground">
           {props.since} → {props.until}
         </div>
@@ -101,7 +164,13 @@ export function CrmDashboard(props: Props) {
       </div>
 
       {props.tab === "resumen" ? (
-        <CrmSummaryTab kpis={props.kpis} breakdown={props.breakdown} />
+        <CrmSummaryTab
+          kpis={props.kpis}
+          breakdown={props.breakdown}
+          funnel={props.funnel}
+          cycleTime={props.cycleTime}
+          stalled={props.stalled}
+        />
       ) : (
         <CrmDealsTab
           filterOptions={props.filterOptions}

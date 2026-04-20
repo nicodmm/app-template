@@ -33,6 +33,7 @@ export interface CrmProvider {
     sourceFieldType: "channel" | "custom";
     sourceFieldKey: string;
     updatedSince?: Date;
+    addedSince?: Date;
   }): AsyncGenerator<CrmDeal>;
   fetchLostOrDeletedIdsSince(
     conn: ConnectionContext,

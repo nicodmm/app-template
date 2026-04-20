@@ -12,6 +12,9 @@ import {
   getCrmBreakdownBySource,
   getCrmDeals,
   getCrmFilterOptions,
+  getCrmFunnel,
+  getCrmAvgCloseDays,
+  getCrmStalledDeals,
 } from "@/lib/queries/crm";
 import { CrmDashboard } from "@/components/crm-dashboard";
 
@@ -92,7 +95,7 @@ export default async function CrmPage({ params, searchParams }: PageProps) {
   const sourceIds = sp.source ? sp.source.split(",").filter(Boolean) : undefined;
   const stageIds = sp.stage ? sp.stage.split(",").filter(Boolean) : undefined;
 
-  const [kpis, breakdown, filterOptions, dealPage] = await Promise.all([
+  const [kpis, breakdown, filterOptions, dealPage, funnel, cycleTime, stalled] = await Promise.all([
     getCrmKpis(state.connection.id, since, until),
     getCrmBreakdownBySource(state.connection.id, since, until),
     getCrmFilterOptions(state.connection.id),
@@ -101,6 +104,9 @@ export default async function CrmPage({ params, searchParams }: PageProps) {
       { since, until, sourceExternalIds: sourceIds, stageIds, status },
       page
     ),
+    getCrmFunnel(state.connection.id, since, until),
+    getCrmAvgCloseDays(state.connection.id, since, until),
+    getCrmStalledDeals(state.connection.id),
   ]);
 
   return (
@@ -114,6 +120,9 @@ export default async function CrmPage({ params, searchParams }: PageProps) {
       tab={tab}
       kpis={kpis}
       breakdown={breakdown}
+      funnel={funnel}
+      cycleTime={cycleTime}
+      stalled={stalled}
       filterOptions={filterOptions}
       dealPage={dealPage}
       page={page}

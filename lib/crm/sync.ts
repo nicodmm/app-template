@@ -117,9 +117,12 @@ export async function fetchAndUpsertCatalogs(connectionId: string): Promise<void
 /**
  * Fetch and upsert deals. If updatedSince is provided, also runs lost-deletion cleanup.
  */
+export const BACKFILL_WINDOW_MONTHS = 12;
+
 export async function fetchAndUpsertDeals(
   connectionId: string,
-  updatedSince: Date | null
+  updatedSince: Date | null,
+  addedSince: Date | null = null
 ): Promise<{ upserted: number; deleted: number }> {
   const connection = await getConnectionOrThrow(connectionId);
   const provider = getProvider(connection.provider);
@@ -202,6 +205,7 @@ export async function fetchAndUpsertDeals(
     sourceFieldType: cfg.sourceFieldType as "channel" | "custom",
     sourceFieldKey: cfg.sourceFieldKey,
     updatedSince: updatedSince ?? undefined,
+    addedSince: addedSince ?? undefined,
   })) {
     const pipelineLocalId = pipelineIdByExternal.get(deal.pipelineExternalId);
     const stageLocalId =
