@@ -1,6 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
 import { env } from "@/lib/env";
-import { randomUUID } from "crypto";
 import type { CrmProviderId } from "./types";
 
 const STATE_ALG = "HS256";
@@ -11,17 +10,14 @@ export interface CrmOAuthState {
   workspaceId: string;
   userId: string;
   provider: CrmProviderId;
-  nonce: string;
 }
 
 function getKey(): Uint8Array {
   return new TextEncoder().encode(env.CRM_STATE_SECRET);
 }
 
-export async function signOAuthState(
-  state: Omit<CrmOAuthState, "nonce">
-): Promise<string> {
-  return new SignJWT({ ...state, nonce: randomUUID() })
+export async function signOAuthState(state: CrmOAuthState): Promise<string> {
+  return new SignJWT({ ...state })
     .setProtectedHeader({ alg: STATE_ALG })
     .setIssuedAt()
     .setExpirationTime(STATE_EXPIRY)
@@ -30,16 +26,12 @@ export async function signOAuthState(
 
 export async function verifyOAuthState(token: string): Promise<CrmOAuthState> {
   const { payload } = await jwtVerify(token, getKey(), { algorithms: [STATE_ALG] });
-  const { accountId, workspaceId, userId, provider, nonce } = payload as Record<
-    string,
-    unknown
-  >;
+  const { accountId, workspaceId, userId, provider } = payload as Record<string, unknown>;
   if (
     typeof accountId !== "string" ||
     typeof workspaceId !== "string" ||
     typeof userId !== "string" ||
-    typeof provider !== "string" ||
-    typeof nonce !== "string"
+    typeof provider !== "string"
   ) {
     throw new Error("Invalid state payload");
   }
@@ -52,5 +44,5 @@ export async function verifyOAuthState(token: string): Promise<CrmOAuthState> {
   if (!VALID_PROVIDERS.includes(provider as CrmProviderId)) {
     throw new Error("Invalid state payload");
   }
-  return { accountId, workspaceId, userId, provider: provider as CrmProviderId, nonce };
+  return { accountId, workspaceId, userId, provider: provider as CrmProviderId };
 }
