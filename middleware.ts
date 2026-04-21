@@ -12,7 +12,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: { name: string; value: string; options?: Parameters<typeof supabaseResponse.cookies.set>[2] }[]) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
@@ -30,11 +30,26 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
+
   const isProtected =
-    pathname.startsWith("/dashboard") || pathname.startsWith("/profile");
+    pathname.startsWith("/app") ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/profile");
 
   if (isProtected && !user) {
     return NextResponse.redirect(new URL("/auth/login", request.url));
+  }
+
+  // Redirect authenticated users away from auth pages
+  const isAuthPage = pathname.startsWith("/auth/");
+  if (isAuthPage && user && !pathname.startsWith("/auth/callback")) {
+    return NextResponse.redirect(new URL("/app/portfolio", request.url));
+  }
+
+  // Redirect root to portfolio if logged in
+  if (pathname === "/" && user) {
+    return NextResponse.redirect(new URL("/app/portfolio", request.url));
   }
 
   return supabaseResponse;
