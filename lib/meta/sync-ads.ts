@@ -111,9 +111,16 @@ export async function fetchAndUpsertAds(
     ads.push(ad);
   }
 
+  const extractedByAdId = new Map<string, ExtractedCreativeImage>();
+  for (const ad of ads) {
+    extractedByAdId.set(ad.id, extractCreativeImage(ad.creative));
+  }
+
   const hashesToResolve = Array.from(
     new Set(
-      ads.map((ad) => ad.creative?.image_hash).filter((h): h is string => !!h)
+      Array.from(extractedByAdId.values())
+        .map((e) => e.imageHash)
+        .filter((h): h is string => !!h)
     )
   );
   const resolvedByHash = await resolveImageUrlsByHash(
@@ -135,8 +142,12 @@ export async function fetchAndUpsertAds(
       .where(and(eq(metaAds.adAccountId, adAccountRowId), eq(metaAds.metaAdId, ad.id)))
       .limit(1);
 
-    const resolved = ad.creative?.image_hash
-      ? resolvedByHash.get(ad.creative.image_hash)
+    const extracted = extractedByAdId.get(ad.id) ?? {
+      imageUrl: null,
+      imageHash: null,
+    };
+    const resolved = extracted.imageHash
+      ? resolvedByHash.get(extracted.imageHash)
       : undefined;
 
     const values = {
@@ -147,7 +158,7 @@ export async function fetchAndUpsertAds(
       status: ad.status,
       creativeId: ad.creative?.id ?? null,
       thumbnailUrl: ad.creative?.thumbnail_url ?? resolved?.thumbnailUrl ?? null,
-      imageUrl: ad.creative?.image_url ?? resolved?.url ?? null,
+      imageUrl: extracted.imageUrl ?? resolved?.url ?? null,
       lastSyncedAt: now,
       updatedAt: now,
     };
