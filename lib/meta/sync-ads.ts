@@ -14,6 +14,22 @@ import {
   type InsightAction,
 } from "./insights-utils";
 
+type AdCreativeChildAttachment = {
+  image_hash?: string;
+  image_url?: string;
+};
+
+type AdCreativeLinkData = {
+  image_hash?: string;
+  image_url?: string;
+  child_attachments?: AdCreativeChildAttachment[];
+};
+
+type AdCreativeVideoData = {
+  image_hash?: string;
+  image_url?: string;
+};
+
 type AdApi = {
   id: string;
   name: string;
@@ -24,6 +40,10 @@ type AdApi = {
     thumbnail_url?: string;
     image_url?: string;
     image_hash?: string;
+    object_story_spec?: {
+      link_data?: AdCreativeLinkData;
+      video_data?: AdCreativeVideoData;
+    };
   };
 };
 
@@ -50,8 +70,13 @@ export async function fetchAndUpsertAds(
   for await (const ad of paginate<AdApi>(`/${metaAdAccountId}/ads`, {
     accessToken,
     searchParams: {
-      fields:
-        "id,name,status,creative{id,thumbnail_url,image_url,image_hash},campaign_id",
+      fields: [
+        "id",
+        "name",
+        "status",
+        "campaign_id",
+        "creative{id,thumbnail_url,image_url,image_hash,object_story_spec{link_data{image_url,image_hash,child_attachments},video_data{image_url,image_hash}}}",
+      ].join(","),
       limit: 500,
     },
   })) {
