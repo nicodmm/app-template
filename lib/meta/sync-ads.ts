@@ -60,6 +60,34 @@ type AdInsightApiRow = {
   action_values?: InsightAction[];
 };
 
+type ExtractedCreativeImage = {
+  imageUrl: string | null;
+  imageHash: string | null;
+};
+
+function extractCreativeImage(
+  creative: AdApi["creative"]
+): ExtractedCreativeImage {
+  if (!creative) return { imageUrl: null, imageHash: null };
+
+  if (creative.image_url) return { imageUrl: creative.image_url, imageHash: null };
+  if (creative.image_hash) return { imageUrl: null, imageHash: creative.image_hash };
+
+  const linkData = creative.object_story_spec?.link_data;
+  if (linkData?.image_url) return { imageUrl: linkData.image_url, imageHash: null };
+  if (linkData?.image_hash) return { imageUrl: null, imageHash: linkData.image_hash };
+
+  const firstChild = linkData?.child_attachments?.[0];
+  if (firstChild?.image_url) return { imageUrl: firstChild.image_url, imageHash: null };
+  if (firstChild?.image_hash) return { imageUrl: null, imageHash: firstChild.image_hash };
+
+  const videoData = creative.object_story_spec?.video_data;
+  if (videoData?.image_url) return { imageUrl: videoData.image_url, imageHash: null };
+  if (videoData?.image_hash) return { imageUrl: null, imageHash: videoData.image_hash };
+
+  return { imageUrl: null, imageHash: null };
+}
+
 export async function fetchAndUpsertAds(
   adAccountRowId: string,
   metaAdAccountId: string,
@@ -75,7 +103,7 @@ export async function fetchAndUpsertAds(
         "name",
         "status",
         "campaign_id",
-        "creative{id,thumbnail_url,image_url,image_hash,object_story_spec{link_data{image_url,image_hash,child_attachments},video_data{image_url,image_hash}}}",
+        "creative{id,thumbnail_url,image_url,image_hash,object_story_spec{link_data{image_url,image_hash,child_attachments{image_url,image_hash}},video_data{image_url,image_hash}}}",
       ].join(","),
       limit: 500,
     },
