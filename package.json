@@ -17,7 +17,8 @@
     "db:generate:prod": "dotenv -e .env.prod -- drizzle-kit generate",
     "db:migrate:prod": "dotenv -e .env.prod -- tsx scripts/migrate.ts",
     "db:rollback:prod": "dotenv -e .env.prod -- tsx scripts/rollback.ts",
-    "db:status:prod": "dotenv -e .env.prod -- drizzle-kit migrate --dry-run"
+    "db:status:prod": "dotenv -e .env.prod -- drizzle-kit migrate --dry-run",
+    "db:seed:crm": "dotenv -e .env.local -- tsx scripts/seed-crm.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
@@ -30,6 +31,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "drizzle-orm": "^0.38.0",
+    "jose": "^6.2.2",
     "lucide-react": "^0.460.0",
     "mammoth": "^1.12.0",
     "next": "^15.0.0",
