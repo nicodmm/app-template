@@ -6,9 +6,29 @@ import { db } from "@/lib/drizzle/db";
 import { accounts, usageTracking } from "@/lib/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { requireUserId } from "@/lib/auth";
-import { getWorkspaceByUserId, getMonthlyUsage } from "@/lib/queries/workspace";
+import { getWorkspaceByUserId, getMonthlyUsage, getWorkspaceMember } from "@/lib/queries/workspace";
 import { getAccountsCount, getAccountById } from "@/lib/queries/accounts";
 import { buildEnabledModulesFromForm } from "@/lib/modules-client";
+
+async function assertCanWriteAccount(
+  userId: string,
+  workspaceId: string,
+  accountId: string
+): Promise<void> {
+  const member = await getWorkspaceMember(workspaceId, userId);
+  if (!member) throw new Error("No tenés acceso a esta cuenta");
+  if (member.role === "owner" || member.role === "admin") return;
+
+  // Members can only write to accounts they own.
+  const [row] = await db
+    .select({ ownerId: accounts.ownerId })
+    .from(accounts)
+    .where(and(eq(accounts.id, accountId), eq(accounts.workspaceId, workspaceId)))
+    .limit(1);
+  if (!row || row.ownerId !== userId) {
+    throw new Error("No tenés permisos sobre esta cuenta");
+  }
+}
 
 function parseFee(raw: string | null): string | null {
   if (!raw) return null;
@@ -127,6 +147,11 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
   const workspace = await getWorkspaceOrThrow(userId);
 
   const accountId = formData.get("accountId") as string;
+  try {
+    await assertCanWriteAccount(userId, workspace.id, accountId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Sin permisos" };
+  }
   const name = formData.get("name") as string;
   const goals = (formData.get("goals") as string) || null;
   const serviceScopeValues = formData.getAll("serviceScope") as string[];
@@ -200,6 +225,7 @@ export async function reEnrichAccount(accountId: string): Promise<void> {
 export async function deleteAccount(accountId: string): Promise<void> {
   const userId = await requireUserId();
   const workspace = await getWorkspaceOrThrow(userId);
+  await assertCanWriteAccount(userId, workspace.id, accountId);
 
   await db
     .delete(accounts)
@@ -218,6 +244,7 @@ export async function updateHealthSignal(
 ): Promise<void> {
   const userId = await requireUserId();
   const workspace = await getWorkspaceOrThrow(userId);
+  await assertCanWriteAccount(userId, workspace.id, accountId);
 
   await db
     .update(accounts)

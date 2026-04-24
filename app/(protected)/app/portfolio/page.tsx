@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { requireUserId } from "@/lib/auth";
-import { getWorkspaceByUserId } from "@/lib/queries/workspace";
+import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspace";
 import { getPortfolioAccounts } from "@/lib/queries/accounts";
 import { AccountCard } from "@/components/account-card";
 import { redirect } from "next/navigation";
@@ -10,8 +10,14 @@ export default async function PortfolioPage() {
   const userId = await requireUserId();
   const workspace = await getWorkspaceByUserId(userId);
   if (!workspace) redirect("/auth/login");
+  const member = await getWorkspaceMember(workspace.id, userId);
+  if (!member) redirect("/auth/login");
 
-  const accounts = await getPortfolioAccounts(workspace.id);
+  const accounts = await getPortfolioAccounts({
+    workspaceId: workspace.id,
+    userId,
+    role: member.role,
+  });
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -38,7 +44,7 @@ export default async function PortfolioPage() {
           <div className="text-4xl mb-4">📋</div>
           <h2 className="font-semibold mb-1">Creá tu primera cuenta</h2>
           <p className="text-sm text-muted-foreground mb-6 max-w-sm">
-            Las cuentas son el corazón de plani.fyi. Cada cuenta representa un
+            Las cuentas son el corazón de nao.fyi. Cada cuenta representa un
             cliente y acumula su historial, tareas y señales de salud.
           </p>
           <Link

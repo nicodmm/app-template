@@ -1,7 +1,7 @@
 export const ACCOUNT_MODULES = [
   { key: "crm", label: "CRM (Pipedrive)", description: "Integración con Pipedrive" },
   { key: "paid_media", label: "Paid Media (Meta Ads)", description: "Conexión y reporte de Meta Ads" },
-  { key: "context_upload", label: "Subir contexto", description: "Transcripciones y archivos de contexto" },
+  { key: "context_upload", label: "Subir contexto", description: "Transcripciones, notas y archivos de contexto" },
   { key: "tasks", label: "Tareas", description: "Panel de tareas pendientes" },
   { key: "participants", label: "Contactos y participantes", description: "Contactos de la cuenta" },
   { key: "signals", label: "Señales", description: "Alertas y señales detectadas" },

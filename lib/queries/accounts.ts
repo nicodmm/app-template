@@ -8,9 +8,26 @@ export type AccountWithOwner = Account & {
   ownerEmail: string | null;
 };
 
+export interface PortfolioScope {
+  workspaceId: string;
+  userId: string;
+  role: string;
+}
+
+function canSeeAllAccounts(role: string): boolean {
+  return role === "owner" || role === "admin";
+}
+
 export async function getPortfolioAccounts(
-  workspaceId: string
+  scope: PortfolioScope
 ): Promise<AccountWithOwner[]> {
+  const whereClause = canSeeAllAccounts(scope.role)
+    ? eq(accounts.workspaceId, scope.workspaceId)
+    : and(
+        eq(accounts.workspaceId, scope.workspaceId),
+        eq(accounts.ownerId, scope.userId)
+      );
+
   const rows = await db
     .select({
       account: accounts,
@@ -19,7 +36,7 @@ export async function getPortfolioAccounts(
     })
     .from(accounts)
     .leftJoin(users, eq(accounts.ownerId, users.id))
-    .where(eq(accounts.workspaceId, workspaceId))
+    .where(whereClause)
     .orderBy(
       sql`CASE
         WHEN ${accounts.healthSignal} = 'red' THEN 1
@@ -39,7 +56,8 @@ export async function getPortfolioAccounts(
 
 export async function getAccountById(
   accountId: string,
-  workspaceId: string
+  workspaceId: string,
+  viewer?: { userId: string; role: string }
 ): Promise<AccountWithOwner | null> {
   const rows = await db
     .select({
@@ -55,6 +73,12 @@ export async function getAccountById(
     .limit(1);
 
   if (!rows[0]) return null;
+
+  // Role gating: members can only read accounts they own.
+  if (viewer && !canSeeAllAccounts(viewer.role)) {
+    if (rows[0].account.ownerId !== viewer.userId) return null;
+  }
+
   return {
     ...rows[0].account,
     ownerName: rows[0].ownerName,

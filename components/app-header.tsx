@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, User } from "lucide-react";
+import { LogOut, User, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -54,6 +54,14 @@ export function AppHeader({ userEmail, userInitial }: AppHeaderProps) {
               >
                 <User size={14} />
                 Perfil
+              </Link>
+              <Link
+                href="/app/settings/workspace"
+                className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent"
+                onClick={() => setOpen(false)}
+              >
+                <Users size={14} />
+                Workspace
               </Link>
               <button
                 onClick={handleSignOut}

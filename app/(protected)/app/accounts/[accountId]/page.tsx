@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { requireUserId } from "@/lib/auth";
-import { getWorkspaceByUserId, getWorkspaceMembers } from "@/lib/queries/workspace";
+import { getWorkspaceByUserId, getWorkspaceMembers, getWorkspaceMember } from "@/lib/queries/workspace";
 import { getAccountById } from "@/lib/queries/accounts";
 import { getTranscriptHistory } from "@/lib/queries/transcripts";
 import { getAccountContextDocuments } from "@/lib/queries/context-documents";
@@ -42,6 +42,8 @@ export default async function AccountDetailPage({
 
   const workspace = await getWorkspaceByUserId(userId);
   if (!workspace) redirect("/auth/login");
+  const viewerMember = await getWorkspaceMember(workspace.id, userId);
+  if (!viewerMember) redirect("/auth/login");
 
   const [
     account,
@@ -53,7 +55,7 @@ export default async function AccountDetailPage({
     accountSignals,
     healthHistory,
   ] = await Promise.all([
-    getAccountById(accountId, workspace.id),
+    getAccountById(accountId, workspace.id, { userId, role: viewerMember.role }),
     getTranscriptHistory(accountId, 50),
     getAccountContextDocuments(accountId, 50),
     getWorkspaceMembers(workspace.id),

@@ -5,7 +5,7 @@ import { users, workspaces, workspaceMembers, usageTracking } from "@/lib/drizzl
 import { eq } from "drizzle-orm";
 import { getWorkspaceByUserId } from "@/lib/queries/workspace";
 
-export async function createDefaultWorkspace(
+export async function ensureUserRecord(
   userId: string,
   email: string
 ): Promise<void> {
@@ -18,6 +18,13 @@ export async function createDefaultWorkspace(
       target: users.id,
       set: { email, updatedAt: new Date() },
     });
+}
+
+export async function createDefaultWorkspace(
+  userId: string,
+  email: string
+): Promise<void> {
+  await ensureUserRecord(userId, email);
 
   const existing = await getWorkspaceByUserId(userId);
   if (existing) return;
