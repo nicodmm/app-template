@@ -68,21 +68,21 @@ export function PaidMediaAssetVariantsSection({
           </thead>
           <tbody>
             {rows.map((r) => {
-              const clickTarget = r.imageUrl ?? r.thumbnailUrl;
-              const clickable = !!clickTarget;
+              const hasImage = !!(r.imageUrl ?? r.thumbnailUrl);
+              const proxyUrl = `/api/meta/image/variant/${r.id}`;
               return (
                 <tr
                   key={r.id}
                   className={`border-t border-border ${
-                    clickable ? "cursor-pointer hover:bg-accent/30" : ""
+                    hasImage ? "cursor-pointer hover:bg-accent/30" : ""
                   }`}
-                  onClick={clickable ? () => onRowClick(clickTarget) : undefined}
+                  onClick={hasImage ? () => onRowClick(proxyUrl) : undefined}
                 >
                   <td className="py-1 pr-2">
-                    {r.thumbnailUrl ? (
+                    {hasImage ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
-                        src={r.thumbnailUrl}
+                        src={proxyUrl}
                         alt={r.name ?? r.metaAssetHash}
                         loading="lazy"
                         className="w-10 h-10 object-cover rounded border border-border"

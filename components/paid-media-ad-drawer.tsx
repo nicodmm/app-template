@@ -187,16 +187,13 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
           {ad.thumbnailUrl || ad.imageUrl ? (
             <button
               type="button"
-              onClick={() => {
-                const full = ad.imageUrl ?? ad.thumbnailUrl;
-                if (full) setPreviewUrl(full);
-              }}
+              onClick={() => setPreviewUrl(`/api/meta/image/ad/${ad.id}`)}
               className="block group relative"
               aria-label="Ver creatividad en grande"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={ad.thumbnailUrl ?? ad.imageUrl ?? ""}
+                src={`/api/meta/image/ad/${ad.id}`}
                 alt={ad.name}
                 loading="lazy"
                 className="rounded-md border border-border max-w-full max-h-64 object-contain bg-muted"
