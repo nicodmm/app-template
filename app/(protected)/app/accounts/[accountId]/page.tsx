@@ -21,6 +21,7 @@ import { HealthHistoryTimeline } from "@/components/health-history-timeline";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { PaidMediaMiniCard } from "@/components/paid-media-mini-card";
 import { CrmMiniCard } from "@/components/crm-mini-card";
+import { isModuleEnabled } from "@/lib/modules-client";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
@@ -156,7 +157,7 @@ export default async function AccountDetailPage({
       </div>
 
       {/* Account context */}
-      {(account.goals || account.serviceScope) && (
+      {(account.goals || account.serviceScope || account.startDate || account.fee) && (
         <div className="rounded-xl border border-border bg-card p-6 mb-6">
           <h2 className="font-semibold mb-4">Contexto de la cuenta</h2>
           <div className="grid sm:grid-cols-2 gap-6">
@@ -185,29 +186,59 @@ export default async function AccountDetailPage({
                 </div>
               </div>
             )}
+            {account.startDate && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+                  Fecha de inicio
+                </p>
+                <p className="text-sm leading-relaxed">
+                  {new Date(account.startDate).toLocaleDateString("es-AR", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </p>
+              </div>
+            )}
+            {account.fee && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+                  Fee mensual
+                </p>
+                <p className="text-sm leading-relaxed">
+                  USD {Number(account.fee).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* Paid Media mini-card */}
-      <div className="mb-6">
-        <PaidMediaMiniCard workspaceId={workspace.id} accountId={accountId} />
-      </div>
+      {isModuleEnabled(account.enabledModules, "paid_media") && (
+        <div className="mb-6">
+          <PaidMediaMiniCard workspaceId={workspace.id} accountId={accountId} />
+        </div>
+      )}
 
       {/* CRM mini-card */}
-      <div className="mb-6">
-        <CrmMiniCard workspaceId={workspace.id} accountId={accountId} />
-      </div>
+      {isModuleEnabled(account.enabledModules, "crm") && (
+        <div className="mb-6">
+          <CrmMiniCard workspaceId={workspace.id} accountId={accountId} />
+        </div>
+      )}
 
       {/* Transcript Upload */}
-      <div className="rounded-xl border border-border bg-card p-6 mb-6">
-        <h2 className="font-semibold mb-4">Subir transcripción</h2>
-        <TranscriptUploadForm accountId={accountId} />
-      </div>
+      {isModuleEnabled(account.enabledModules, "context_upload") && (
+        <div className="rounded-xl border border-border bg-card p-6 mb-6">
+          <h2 className="font-semibold mb-4">Subir transcripción</h2>
+          <TranscriptUploadForm accountId={accountId} />
+        </div>
+      )}
 
       {/* Collapsible modules (default closed) */}
       <div className="space-y-4">
-        {transcriptHistory.length > 0 && (
+        {isModuleEnabled(account.enabledModules, "context_upload") && transcriptHistory.length > 0 && (
           <CollapsibleSection
             title="Historial de transcripciones"
             summary={`${transcriptHistory.length} transcripción${transcriptHistory.length !== 1 ? "es" : ""}`}
@@ -216,53 +247,61 @@ export default async function AccountDetailPage({
           </CollapsibleSection>
         )}
 
-        <CollapsibleSection
-          title="✅ Tareas"
-          summary={
-            accountTasks.length === 0
-              ? "sin tareas"
-              : `${pendingTasks} pendiente${pendingTasks !== 1 ? "s" : ""}${
-                  completedTasks > 0 ? ` · ${completedTasks} completada${completedTasks !== 1 ? "s" : ""}` : ""
-                }`
-          }
-        >
-          <TasksPanel tasks={accountTasks} accountId={accountId} members={members} />
-        </CollapsibleSection>
+        {isModuleEnabled(account.enabledModules, "tasks") && (
+          <CollapsibleSection
+            title="✅ Tareas"
+            summary={
+              accountTasks.length === 0
+                ? "sin tareas"
+                : `${pendingTasks} pendiente${pendingTasks !== 1 ? "s" : ""}${
+                    completedTasks > 0 ? ` · ${completedTasks} completada${completedTasks !== 1 ? "s" : ""}` : ""
+                  }`
+            }
+          >
+            <TasksPanel tasks={accountTasks} accountId={accountId} members={members} />
+          </CollapsibleSection>
+        )}
 
-        <CollapsibleSection
-          title="👥 Contactos y Participantes"
-          summary={
-            accountParticipants.length === 0
-              ? "sin contactos"
-              : `${accountParticipants.length} contacto${accountParticipants.length !== 1 ? "s" : ""}`
-          }
-        >
-          <ParticipantsPanel participants={accountParticipants} />
-        </CollapsibleSection>
+        {isModuleEnabled(account.enabledModules, "participants") && (
+          <CollapsibleSection
+            title="👥 Contactos y Participantes"
+            summary={
+              accountParticipants.length === 0
+                ? "sin contactos"
+                : `${accountParticipants.length} contacto${accountParticipants.length !== 1 ? "s" : ""}`
+            }
+          >
+            <ParticipantsPanel participants={accountParticipants} />
+          </CollapsibleSection>
+        )}
 
-        <CollapsibleSection
-          title="⚡ Señales"
-          summary={
-            accountSignals.length === 0
-              ? "sin señales"
-              : `${activeSignals} activa${activeSignals !== 1 ? "s" : ""}${
-                  resolvedSignals > 0 ? ` · ${resolvedSignals} resuelta${resolvedSignals !== 1 ? "s" : ""}` : ""
-                }`
-          }
-        >
-          <SignalsPanel signals={accountSignals} accountId={accountId} />
-        </CollapsibleSection>
+        {isModuleEnabled(account.enabledModules, "signals") && (
+          <CollapsibleSection
+            title="⚡ Señales"
+            summary={
+              accountSignals.length === 0
+                ? "sin señales"
+                : `${activeSignals} activa${activeSignals !== 1 ? "s" : ""}${
+                    resolvedSignals > 0 ? ` · ${resolvedSignals} resuelta${resolvedSignals !== 1 ? "s" : ""}` : ""
+                  }`
+            }
+          >
+            <SignalsPanel signals={accountSignals} accountId={accountId} />
+          </CollapsibleSection>
+        )}
 
-        <CollapsibleSection
-          title="📈 Evolución de salud"
-          summary={
-            healthHistory.length === 0
-              ? "sin historial"
-              : `${healthChanges} cambio${healthChanges !== 1 ? "s" : ""} de estado`
-          }
-        >
-          <HealthHistoryTimeline entries={healthHistory} />
-        </CollapsibleSection>
+        {isModuleEnabled(account.enabledModules, "health") && (
+          <CollapsibleSection
+            title="📈 Evolución de salud"
+            summary={
+              healthHistory.length === 0
+                ? "sin historial"
+                : `${healthChanges} cambio${healthChanges !== 1 ? "s" : ""} de estado`
+            }
+          >
+            <HealthHistoryTimeline entries={healthHistory} />
+          </CollapsibleSection>
+        )}
       </div>
     </div>
   );

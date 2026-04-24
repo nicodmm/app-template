@@ -1,6 +1,7 @@
-import { pgTable, text, timestamp, uuid, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, boolean, index, date, numeric, jsonb } from "drizzle-orm/pg-core";
 import { users } from "./users";
 import { workspaces } from "./workspaces";
+import type { AccountModuleKey } from "@/lib/modules-client";
 
 export const accounts = pgTable(
   "accounts",
@@ -15,6 +16,12 @@ export const accounts = pgTable(
     }),
     goals: text("goals"),
     serviceScope: text("service_scope"),
+    startDate: date("start_date"),
+    fee: numeric("fee", { precision: 12, scale: 2 }),
+    enabledModules: jsonb("enabled_modules")
+      .$type<Partial<Record<AccountModuleKey, boolean>>>()
+      .notNull()
+      .default({}),
     healthSignal: text("health_signal").default("inactive"),
     healthJustification: text("health_justification"),
     aiSummary: text("ai_summary"),

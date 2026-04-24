@@ -6,6 +6,7 @@ import { updateAccount } from "@/app/actions/accounts";
 import type { AccountWithOwner } from "@/lib/queries/accounts";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
 import { ServiceScopeCheckboxes } from "@/components/service-scope-checkboxes";
+import { AccountModulesToggles } from "@/components/account-modules-toggles";
 
 interface EditAccountFormProps {
   account: AccountWithOwner;
@@ -78,6 +79,42 @@ export function EditAccountForm({ account, members }: EditAccountFormProps) {
           Scope de servicio
         </label>
         <ServiceScopeCheckboxes defaultValue={account.serviceScope} />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="startDate" className="block text-sm font-medium mb-1">
+            Fecha de inicio
+          </label>
+          <input
+            id="startDate"
+            name="startDate"
+            type="date"
+            defaultValue={account.startDate ?? ""}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+        </div>
+        <div>
+          <label htmlFor="fee" className="block text-sm font-medium mb-1">
+            Fee mensual (USD)
+          </label>
+          <input
+            id="fee"
+            name="fee"
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            defaultValue={account.fee ?? ""}
+            placeholder="Ej: 3500"
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2">Módulos activos</label>
+        <AccountModulesToggles defaultValue={account.enabledModules} />
       </div>
 
       {state.error && (

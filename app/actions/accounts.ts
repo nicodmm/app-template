@@ -8,6 +8,22 @@ import { eq, and } from "drizzle-orm";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getMonthlyUsage } from "@/lib/queries/workspace";
 import { getAccountsCount } from "@/lib/queries/accounts";
+import { buildEnabledModulesFromForm } from "@/lib/modules-client";
+
+function parseFee(raw: string | null): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n.toFixed(2);
+}
+
+function parseStartDate(raw: string | null): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : null;
+}
 
 async function getWorkspaceOrThrow(userId: string) {
   const workspace = await getWorkspaceByUserId(userId);
@@ -24,15 +40,13 @@ export async function createAccount(formData: FormData): Promise<void> {
   const serviceScopeValues = formData.getAll("serviceScope") as string[];
   const serviceScope = serviceScopeValues.length > 0 ? serviceScopeValues.join(", ") : null;
   const ownerId = (formData.get("ownerId") as string) || userId;
+  const startDate = parseStartDate(formData.get("startDate") as string | null);
+  const fee = parseFee(formData.get("fee") as string | null);
+  const enabledModules = buildEnabledModulesFromForm(
+    formData.getAll("enabledModules") as string[]
+  );
 
   if (!name?.trim()) throw new Error("El nombre de la cuenta es requerido");
-
-  // Quota check — limit enforced against usage_tracking.accounts_count
-  const count = await getAccountsCount(workspace.id);
-  // Phase 9 wires real tier limits from Stripe; placeholder: Free = 2 accounts
-  if (count >= 2) {
-    redirect("/app/accounts/new?error=" + encodeURIComponent("Límite de cuentas alcanzado. Actualizá tu plan para crear más."));
-  }
 
   const [account] = await db
     .insert(accounts)
@@ -42,6 +56,9 @@ export async function createAccount(formData: FormData): Promise<void> {
       goals,
       serviceScope,
       ownerId,
+      startDate,
+      fee,
+      enabledModules,
     })
     .returning();
 
@@ -74,6 +91,11 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
   const serviceScopeValues = formData.getAll("serviceScope") as string[];
   const serviceScope = serviceScopeValues.length > 0 ? serviceScopeValues.join(", ") : null;
   const ownerId = (formData.get("ownerId") as string) || null;
+  const startDate = parseStartDate(formData.get("startDate") as string | null);
+  const fee = parseFee(formData.get("fee") as string | null);
+  const enabledModules = buildEnabledModulesFromForm(
+    formData.getAll("enabledModules") as string[]
+  );
 
   if (!name?.trim()) return { error: "El nombre es requerido" };
 
@@ -84,6 +106,9 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
       goals,
       serviceScope,
       ownerId,
+      startDate,
+      fee,
+      enabledModules,
       updatedAt: new Date(),
     })
     .where(

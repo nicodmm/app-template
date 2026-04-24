@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ServiceScopeCheckboxes } from "@/components/service-scope-checkboxes";
+import { AccountModulesToggles } from "@/components/account-modules-toggles";
 
 interface PageProps {
   searchParams: Promise<{ error?: string }>;
@@ -86,6 +87,33 @@ export default async function NewAccountPage({ searchParams }: PageProps) {
         <div className="flex flex-col gap-2">
           <Label>Scope de servicio</Label>
           <ServiceScopeCheckboxes />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="startDate">Fecha de inicio del proyecto</Label>
+            <Input id="startDate" name="startDate" type="date" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="fee">Fee mensual (USD)</Label>
+            <Input
+              id="fee"
+              name="fee"
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0"
+              placeholder="Ej: 3500"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label>Módulos activos</Label>
+          <p className="text-xs text-muted-foreground -mt-1">
+            Elegí qué secciones ver en el perfil del cliente. Podés cambiar esto después.
+          </p>
+          <AccountModulesToggles />
         </div>
 
         <div className="flex gap-3 pt-2">
