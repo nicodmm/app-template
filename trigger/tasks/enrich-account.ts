@@ -85,7 +85,7 @@ export const enrichAccount = task({
         signal: controller.signal,
         headers: {
           "User-Agent":
-            "Mozilla/5.0 (compatible; plani.fyi/1.0; +https://plani.fyi)",
+            "Mozilla/5.0 (compatible; nao.fyi/1.0; +https://nao.fyi)",
           Accept: "text/html,application/xhtml+xml",
         },
       }).catch((err) => {

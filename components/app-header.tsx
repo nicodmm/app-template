@@ -25,7 +25,7 @@ export function AppHeader({ userEmail, userInitial }: AppHeaderProps) {
   return (
     <header className="flex h-14 items-center justify-between border-b border-border px-4 shrink-0">
       <Link href="/app/portfolio" className="font-semibold text-sm tracking-tight">
-        plani.fyi
+        nao.fyi
       </Link>
 
       <div className="relative">
