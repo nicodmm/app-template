@@ -5,13 +5,15 @@ import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getWorkspaceMembers } from "@/lib/queries/workspace";
 import { getAccountById } from "@/lib/queries/accounts";
 import { getTranscriptHistory } from "@/lib/queries/transcripts";
+import { getAccountContextDocuments } from "@/lib/queries/context-documents";
 import { getAccountTasks } from "@/lib/queries/tasks";
 import { getAccountParticipants } from "@/lib/queries/participants";
 import { getAccountSignals, getAccountHealthHistory } from "@/lib/queries/signals";
 import { deleteAccount, updateAccount, updateHealthSignal } from "@/app/actions/accounts";
 import { AccountHealthBadge } from "@/components/account-health-badge";
 import { EditAccountForm } from "@/components/edit-account-form";
-import { TranscriptUploadForm } from "@/components/transcript-upload-form";
+import { ContextUploadForm } from "@/components/context-upload-form";
+import { ContextDocumentsList } from "@/components/context-documents-list";
 import { DeleteButton } from "@/components/delete-button";
 import { TranscriptHistoryTable } from "@/components/transcript-history-table";
 import { TasksPanel } from "@/components/tasks-panel";
@@ -44,6 +46,7 @@ export default async function AccountDetailPage({
   const [
     account,
     transcriptHistory,
+    contextDocs,
     members,
     accountTasks,
     accountParticipants,
@@ -52,6 +55,7 @@ export default async function AccountDetailPage({
   ] = await Promise.all([
     getAccountById(accountId, workspace.id),
     getTranscriptHistory(accountId, 50),
+    getAccountContextDocuments(accountId, 50),
     getWorkspaceMembers(workspace.id),
     getAccountTasks(accountId),
     getAccountParticipants(accountId),
@@ -327,11 +331,11 @@ export default async function AccountDetailPage({
         </div>
       )}
 
-      {/* Transcript Upload */}
+      {/* Context Upload */}
       {isModuleEnabled(account.enabledModules, "context_upload") && (
         <div className="rounded-xl border border-border bg-card p-6 mb-6">
-          <h2 className="font-semibold mb-4">Subir transcripción</h2>
-          <TranscriptUploadForm accountId={accountId} />
+          <h2 className="font-semibold mb-4">Subir contexto</h2>
+          <ContextUploadForm accountId={accountId} />
         </div>
       )}
 
@@ -343,6 +347,15 @@ export default async function AccountDetailPage({
             summary={`${transcriptHistory.length} transcripción${transcriptHistory.length !== 1 ? "es" : ""}`}
           >
             <TranscriptHistoryTable transcripts={transcriptHistory} accountId={accountId} />
+          </CollapsibleSection>
+        )}
+
+        {isModuleEnabled(account.enabledModules, "context_upload") && contextDocs.length > 0 && (
+          <CollapsibleSection
+            title="Archivos de contexto"
+            summary={`${contextDocs.length} ${contextDocs.length === 1 ? "archivo" : "archivos"}`}
+          >
+            <ContextDocumentsList documents={contextDocs} />
           </CollapsibleSection>
         )}
 

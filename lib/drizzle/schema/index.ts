@@ -23,3 +23,4 @@ export * from "./crm_stages";
 export * from "./crm_source_config";
 export * from "./crm_sources";
 export * from "./crm_deals";
+export * from "./context_documents";

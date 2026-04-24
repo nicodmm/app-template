@@ -2,7 +2,7 @@ import { task, metadata } from "@trigger.dev/sdk/v3";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { db } from "@/lib/drizzle/db";
-import { transcripts, accounts, participants } from "@/lib/drizzle/schema";
+import { transcripts, accounts, participants, contextDocuments } from "@/lib/drizzle/schema";
 import { eq, desc, ne, and } from "drizzle-orm";
 
 const client = new Anthropic();
@@ -41,10 +41,15 @@ function buildAccountFactsBlock(args: {
   serviceScope: string | null;
   healthSignal: string | null;
   healthJustification: string | null;
+  industry: string | null;
+  companyDescription: string | null;
   participantsList: Array<{ name: string; role: string | null; confidence: string; appearanceCount: number }>;
+  contextDocsList: Array<{ docType: string; title: string; notes: string | null; excerpt: string | null; createdAt: Date }>;
 }): string {
   const lines: string[] = [];
   lines.push(`Cliente: ${args.accountName}`);
+  if (args.industry) lines.push(`Industria: ${args.industry}`);
+  if (args.companyDescription) lines.push(`Descripción: ${args.companyDescription}`);
   if (args.monthsAsClient !== null) {
     lines.push(`Meses como cliente: ${args.monthsAsClient}`);
   }
@@ -78,6 +83,15 @@ function buildAccountFactsBlock(args: {
       lines.push(`  - ${parts.join(" · ")}`);
     }
   }
+  if (args.contextDocsList.length > 0) {
+    lines.push("Contexto adicional cargado por el equipo (no-transcripciones):");
+    for (const d of args.contextDocsList) {
+      const when = d.createdAt.toISOString().slice(0, 10);
+      const body = d.notes ?? d.excerpt ?? "";
+      const bodyShort = body.length > 300 ? body.slice(0, 300) + "..." : body;
+      lines.push(`  - [${d.docType}] ${d.title} (${when}): ${bodyShort}`);
+    }
+  }
   return lines.join("\n");
 }
 
@@ -96,6 +110,8 @@ export const generateSummary = task({
         serviceScope: accounts.serviceScope,
         healthSignal: accounts.healthSignal,
         healthJustification: accounts.healthJustification,
+        industry: accounts.industry,
+        companyDescription: accounts.companyDescription,
       })
       .from(accounts)
       .where(eq(accounts.id, payload.accountId))
@@ -113,6 +129,19 @@ export const generateSummary = task({
       .orderBy(desc(participants.lastSeenAt), desc(participants.appearanceCount))
       .limit(5);
 
+    const recentContextDocs = await db
+      .select({
+        docType: contextDocuments.docType,
+        title: contextDocuments.title,
+        notes: contextDocuments.notes,
+        extractedText: contextDocuments.extractedText,
+        createdAt: contextDocuments.createdAt,
+      })
+      .from(contextDocuments)
+      .where(eq(contextDocuments.accountId, payload.accountId))
+      .orderBy(desc(contextDocuments.createdAt))
+      .limit(5);
+
     const accountFacts = buildAccountFactsBlock({
       accountName: accountRow?.name ?? "(desconocido)",
       monthsAsClient: monthsBetween(accountRow?.startDate ?? null, new Date()),
@@ -120,7 +149,16 @@ export const generateSummary = task({
       serviceScope: accountRow?.serviceScope ?? null,
       healthSignal: accountRow?.healthSignal ?? null,
       healthJustification: accountRow?.healthJustification ?? null,
+      industry: accountRow?.industry ?? null,
+      companyDescription: accountRow?.companyDescription ?? null,
       participantsList: topParticipants,
+      contextDocsList: recentContextDocs.map((d) => ({
+        docType: d.docType,
+        title: d.title,
+        notes: d.notes,
+        excerpt: d.extractedText ? d.extractedText.slice(0, 500) : null,
+        createdAt: d.createdAt,
+      })),
     });
 
     const recentSummaries = await db
