@@ -108,6 +108,29 @@ export default async function NewAccountPage({ searchParams }: PageProps) {
           </div>
         </div>
 
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="websiteUrl">Página web</Label>
+          <Input
+            id="websiteUrl"
+            name="websiteUrl"
+            type="url"
+            placeholder="https://empresa.com"
+          />
+          <p className="text-xs text-muted-foreground">
+            Si la cargás, vamos a enriquecer automáticamente el perfil (industria, tamaño, ubicación).
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="linkedinUrl">LinkedIn de la empresa</Label>
+          <Input
+            id="linkedinUrl"
+            name="linkedinUrl"
+            type="url"
+            placeholder="https://www.linkedin.com/company/..."
+          />
+        </div>
+
         <div className="flex flex-col gap-2">
           <Label>Módulos activos</Label>
           <p className="text-xs text-muted-foreground -mt-1">

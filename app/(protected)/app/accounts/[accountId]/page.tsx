@@ -21,6 +21,7 @@ import { HealthHistoryTimeline } from "@/components/health-history-timeline";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { PaidMediaMiniCard } from "@/components/paid-media-mini-card";
 import { CrmMiniCard } from "@/components/crm-mini-card";
+import { ReEnrichButton } from "@/components/re-enrich-button";
 import { isModuleEnabled } from "@/lib/modules-client";
 
 interface PageProps {
@@ -157,9 +158,35 @@ export default async function AccountDetailPage({
       </div>
 
       {/* Account context */}
-      {(account.goals || account.serviceScope || account.startDate || account.fee) && (
+      {(account.goals ||
+        account.serviceScope ||
+        account.startDate ||
+        account.fee ||
+        account.industry ||
+        account.employeeCount ||
+        account.location ||
+        account.companyDescription ||
+        account.websiteUrl ||
+        account.linkedinUrl ||
+        account.enrichmentStatus) && (
         <div className="rounded-xl border border-border bg-card p-6 mb-6">
-          <h2 className="font-semibold mb-4">Contexto de la cuenta</h2>
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="font-semibold">Contexto de la cuenta</h2>
+              {account.industry && (
+                <span className="inline-flex items-center rounded-full bg-accent px-2 py-0.5 text-xs font-medium">
+                  {account.industry}
+                </span>
+              )}
+            </div>
+            {account.websiteUrl && (
+              <ReEnrichButton
+                accountId={accountId}
+                disabled={account.enrichmentStatus === "pending"}
+              />
+            )}
+          </div>
+
           <div className="grid sm:grid-cols-2 gap-6">
             {account.goals && (
               <div>
@@ -210,7 +237,79 @@ export default async function AccountDetailPage({
                 </p>
               </div>
             )}
+            {account.employeeCount && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+                  Empleados
+                </p>
+                <p className="text-sm leading-relaxed">{account.employeeCount}</p>
+              </div>
+            )}
+            {account.location && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+                  Ubicación
+                </p>
+                <p className="text-sm leading-relaxed">{account.location}</p>
+              </div>
+            )}
+            {(account.websiteUrl || account.linkedinUrl) && (
+              <div className="sm:col-span-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                  Links
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {account.websiteUrl && (
+                    <a
+                      href={account.websiteUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors"
+                    >
+                      Web ↗
+                    </a>
+                  )}
+                  {account.linkedinUrl && (
+                    <a
+                      href={account.linkedinUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors"
+                    >
+                      LinkedIn ↗
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
+
+          {account.companyDescription && (
+            <p className="text-sm text-muted-foreground leading-relaxed mt-6 pt-4 border-t border-border">
+              {account.companyDescription}
+            </p>
+          )}
+
+          {account.enrichmentStatus && (
+            <p className="text-xs text-muted-foreground mt-4">
+              {account.enrichmentStatus === "pending" && "Enriqueciendo perfil desde la web..."}
+              {account.enrichmentStatus === "ok" && account.enrichedAt && (
+                <>
+                  Enriquecido el{" "}
+                  {new Date(account.enrichedAt).toLocaleDateString("es-AR", {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </>
+              )}
+              {account.enrichmentStatus === "failed" && (
+                <span className="text-destructive">
+                  Error al enriquecer: {account.enrichmentError ?? "desconocido"}
+                </span>
+              )}
+            </p>
+          )}
         </div>
       )}
 

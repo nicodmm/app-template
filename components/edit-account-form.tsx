@@ -113,6 +113,37 @@ export function EditAccountForm({ account, members }: EditAccountFormProps) {
       </div>
 
       <div>
+        <label htmlFor="websiteUrl" className="block text-sm font-medium mb-1">
+          Página web
+        </label>
+        <input
+          id="websiteUrl"
+          name="websiteUrl"
+          type="url"
+          defaultValue={account.websiteUrl ?? ""}
+          placeholder="https://empresa.com"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Cambiarla vuelve a ejecutar el enriquecimiento automáticamente.
+        </p>
+      </div>
+
+      <div>
+        <label htmlFor="linkedinUrl" className="block text-sm font-medium mb-1">
+          LinkedIn de la empresa
+        </label>
+        <input
+          id="linkedinUrl"
+          name="linkedinUrl"
+          type="url"
+          defaultValue={account.linkedinUrl ?? ""}
+          placeholder="https://www.linkedin.com/company/..."
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+      </div>
+
+      <div>
         <label className="block text-sm font-medium mb-2">Módulos activos</label>
         <AccountModulesToggles defaultValue={account.enabledModules} />
       </div>

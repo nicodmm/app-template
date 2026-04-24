@@ -22,6 +22,15 @@ export const accounts = pgTable(
       .$type<Partial<Record<AccountModuleKey, boolean>>>()
       .notNull()
       .default({}),
+    websiteUrl: text("website_url"),
+    linkedinUrl: text("linkedin_url"),
+    industry: text("industry"),
+    employeeCount: text("employee_count"),
+    location: text("location"),
+    companyDescription: text("company_description"),
+    enrichedAt: timestamp("enriched_at"),
+    enrichmentStatus: text("enrichment_status"),
+    enrichmentError: text("enrichment_error"),
     healthSignal: text("health_signal").default("inactive"),
     healthJustification: text("health_justification"),
     aiSummary: text("ai_summary"),
