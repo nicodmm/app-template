@@ -21,27 +21,28 @@ const SIGNAL_CONFIG: Record<
   green: {
     label: "Saludable",
     pillClass:
-      "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+      "bg-emerald-500 text-white dark:bg-emerald-600 ring-1 ring-emerald-700/50 shadow-sm shadow-emerald-500/20",
     ringClass: "border-emerald-500 bg-emerald-500/15",
     Icon: CircleCheck,
   },
   yellow: {
     label: "Atención",
     pillClass:
-      "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200",
+      "bg-amber-500 text-white dark:bg-amber-500 dark:text-amber-950 ring-1 ring-amber-700/50 shadow-sm shadow-amber-500/25",
     ringClass: "border-amber-500 bg-amber-500/15",
     Icon: AlertTriangle,
   },
   red: {
     label: "Crítico",
     pillClass:
-      "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+      "bg-red-600 text-white ring-1 ring-red-800/50 shadow-sm shadow-red-500/25",
     ringClass: "border-red-500 bg-red-500/15",
     Icon: AlertOctagon,
   },
   inactive: {
     label: "Inactivo",
-    pillClass: "bg-muted text-muted-foreground",
+    pillClass:
+      "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 ring-1 ring-slate-300 dark:ring-slate-700",
     ringClass: "border-muted-foreground bg-muted",
     Icon: MinusCircle,
   },

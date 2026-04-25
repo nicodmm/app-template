@@ -1,5 +1,6 @@
 import { Mic } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
+import { RichMarkdown } from "@/components/ui/rich-markdown";
 import type { LatestMeetingSummary } from "@/lib/queries/transcripts";
 
 function formatDate(date: Date | string): string {
@@ -33,8 +34,8 @@ export function LastMeetingCard({ summary }: LastMeetingCardProps) {
           {formatDate(date)}
         </span>
       </div>
-      <div className="text-sm text-foreground/90 leading-relaxed whitespace-pre-line">
-        {summary.meetingSummary}
+      <div className="text-sm text-foreground/90">
+        <RichMarkdown text={summary.meetingSummary} />
       </div>
       {summary.fileName && (
         <p className="mt-3 text-[11px] text-muted-foreground/70 truncate">

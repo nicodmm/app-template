@@ -28,31 +28,36 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
   churn_risk: {
     label: "Riesgo de Churn",
     icon: AlertTriangle,
-    className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+    className:
+      "bg-red-600 text-white dark:bg-red-600 ring-1 ring-red-800/50 shadow-sm shadow-red-500/25",
     iconClassName: "text-red-600 dark:text-red-400",
   },
   growth_opportunity: {
     label: "Oportunidad de Crecimiento",
     icon: TrendingUp,
-    className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+    className:
+      "bg-emerald-500 text-white dark:bg-emerald-600 ring-1 ring-emerald-700/50 shadow-sm shadow-emerald-500/20",
     iconClassName: "text-emerald-600 dark:text-emerald-400",
   },
   upsell_opportunity: {
     label: "Oportunidad de Upsell",
     icon: ArrowUpCircle,
-    className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+    className:
+      "bg-blue-600 text-white dark:bg-blue-600 ring-1 ring-blue-800/50 shadow-sm shadow-blue-500/25",
     iconClassName: "text-blue-600 dark:text-blue-400",
   },
   inactivity_flag: {
     label: "Inactividad",
     icon: Moon,
-    className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    className:
+      "bg-amber-500 text-white dark:bg-amber-500 dark:text-amber-950 ring-1 ring-amber-700/50 shadow-sm shadow-amber-500/25",
     iconClassName: "text-amber-600 dark:text-amber-400",
   },
   custom: {
     label: "Personalizada",
     icon: Sparkles,
-    className: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+    className:
+      "bg-purple-600 text-white dark:bg-purple-600 ring-1 ring-purple-800/50 shadow-sm shadow-purple-500/25",
     iconClassName: "text-purple-600 dark:text-purple-400",
   },
 };
@@ -269,7 +274,7 @@ export function SignalsPanel({ signals, accountId }: SignalsPanelProps) {
             : "No hay señales resueltas con ese filtro."}
         </p>
       ) : (
-        <div className="rounded-lg border border-border bg-card divide-y divide-border">
+        <div className="rounded-lg [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)] divide-y divide-[var(--glass-tile-border)]">
           {filtered.map((s) => (
             <SignalRow key={s.id} signal={s} accountId={accountId} />
           ))}

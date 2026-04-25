@@ -7,15 +7,18 @@ import type { ParticipantWithContext } from "@/lib/queries/participants";
 const CONFIDENCE_CONFIG: Record<string, { label: string; className: string }> = {
   high: {
     label: "Alta",
-    className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+    className:
+      "bg-emerald-500 text-white dark:bg-emerald-600 ring-1 ring-emerald-700/50 shadow-sm shadow-emerald-500/20",
   },
   medium: {
     label: "Media",
-    className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    className:
+      "bg-amber-500 text-white dark:bg-amber-500 dark:text-amber-950 ring-1 ring-amber-700/50 shadow-sm shadow-amber-500/25",
   },
   low: {
     label: "Baja",
-    className: "bg-muted text-muted-foreground",
+    className:
+      "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 ring-1 ring-slate-300 dark:ring-slate-700",
   },
 };
 
@@ -113,7 +116,7 @@ export function ParticipantsPanel({ participants }: ParticipantsPanelProps) {
       {filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground py-2">Sin resultados.</p>
       ) : (
-        <div className="rounded-lg border border-border bg-card divide-y divide-border">
+        <div className="rounded-lg [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)] divide-y divide-[var(--glass-tile-border)]">
           {filtered.map((p) => {
             const confidence = CONFIDENCE_CONFIG[p.confidence] ?? CONFIDENCE_CONFIG.medium;
             return (

@@ -23,12 +23,11 @@ import { getAccountParticipants } from "@/lib/queries/participants";
 import {
   getAccountSignals,
   getAccountHealthHistory,
-  getWeeklyHealthSparkline,
 } from "@/lib/queries/signals";
 import { deleteAccount, updateAccount, updateHealthSignal } from "@/app/actions/accounts";
 import { AccountHealthBadge } from "@/components/account-health-badge";
-import { HealthStripChart } from "@/components/health-strip-chart";
 import { LastMeetingCard } from "@/components/last-meeting-card";
+import { RichMarkdown } from "@/components/ui/rich-markdown";
 import { EditAccountForm } from "@/components/edit-account-form";
 import { ContextUploadForm } from "@/components/context-upload-form";
 import { ContextFilesTimeline } from "@/components/context-files-timeline";
@@ -72,7 +71,6 @@ export default async function AccountDetailPage({
     accountParticipants,
     accountSignals,
     healthHistory,
-    healthSparkline,
     lastMeetingSummary,
   ] = await Promise.all([
     getAccountById(accountId, workspace.id, { userId, role: viewerMember.role }),
@@ -83,7 +81,6 @@ export default async function AccountDetailPage({
     getAccountParticipants(accountId),
     getAccountSignals(accountId),
     getAccountHealthHistory(accountId),
-    getWeeklyHealthSparkline(accountId, 12),
     getLatestMeetingSummary(accountId),
   ]);
 
@@ -120,20 +117,7 @@ export default async function AccountDetailPage({
             <h1 className="text-2xl font-semibold truncate">{account.name}</h1>
             <AccountHealthBadge signal={account.healthSignal} />
           </div>
-          <div className="mt-2 flex items-center gap-3 flex-wrap">
-            <HealthStripChart
-              buckets={healthSparkline}
-              scrollTo={
-                isModuleEnabled(account.enabledModules, "health")
-                  ? "salud-section"
-                  : undefined
-              }
-            />
-            <span className="text-[11px] text-muted-foreground">
-              últimas 12 semanas
-            </span>
-          </div>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="text-sm text-muted-foreground mt-1">
             {account.ownerName ?? account.ownerEmail ?? "Sin responsable"}
             {account.aiSummaryUpdatedAt && (
               <>
@@ -176,18 +160,8 @@ export default async function AccountDetailPage({
       <GlassCard className="p-6 mb-6">
         <h2 className="font-semibold mb-3">Resumen de situación</h2>
         {account.aiSummary ? (
-          <div className="text-sm text-foreground leading-relaxed space-y-1">
-            {account.aiSummary.split("\n").map((line, i) => {
-              if (!line.trim()) return null;
-              const parts = line.split(/\*\*(.*?)\*\*/g);
-              return (
-                <p key={i}>
-                  {parts.map((part, j) =>
-                    j % 2 === 1 ? <strong key={j}>{part}</strong> : part
-                  )}
-                </p>
-              );
-            })}
+          <div className="text-sm text-foreground">
+            <RichMarkdown text={account.aiSummary} />
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
