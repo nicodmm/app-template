@@ -1,16 +1,33 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import {
+  ChevronLeft,
+  CheckSquare,
+  Users as UsersIcon,
+  Zap,
+  TrendingUp,
+  FolderOpen,
+  ExternalLink,
+} from "lucide-react";
 import { requireUserId } from "@/lib/auth";
-import { getWorkspaceByUserId, getWorkspaceMembers, getWorkspaceMember } from "@/lib/queries/workspace";
+import {
+  getWorkspaceByUserId,
+  getWorkspaceMembers,
+  getWorkspaceMember,
+} from "@/lib/queries/workspace";
 import { getAccountById } from "@/lib/queries/accounts";
 import { getTranscriptHistory } from "@/lib/queries/transcripts";
 import { getAccountContextDocuments } from "@/lib/queries/context-documents";
 import { getAccountTasks } from "@/lib/queries/tasks";
 import { getAccountParticipants } from "@/lib/queries/participants";
-import { getAccountSignals, getAccountHealthHistory } from "@/lib/queries/signals";
+import {
+  getAccountSignals,
+  getAccountHealthHistory,
+  getWeeklyHealthSparkline,
+} from "@/lib/queries/signals";
 import { deleteAccount, updateAccount, updateHealthSignal } from "@/app/actions/accounts";
 import { AccountHealthBadge } from "@/components/account-health-badge";
+import { HealthStripChart } from "@/components/health-strip-chart";
 import { EditAccountForm } from "@/components/edit-account-form";
 import { ContextUploadForm } from "@/components/context-upload-form";
 import { ContextFilesTimeline } from "@/components/context-files-timeline";
@@ -20,6 +37,7 @@ import { ParticipantsPanel } from "@/components/participants-panel";
 import { SignalsPanel } from "@/components/signals-panel";
 import { HealthHistoryTimeline } from "@/components/health-history-timeline";
 import { CollapsibleSection } from "@/components/collapsible-section";
+import { GlassCard } from "@/components/ui/glass-card";
 import { PaidMediaMiniCard } from "@/components/paid-media-mini-card";
 import { CrmMiniCard } from "@/components/crm-mini-card";
 import { ReEnrichButton } from "@/components/re-enrich-button";
@@ -53,6 +71,7 @@ export default async function AccountDetailPage({
     accountParticipants,
     accountSignals,
     healthHistory,
+    healthSparkline,
   ] = await Promise.all([
     getAccountById(accountId, workspace.id, { userId, role: viewerMember.role }),
     getTranscriptHistory(accountId, 50),
@@ -62,6 +81,7 @@ export default async function AccountDetailPage({
     getAccountParticipants(accountId),
     getAccountSignals(accountId),
     getAccountHealthHistory(accountId),
+    getWeeklyHealthSparkline(accountId, 12),
   ]);
 
   if (!account) notFound();
@@ -91,16 +111,32 @@ export default async function AccountDetailPage({
       </Link>
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-8">
-        <div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+        <div className="min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-semibold">{account.name}</h1>
+            <h1 className="text-2xl font-semibold truncate">{account.name}</h1>
             <AccountHealthBadge signal={account.healthSignal} />
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
+          <div className="mt-2 flex items-center gap-3 flex-wrap">
+            <HealthStripChart
+              buckets={healthSparkline}
+              scrollTo={
+                isModuleEnabled(account.enabledModules, "health")
+                  ? "salud-section"
+                  : undefined
+              }
+            />
+            <span className="text-[11px] text-muted-foreground">
+              últimas 12 semanas
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2">
             {account.ownerName ?? account.ownerEmail ?? "Sin responsable"}
             {account.aiSummaryUpdatedAt && (
-              <> · Actualizado {new Date(account.aiSummaryUpdatedAt).toLocaleDateString("es-AR")}</>
+              <>
+                {" · "}Actualizado{" "}
+                {new Date(account.aiSummaryUpdatedAt).toLocaleDateString("es-AR")}
+              </>
             )}
           </p>
         </div>
@@ -108,7 +144,7 @@ export default async function AccountDetailPage({
         <div className="flex gap-2 shrink-0">
           <Link
             href={`/app/accounts/${accountId}?edit=1`}
-            className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors"
+            className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium transition-colors backdrop-blur-[16px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] hover:bg-white/40 dark:hover:bg-white/10"
           >
             Editar
           </Link>
@@ -118,7 +154,7 @@ export default async function AccountDetailPage({
               await deleteAccount(accountId);
             }}
             confirmMessage={`¿Eliminar la cuenta "${account.name}"? Esta acción no se puede deshacer.`}
-            className="inline-flex items-center rounded-md border border-destructive/30 text-destructive px-3 py-1.5 text-xs font-medium hover:bg-destructive/10 transition-colors"
+            className="inline-flex items-center rounded-md text-destructive px-3 py-1.5 text-xs font-medium transition-colors backdrop-blur-[16px] [background:var(--glass-bg)] [border:1px_solid_rgb(239_68_68/0.3)] hover:bg-destructive/10"
           >
             Eliminar
           </DeleteButton>
@@ -127,14 +163,14 @@ export default async function AccountDetailPage({
 
       {/* Edit form */}
       {isEditing && (
-        <div className="rounded-xl border border-primary/20 bg-card p-6 mb-8">
+        <GlassCard variant="strong" className="p-6 mb-8 ring-1 ring-primary/20">
           <h2 className="font-semibold mb-4">Editar cuenta</h2>
           <EditAccountForm account={account} members={members} />
-        </div>
+        </GlassCard>
       )}
 
       {/* AI Summary */}
-      <div className="rounded-xl border border-border bg-card p-6 mb-6">
+      <GlassCard className="p-6 mb-6">
         <h2 className="font-semibold mb-3">Resumen de situación</h2>
         {account.aiSummary ? (
           <div className="text-sm text-foreground leading-relaxed space-y-1">
@@ -156,11 +192,11 @@ export default async function AccountDetailPage({
           </p>
         )}
         {account.healthJustification && (
-          <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
+          <p className="text-xs text-muted-foreground mt-3 pt-3 [border-top:1px_solid_var(--glass-border)]">
             {account.healthJustification}
           </p>
         )}
-      </div>
+      </GlassCard>
 
       {/* Account context */}
       {(account.goals ||
@@ -174,12 +210,12 @@ export default async function AccountDetailPage({
         account.websiteUrl ||
         account.linkedinUrl ||
         account.enrichmentStatus) && (
-        <div className="rounded-xl border border-border bg-card p-6 mb-6">
+        <GlassCard className="p-6 mb-6">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="font-semibold">Contexto de la cuenta</h2>
               {account.industry && (
-                <span className="inline-flex items-center rounded-full bg-accent px-2 py-0.5 text-xs font-medium">
+                <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                   {account.industry}
                 </span>
               )}
@@ -269,9 +305,9 @@ export default async function AccountDetailPage({
                       href={account.websiteUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors"
+                      className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] hover:bg-white/40 dark:hover:bg-white/10"
                     >
-                      Web ↗
+                      Web <ExternalLink size={11} aria-hidden />
                     </a>
                   )}
                   {account.linkedinUrl && (
@@ -279,9 +315,9 @@ export default async function AccountDetailPage({
                       href={account.linkedinUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors"
+                      className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] hover:bg-white/40 dark:hover:bg-white/10"
                     >
-                      LinkedIn ↗
+                      LinkedIn <ExternalLink size={11} aria-hidden />
                     </a>
                   )}
                 </div>
@@ -290,7 +326,7 @@ export default async function AccountDetailPage({
           </div>
 
           {account.companyDescription && (
-            <p className="text-sm text-muted-foreground leading-relaxed mt-6 pt-4 border-t border-border">
+            <p className="text-sm text-muted-foreground leading-relaxed mt-6 pt-4 [border-top:1px_solid_var(--glass-border)]">
               {account.companyDescription}
             </p>
           )}
@@ -315,7 +351,7 @@ export default async function AccountDetailPage({
               )}
             </p>
           )}
-        </div>
+        </GlassCard>
       )}
 
       {/* Paid Media mini-card */}
@@ -334,10 +370,10 @@ export default async function AccountDetailPage({
 
       {/* Context Upload */}
       {isModuleEnabled(account.enabledModules, "context_upload") && (
-        <div className="rounded-xl border border-border bg-card p-6 mb-6">
+        <GlassCard className="p-6 mb-6">
           <h2 className="font-semibold mb-4">Subir contexto</h2>
           <ContextUploadForm accountId={accountId} />
-        </div>
+        </GlassCard>
       )}
 
       {/* Collapsible modules (default closed) */}
@@ -346,6 +382,7 @@ export default async function AccountDetailPage({
           transcriptHistory.length + contextDocs.length > 0 && (
             <CollapsibleSection
               title="Archivos de contexto"
+              icon={FolderOpen}
               summary={(() => {
                 const total = transcriptHistory.length + contextDocs.length;
                 const ts = transcriptHistory.length;
@@ -367,7 +404,8 @@ export default async function AccountDetailPage({
 
         {isModuleEnabled(account.enabledModules, "tasks") && (
           <CollapsibleSection
-            title="✅ Tareas"
+            title="Tareas"
+            icon={CheckSquare}
             summary={
               accountTasks.length === 0
                 ? "sin tareas"
@@ -382,7 +420,8 @@ export default async function AccountDetailPage({
 
         {isModuleEnabled(account.enabledModules, "participants") && (
           <CollapsibleSection
-            title="👥 Contactos y Participantes"
+            title="Contactos y Participantes"
+            icon={UsersIcon}
             summary={
               accountParticipants.length === 0
                 ? "sin contactos"
@@ -395,7 +434,8 @@ export default async function AccountDetailPage({
 
         {isModuleEnabled(account.enabledModules, "signals") && (
           <CollapsibleSection
-            title="⚡ Señales"
+            title="Señales"
+            icon={Zap}
             summary={
               accountSignals.length === 0
                 ? "sin señales"
@@ -410,7 +450,10 @@ export default async function AccountDetailPage({
 
         {isModuleEnabled(account.enabledModules, "health") && (
           <CollapsibleSection
-            title="📈 Evolución de salud"
+            id="salud-section"
+            title="Evolución de salud"
+            icon={TrendingUp}
+            defaultOpen
             summary={
               healthHistory.length === 0
                 ? "sin historial"

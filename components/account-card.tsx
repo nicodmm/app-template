@@ -1,27 +1,31 @@
 import Link from "next/link";
+import { CircleCheck, AlertTriangle, AlertOctagon, MinusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AccountWithOwner } from "@/lib/queries/accounts";
 
 const HEALTH_CONFIG = {
   green: {
     label: "Al día",
-    className: "bg-success/15 text-success border-success/20",
-    dot: "bg-success",
+    className:
+      "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30",
+    Icon: CircleCheck,
   },
   yellow: {
     label: "Atención",
-    className: "bg-warning/15 text-warning-foreground border-warning/20",
-    dot: "bg-warning",
+    className:
+      "bg-amber-400/20 text-amber-800 dark:text-amber-200 ring-1 ring-amber-500/30",
+    Icon: AlertTriangle,
   },
   red: {
     label: "En riesgo",
-    className: "bg-destructive/15 text-destructive border-destructive/20",
-    dot: "bg-destructive",
+    className:
+      "bg-red-500/15 text-red-700 dark:text-red-300 ring-1 ring-red-500/30",
+    Icon: AlertOctagon,
   },
   inactive: {
     label: "Sin actividad",
-    className: "bg-muted text-muted-foreground border-border",
-    dot: "bg-muted-foreground",
+    className: "bg-muted text-muted-foreground ring-1 ring-border",
+    Icon: MinusCircle,
   },
 } as const;
 
@@ -45,15 +49,23 @@ interface AccountCardProps {
 export function AccountCard({ account }: AccountCardProps) {
   const signal = (account.healthSignal ?? "inactive") as keyof typeof HEALTH_CONFIG;
   const config = HEALTH_CONFIG[signal] ?? HEALTH_CONFIG.inactive;
+  const Icon = config.Icon;
 
   const daysSinceActivity = account.lastActivityAt
-    ? Math.floor((Date.now() - new Date(account.lastActivityAt).getTime()) / (1000 * 60 * 60 * 24))
+    ? Math.floor(
+        (Date.now() - new Date(account.lastActivityAt).getTime()) /
+          (1000 * 60 * 60 * 24)
+      )
     : null;
 
   return (
     <Link
       href={`/app/accounts/${account.id}`}
-      className="group block rounded-xl border border-border bg-card p-5 hover:border-primary/30 hover:shadow-sm transition-all"
+      className={cn(
+        "group block rounded-xl p-5 backdrop-blur-[20px] transition-all",
+        "[background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]",
+        "hover:[background:var(--glass-bg-strong)] hover:translate-y-[-1px] hover:[box-shadow:0_14px_44px_-14px_rgba(15,18,53,0.22)]"
+      )}
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <h3 className="font-semibold text-sm leading-tight group-hover:text-primary transition-colors line-clamp-2">
@@ -61,11 +73,11 @@ export function AccountCard({ account }: AccountCardProps) {
         </h3>
         <span
           className={cn(
-            "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+            "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
             config.className
           )}
         >
-          <span className={cn("h-1.5 w-1.5 rounded-full", config.dot)} />
+          <Icon size={11} aria-hidden />
           {config.label}
         </span>
       </div>
@@ -82,7 +94,7 @@ export function AccountCard({ account }: AccountCardProps) {
         </span>
         <span>
           {daysSinceActivity !== null && daysSinceActivity > 30 ? (
-            <span className="text-warning-foreground font-medium">
+            <span className="text-amber-700 dark:text-amber-300 font-medium">
               Sin actividad {daysSinceActivity}d
             </span>
           ) : (

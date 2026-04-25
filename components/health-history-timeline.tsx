@@ -1,39 +1,46 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { CircleCheck, AlertTriangle, AlertOctagon, MinusCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { HealthHistoryEntry } from "@/lib/queries/signals";
 
-type SignalConfig = {
-  label: string;
-  dotClass: string;
-  pillClass: string;
-};
+type IconComponent = typeof CircleCheck;
 
-const SIGNAL_CONFIG: Record<string, SignalConfig> = {
+const SIGNAL_CONFIG: Record<
+  string,
+  { label: string; pillClass: string; ringClass: string; Icon: IconComponent }
+> = {
   green: {
     label: "Saludable",
-    dotClass: "bg-emerald-500 border-emerald-500",
-    pillClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+    pillClass:
+      "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+    ringClass: "border-emerald-500 bg-emerald-500/15",
+    Icon: CircleCheck,
   },
   yellow: {
-    label: "Requiere Atención",
-    dotClass: "bg-amber-400 border-amber-400",
-    pillClass: "bg-amber-200 text-amber-900 dark:bg-amber-900/30 dark:text-amber-300",
+    label: "Atención",
+    pillClass:
+      "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200",
+    ringClass: "border-amber-500 bg-amber-500/15",
+    Icon: AlertTriangle,
   },
   red: {
     label: "Crítico",
-    dotClass: "bg-red-500 border-red-500",
-    pillClass: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+    pillClass:
+      "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+    ringClass: "border-red-500 bg-red-500/15",
+    Icon: AlertOctagon,
   },
   inactive: {
     label: "Inactivo",
-    dotClass: "bg-muted-foreground border-muted-foreground",
     pillClass: "bg-muted text-muted-foreground",
+    ringClass: "border-muted-foreground bg-muted",
+    Icon: MinusCircle,
   },
 };
 
-function getConfig(signal: string): SignalConfig {
+function getConfig(signal: string) {
   return SIGNAL_CONFIG[signal] ?? SIGNAL_CONFIG.inactive;
 }
 
@@ -69,7 +76,9 @@ export function HealthHistoryTimeline({ entries }: HealthHistoryTimelineProps) {
     return { entry: e, isChange };
   });
 
-  const visible = showAll ? withChangeFlag : withChangeFlag.filter((x) => x.isChange);
+  const visible = showAll
+    ? withChangeFlag
+    : withChangeFlag.filter((x) => x.isChange);
   const hiddenCount = withChangeFlag.length - visible.length;
 
   return (
@@ -99,10 +108,9 @@ export function HealthHistoryTimeline({ entries }: HealthHistoryTimelineProps) {
       </div>
 
       <div className="relative">
-        {/* Vertical line */}
-        <div className="absolute left-[7px] top-2 bottom-2 w-px bg-border" />
+        <div className="absolute left-[10px] top-3 bottom-3 w-px bg-[var(--glass-border)]" />
 
-        <ul className="space-y-4">
+        <ul className="space-y-5">
           {visible.map(({ entry, isChange }) => (
             <TimelineItem key={entry.id} entry={entry} isChange={isChange} />
           ))}
@@ -112,28 +120,40 @@ export function HealthHistoryTimeline({ entries }: HealthHistoryTimelineProps) {
   );
 }
 
-interface TimelineItemProps {
+function TimelineItem({
+  entry,
+  isChange,
+}: {
   entry: HealthHistoryEntry;
   isChange: boolean;
-}
-
-function TimelineItem({ entry, isChange }: TimelineItemProps) {
-  const [open, setOpen] = useState(false);
+}) {
   const config = getConfig(entry.healthSignal);
-  const displayDate = entry.meetingDate ? formatDate(entry.meetingDate) : formatDate(entry.createdAt);
+  const Icon = config.Icon;
+  const displayDate = entry.meetingDate
+    ? formatDate(entry.meetingDate)
+    : formatDate(entry.createdAt);
 
   return (
-    <li className="relative pl-6">
-      {/* Dot */}
+    <li className="relative pl-8">
       <span
-        className={`absolute left-0 top-1 w-[15px] h-[15px] rounded-full border-2 ${
-          isChange ? config.dotClass : "bg-background " + config.dotClass.replace("bg-", "border-").split(" ")[0]
-        }`}
-      />
+        aria-hidden
+        className={cn(
+          "absolute left-0 top-0.5 flex h-[21px] w-[21px] items-center justify-center rounded-full border-2",
+          config.ringClass,
+          !isChange && "opacity-60"
+        )}
+      >
+        <Icon size={11} className="text-foreground/80" />
+      </span>
 
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${config.pillClass}`}>
+          <span
+            className={cn(
+              "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+              config.pillClass
+            )}
+          >
             {config.label}
           </span>
           <span className="text-xs text-muted-foreground">{displayDate}</span>
@@ -145,20 +165,9 @@ function TimelineItem({ entry, isChange }: TimelineItemProps) {
         </div>
 
         {entry.justification && (
-          <>
-            <button
-              onClick={() => setOpen((v) => !v)}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-              {open ? "Ocultar justificación" : "Ver justificación"}
-            </button>
-            {open && (
-              <p className="text-xs text-muted-foreground leading-relaxed rounded-md bg-muted/40 p-2 mt-1">
-                {entry.justification}
-              </p>
-            )}
-          </>
+          <p className="text-sm text-foreground/90 leading-relaxed">
+            {entry.justification}
+          </p>
         )}
 
         {entry.transcriptFileName && (

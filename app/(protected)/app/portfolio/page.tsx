@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Briefcase } from "lucide-react";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspace";
 import { getPortfolioAccounts } from "@/lib/queries/accounts";
@@ -40,8 +40,10 @@ export default async function PortfolioPage() {
       </div>
 
       {accounts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-20 text-center">
-          <div className="text-4xl mb-4">📋</div>
+        <div className="flex flex-col items-center justify-center rounded-xl py-20 text-center backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_dashed_var(--glass-border)]">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Briefcase size={26} aria-hidden />
+          </div>
           <h2 className="font-semibold mb-1">Creá tu primera cuenta</h2>
           <p className="text-sm text-muted-foreground mb-6 max-w-sm">
             Las cuentas son el corazón de nao.fyi. Cada cuenta representa un
@@ -49,7 +51,7 @@ export default async function PortfolioPage() {
           </p>
           <Link
             href="/app/accounts/new"
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
           >
             <Plus size={15} />
             Crear primera cuenta
