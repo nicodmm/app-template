@@ -300,8 +300,8 @@ export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
     }
     const name = result.fileName ?? "el archivo";
     const msg =
-      result.outcome === "imported"
-        ? `Listo. Importamos "${name}" desde Drive.`
+      result.outcome === "queued"
+        ? `Encolamos "${name}". Va a aparecer en Archivos de contexto en unos segundos.`
         : result.outcome === "duplicate"
           ? `"${name}" ya estaba importado previamente.`
           : `No pudimos procesar "${name}". Probá revisar permisos en Drive.`;

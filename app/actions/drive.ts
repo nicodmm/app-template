@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { eq, and } from "drizzle-orm";
 import { db } from "@/lib/drizzle/db";
-import { driveConnections, accounts } from "@/lib/drizzle/schema";
+import {
+  driveConnections,
+  accounts,
+  transcripts as transcriptsTable,
+  contextDocuments as contextDocumentsTable,
+} from "@/lib/drizzle/schema";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspace";
 import {
@@ -12,10 +17,7 @@ import {
   type DriveFolder,
   type DriveFileMeta,
 } from "@/lib/google/drive";
-import {
-  importDriveFileForAccount,
-  parseDriveFileIdFromUrl,
-} from "@/lib/google/drive-import";
+import { parseDriveFileIdFromUrl } from "@/lib/google/drive-links";
 
 async function ensureManager(): Promise<{ workspaceId: string }> {
   const userId = await requireUserId();
@@ -83,7 +85,11 @@ export async function importDriveLinkForAccount(
   accountId: string,
   url: string,
   userNotes?: string
-): Promise<{ outcome?: "imported" | "duplicate" | "skipped"; fileName?: string; error?: string }> {
+): Promise<{
+  outcome?: "queued" | "duplicate";
+  fileName?: string;
+  error?: string;
+}> {
   const userId = await requireUserId();
   const workspace = await getWorkspaceByUserId(userId);
   if (!workspace) return { error: "Workspace no encontrado" };
@@ -116,6 +122,9 @@ export async function importDriveLinkForAccount(
     };
   }
 
+  // Refresh token and fetch metadata quickly to fail fast on permission issues
+  // before we enqueue. If this part takes long we time out at 8s and let the
+  // user retry instead of hanging.
   let accessToken: string;
   try {
     accessToken = await ensureFreshAccessToken(conn.id);
@@ -128,38 +137,82 @@ export async function importDriveLinkForAccount(
     };
   }
 
-  // Fetch file metadata.
   let meta: DriveFileMeta;
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(
       `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,mimeType,modifiedTime,size`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: controller.signal,
+      }
     );
-    if (!res.ok) {
-      const text = await res.text();
+    clearTimeout(timeout);
+    if (res.status === 404) {
       return {
-        error: `No se pudo leer el archivo (${res.status}). ¿Está compartido con tu cuenta de Google?${text ? " " + text.substring(0, 200) : ""}`,
+        error:
+          "El archivo no existe o tu cuenta de Google no tiene acceso. Compartilo con la cuenta conectada en Drive y probá de nuevo.",
       };
+    }
+    if (res.status === 403) {
+      return {
+        error:
+          "Permiso insuficiente en Drive para leer el archivo. Compartilo con la cuenta conectada.",
+      };
+    }
+    if (!res.ok) {
+      return { error: `Drive devolvió ${res.status}. Probá de nuevo.` };
     }
     meta = (await res.json()) as DriveFileMeta;
   } catch (err) {
+    const msg =
+      err instanceof Error
+        ? err.name === "AbortError"
+          ? "Drive tardó demasiado en responder — probá de nuevo"
+          : err.message
+        : "No se pudo leer metadata del archivo";
+    return { error: msg };
+  }
+
+  // Dedup check before queueing so we don't trigger a no-op task run.
+  const existingTranscript = await db
+    .select({ id: transcriptsTable.id })
+    .from(transcriptsTable)
+    .where(eq(transcriptsTable.googleDriveFileId, meta.id))
+    .limit(1);
+  const existingContext = await db
+    .select({ id: contextDocumentsTable.id })
+    .from(contextDocumentsTable)
+    .where(eq(contextDocumentsTable.googleDriveFileId, meta.id))
+    .limit(1);
+  if (existingTranscript.length > 0 || existingContext.length > 0) {
+    return { outcome: "duplicate", fileName: meta.name };
+  }
+
+  // Queue the actual download + extract + insert in a Trigger task so the
+  // server action returns fast (before Vercel's serverless timeout).
+  try {
+    const { tasks } = await import("@trigger.dev/sdk/v3");
+    await tasks.trigger("import-drive-link", {
+      workspaceId: workspace.id,
+      accountId,
+      fileId: meta.id,
+      uploadedByUserId: userId,
+      userNotes: userNotes ?? null,
+      fileMeta: meta,
+    });
+  } catch (err) {
     return {
-      error: err instanceof Error ? err.message : "No se pudo leer metadata del archivo",
+      error:
+        err instanceof Error
+          ? err.message
+          : "No se pudo encolar el import — ¿está Trigger.dev configurado?",
     };
   }
 
-  const outcome = await importDriveFileForAccount({
-    file: meta,
-    accessToken,
-    workspaceId: workspace.id,
-    accountId,
-    uploadedByUserId: userId,
-    userNotes: userNotes ?? null,
-    source: "drive_link",
-  });
-
   revalidatePath(`/app/accounts/${accountId}`);
-  return { outcome, fileName: meta.name };
+  return { outcome: "queued", fileName: meta.name };
 }
 
 export async function syncDriveNow(): Promise<{ runId?: string; error?: string }> {
