@@ -15,6 +15,19 @@ const ALLOWED_DOC_TYPES = new Set([
   "other",
 ]);
 
+async function triggerSummaryRefresh(
+  accountId: string,
+  workspaceId: string
+): Promise<void> {
+  try {
+    const { tasks } = await import("@trigger.dev/sdk/v3");
+    await tasks.trigger("refresh-account-summary", { accountId, workspaceId });
+  } catch (err) {
+    // Best-effort: don't block the upload if Trigger is unreachable.
+    console.error("Failed to enqueue refresh-account-summary", err);
+  }
+}
+
 interface UploadContextDocumentInput {
   accountId: string;
   docType: string;
@@ -61,6 +74,10 @@ export async function uploadContextDocument(
       extractedText: input.extractedText,
     })
     .returning({ id: contextDocuments.id });
+
+  // Re-generate the account summary in the background so the new context
+  // document influences "Resumen de situación" right away.
+  await triggerSummaryRefresh(input.accountId, workspace.id);
 
   revalidatePath(`/app/accounts/${input.accountId}`);
   return { id: row.id };

@@ -13,9 +13,8 @@ import { deleteAccount, updateAccount, updateHealthSignal } from "@/app/actions/
 import { AccountHealthBadge } from "@/components/account-health-badge";
 import { EditAccountForm } from "@/components/edit-account-form";
 import { ContextUploadForm } from "@/components/context-upload-form";
-import { ContextDocumentsList } from "@/components/context-documents-list";
+import { ContextFilesTimeline } from "@/components/context-files-timeline";
 import { DeleteButton } from "@/components/delete-button";
-import { TranscriptHistoryTable } from "@/components/transcript-history-table";
 import { TasksPanel } from "@/components/tasks-panel";
 import { ParticipantsPanel } from "@/components/participants-panel";
 import { SignalsPanel } from "@/components/signals-panel";
@@ -343,23 +342,28 @@ export default async function AccountDetailPage({
 
       {/* Collapsible modules (default closed) */}
       <div className="space-y-4">
-        {isModuleEnabled(account.enabledModules, "context_upload") && transcriptHistory.length > 0 && (
-          <CollapsibleSection
-            title="Historial de transcripciones"
-            summary={`${transcriptHistory.length} transcripción${transcriptHistory.length !== 1 ? "es" : ""}`}
-          >
-            <TranscriptHistoryTable transcripts={transcriptHistory} accountId={accountId} />
-          </CollapsibleSection>
-        )}
-
-        {isModuleEnabled(account.enabledModules, "context_upload") && contextDocs.length > 0 && (
-          <CollapsibleSection
-            title="Archivos de contexto"
-            summary={`${contextDocs.length} ${contextDocs.length === 1 ? "archivo" : "archivos"}`}
-          >
-            <ContextDocumentsList documents={contextDocs} />
-          </CollapsibleSection>
-        )}
+        {isModuleEnabled(account.enabledModules, "context_upload") &&
+          transcriptHistory.length + contextDocs.length > 0 && (
+            <CollapsibleSection
+              title="Archivos de contexto"
+              summary={(() => {
+                const total = transcriptHistory.length + contextDocs.length;
+                const ts = transcriptHistory.length;
+                const cs = contextDocs.length;
+                if (ts > 0 && cs > 0) {
+                  return `${total} (${ts} transcripción${ts !== 1 ? "es" : ""} · ${cs} archivo${cs !== 1 ? "s" : ""})`;
+                }
+                if (ts > 0) return `${ts} transcripción${ts !== 1 ? "es" : ""}`;
+                return `${cs} archivo${cs !== 1 ? "s" : ""}`;
+              })()}
+            >
+              <ContextFilesTimeline
+                transcripts={transcriptHistory}
+                contextDocs={contextDocs}
+                accountId={accountId}
+              />
+            </CollapsibleSection>
+          )}
 
         {isModuleEnabled(account.enabledModules, "tasks") && (
           <CollapsibleSection

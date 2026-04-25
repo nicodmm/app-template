@@ -84,7 +84,7 @@ export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
   // Transcript file queue
   const [transcriptQueue, setTranscriptQueue] = useState<QueuedTranscript[]>([]);
   const transcriptInputRef = useRef<HTMLInputElement>(null);
-  const [transcriptMode, setTranscriptMode] = useState<"paste" | "files">("paste");
+  const [transcriptMode, setTranscriptMode] = useState<"paste" | "files">("files");
 
   // Note state
   const [noteTitle, setNoteTitle] = useState("");
