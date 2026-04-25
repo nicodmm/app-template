@@ -22,7 +22,6 @@ export default async function ProtectedLayout({
 
   let workspaceData = await getWorkspaceWithUsage(userId);
 
-  // Lazy workspace creation — handles signups where email callback wasn't triggered
   if (!workspaceData) {
     await createDefaultWorkspace(userId, email);
     workspaceData = await getWorkspaceWithUsage(userId);
@@ -30,12 +29,11 @@ export default async function ProtectedLayout({
 
   const role = workspaceData?.member.role ?? "member";
   const transcriptsCount = workspaceData?.usage?.transcriptsCount ?? 0;
-  // Tier limits wired to Stripe in Phase 9 — placeholder for now
   const transcriptsLimit = 5;
   const plan = "Free";
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-dvh flex-col">
       <AppHeader userEmail={email} userInitial={userInitial} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
@@ -44,9 +42,7 @@ export default async function ProtectedLayout({
           transcriptsLimit={transcriptsLimit}
           plan={plan}
         />
-        <main className="flex-1 overflow-auto bg-background">
-          {children}
-        </main>
+        <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>
   );
