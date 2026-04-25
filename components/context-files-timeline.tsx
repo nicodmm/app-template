@@ -12,9 +12,11 @@ import {
   Trash2,
   Download,
   RotateCcw,
+  ExternalLink,
 } from "lucide-react";
 import { deleteTranscript, retryTranscript } from "@/app/actions/transcripts";
 import { deleteContextDocument } from "@/app/actions/context-documents";
+import { driveViewLinkForFile } from "@/lib/google/drive-links";
 import type { Transcript } from "@/lib/drizzle/schema";
 import type { ContextDocument } from "@/lib/queries/context-documents";
 
@@ -159,6 +161,17 @@ export function ContextFilesTimeline({
                     Reintentar
                   </button>
                 )}
+                {t.googleDriveFileId && (
+                  <a
+                    href={driveViewLinkForFile(t.googleDriveFileId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title="Abrir en Drive"
+                  >
+                    <ExternalLink size={14} />
+                  </a>
+                )}
                 <button
                   type="button"
                   onClick={() => downloadTranscript(t)}
@@ -222,22 +235,35 @@ export function ContextFilesTimeline({
                   </p>
                 </div>
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!confirm(`Eliminar "${d.title}"?`)) return;
-                  startTransition(async () => {
-                    await deleteContextDocument(d.id);
-                    router.refresh();
-                  });
-                }}
-                disabled={isPending}
-                className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
-                aria-label="Eliminar"
-                title="Eliminar"
-              >
-                <Trash2 size={14} />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                {d.googleDriveFileId && (
+                  <a
+                    href={driveViewLinkForFile(d.googleDriveFileId, d.mimeType ?? undefined)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title="Abrir en Drive"
+                  >
+                    <ExternalLink size={14} />
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!confirm(`Eliminar "${d.title}"?`)) return;
+                    startTransition(async () => {
+                      await deleteContextDocument(d.id);
+                      router.refresh();
+                    });
+                  }}
+                  disabled={isPending}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                  aria-label="Eliminar"
+                  title="Eliminar"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             </div>
 
             {isOpen && hasBody && (

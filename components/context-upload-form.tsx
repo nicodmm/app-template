@@ -2,11 +2,12 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, FileText, AlertCircle, X, Loader2, StickyNote, Paperclip } from "lucide-react";
+import { Upload, FileText, AlertCircle, X, Loader2, StickyNote, Paperclip, Link as LinkIcon } from "lucide-react";
 import mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
 import { uploadTranscript } from "@/app/actions/transcripts";
 import { uploadContextDocument } from "@/app/actions/context-documents";
+import { importDriveLinkForAccount } from "@/app/actions/drive";
 import { TranscriptProgress } from "@/components/transcript-progress";
 
 interface ContextUploadFormProps {
@@ -74,7 +75,7 @@ const DOC_TYPE_LABEL: Record<string, string> = {
 };
 
 export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
-  const [tab, setTab] = useState<"transcript" | "note" | "file">("transcript");
+  const [tab, setTab] = useState<"transcript" | "note" | "file" | "drive_link">("transcript");
   const router = useRouter();
 
   // Transcript paste state
@@ -94,6 +95,16 @@ export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
   // File context queue
   const [contextQueue, setContextQueue] = useState<QueuedContextFile[]>([]);
   const contextInputRef = useRef<HTMLInputElement>(null);
+
+  // Drive link state
+  const [driveLinkUrl, setDriveLinkUrl] = useState("");
+  const [driveLinkNotes, setDriveLinkNotes] = useState("");
+  const [driveLinkState, setDriveLinkState] = useState<
+    | { phase: "idle" }
+    | { phase: "submitting" }
+    | { phase: "done"; message: string }
+    | { phase: "error"; message: string }
+  >({ phase: "idle" });
 
   const pasteWordCount = pasteContent.trim() ? pasteContent.trim().split(/\s+/).length : 0;
 
@@ -273,17 +284,45 @@ export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
 
   const contextQueuedCount = contextQueue.filter((f) => f.status.phase === "queued").length;
 
+  // ── Drive link ─────────────────────────────────────────────────────────────
+
+  async function handleDriveLinkSubmit() {
+    if (!driveLinkUrl.trim()) return;
+    setDriveLinkState({ phase: "submitting" });
+    const result = await importDriveLinkForAccount(
+      accountId,
+      driveLinkUrl.trim(),
+      driveLinkNotes.trim() || undefined
+    );
+    if (result.error) {
+      setDriveLinkState({ phase: "error", message: result.error });
+      return;
+    }
+    const name = result.fileName ?? "el archivo";
+    const msg =
+      result.outcome === "imported"
+        ? `Listo. Importamos "${name}" desde Drive.`
+        : result.outcome === "duplicate"
+          ? `"${name}" ya estaba importado previamente.`
+          : `No pudimos procesar "${name}". Probá revisar permisos en Drive.`;
+    setDriveLinkState({ phase: "done", message: msg });
+    setDriveLinkUrl("");
+    setDriveLinkNotes("");
+    router.refresh();
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4">
       {/* Main tabs */}
-      <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit">
+      <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit flex-wrap">
         {(
           [
             { key: "transcript", icon: FileText, label: "Transcripción" },
             { key: "note", icon: StickyNote, label: "Nota o mensaje" },
             { key: "file", icon: Paperclip, label: "Archivo" },
+            { key: "drive_link", icon: LinkIcon, label: "Link de Drive" },
           ] as const
         ).map((t) => (
           <button
@@ -668,6 +707,57 @@ export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
               Guardar {contextQueuedCount} archivo{contextQueuedCount !== 1 ? "s" : ""}
             </button>
           )}
+        </div>
+      )}
+
+      {/* DRIVE LINK TAB */}
+      {tab === "drive_link" && (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Pegá un link a un archivo de Drive (documento, planilla, presentación, PDF). Lo
+            importamos usando tu conexión de Drive del Workspace — no guardamos el archivo
+            físico. Si es un documento de texto entra como transcripción; cualquier otro
+            formato queda como archivo de contexto con el link original.
+          </p>
+
+          {driveLinkState.phase === "error" && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+              <p className="text-sm text-destructive">{driveLinkState.message}</p>
+            </div>
+          )}
+          {driveLinkState.phase === "done" && (
+            <div className="rounded-lg border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20 p-3">
+              <p className="text-sm text-emerald-700 dark:text-emerald-300">
+                {driveLinkState.message}
+              </p>
+            </div>
+          )}
+
+          <input
+            type="url"
+            placeholder="https://drive.google.com/file/d/..."
+            value={driveLinkUrl}
+            onChange={(e) => setDriveLinkUrl(e.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <textarea
+            placeholder="Notas o descripción (opcional — qué aporta este archivo al contexto)"
+            value={driveLinkNotes}
+            onChange={(e) => setDriveLinkNotes(e.target.value)}
+            rows={3}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <button
+            onClick={handleDriveLinkSubmit}
+            disabled={!driveLinkUrl.trim() || driveLinkState.phase === "submitting"}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            {driveLinkState.phase === "submitting" ? (
+              <><Loader2 size={14} className="animate-spin" /> Importando...</>
+            ) : (
+              <><LinkIcon size={14} /> Importar desde link</>
+            )}
+          </button>
         </div>
       )}
     </div>
