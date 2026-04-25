@@ -382,7 +382,7 @@ export default async function AccountDetailPage({
           transcriptHistory.length + contextDocs.length > 0 && (
             <CollapsibleSection
               title="Archivos de contexto"
-              icon={FolderOpen}
+              icon={<FolderOpen size={16} aria-hidden />}
               summary={(() => {
                 const total = transcriptHistory.length + contextDocs.length;
                 const ts = transcriptHistory.length;
@@ -405,7 +405,7 @@ export default async function AccountDetailPage({
         {isModuleEnabled(account.enabledModules, "tasks") && (
           <CollapsibleSection
             title="Tareas"
-            icon={CheckSquare}
+            icon={<CheckSquare size={16} aria-hidden />}
             summary={
               accountTasks.length === 0
                 ? "sin tareas"
@@ -421,7 +421,7 @@ export default async function AccountDetailPage({
         {isModuleEnabled(account.enabledModules, "participants") && (
           <CollapsibleSection
             title="Contactos y Participantes"
-            icon={UsersIcon}
+            icon={<UsersIcon size={16} aria-hidden />}
             summary={
               accountParticipants.length === 0
                 ? "sin contactos"
@@ -435,7 +435,7 @@ export default async function AccountDetailPage({
         {isModuleEnabled(account.enabledModules, "signals") && (
           <CollapsibleSection
             title="Señales"
-            icon={Zap}
+            icon={<Zap size={16} aria-hidden />}
             summary={
               accountSignals.length === 0
                 ? "sin señales"
@@ -452,7 +452,7 @@ export default async function AccountDetailPage({
           <CollapsibleSection
             id="salud-section"
             title="Evolución de salud"
-            icon={TrendingUp}
+            icon={<TrendingUp size={16} aria-hidden />}
             defaultOpen
             summary={
               healthHistory.length === 0

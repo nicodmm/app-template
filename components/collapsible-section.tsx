@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, type ReactNode, type ComponentType } from "react";
+import { useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type IconComponent = ComponentType<{ size?: number; className?: string }>;
-
 interface CollapsibleSectionProps {
   title: string;
-  /** Optional Lucide icon shown to the left of the title. */
-  icon?: IconComponent;
+  /**
+   * Optional icon element rendered to the left of the title.
+   * Pass a ReactNode (e.g. <CheckSquare size={16} />), NOT the component
+   * itself — server components can't ship a function across the RSC boundary.
+   */
+  icon?: ReactNode;
   summary?: ReactNode;
   defaultOpen?: boolean;
   /** Optional anchor id so other UI (e.g. strip chart) can scroll into view. */
@@ -19,7 +21,7 @@ interface CollapsibleSectionProps {
 
 export function CollapsibleSection({
   title,
-  icon: Icon,
+  icon,
   summary,
   defaultOpen = false,
   id,
@@ -44,14 +46,15 @@ export function CollapsibleSection({
         <span className="shrink-0 text-muted-foreground">
           {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </span>
-        {Icon && (
-          <Icon
-            size={16}
+        {icon && (
+          <span
             className={cn(
               "shrink-0 transition-colors",
               open ? "text-primary" : "text-muted-foreground"
             )}
-          />
+          >
+            {icon}
+          </span>
         )}
         <h2 className="font-semibold flex-1">{title}</h2>
         {summary && (
