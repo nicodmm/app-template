@@ -40,17 +40,31 @@ export const detectSignals = task({
     await metadata.root.set("progress", 75);
     await metadata.root.set("currentStep", "Detectando señales...");
 
-    // Pull the workspace's agency context so the LLM can frame signals
-    // around what THIS agency cares about (services, ICP, upsell paths).
+    // Pull both the workspace's free-form agency context AND the workspace
+    // service catalog. The agency_context gives the LLM background (who they
+    // are, ICP, things they care about); the services list is treated as the
+    // explicit cross-sell catalog so the LLM can flag opportunities even when
+    // the agency didn't literally list them in the context.
     const [ws] = await db
-      .select({ agencyContext: workspaces.agencyContext })
+      .select({
+        agencyContext: workspaces.agencyContext,
+        services: workspaces.services,
+      })
       .from(workspaces)
       .where(eq(workspaces.id, payload.workspaceId))
       .limit(1);
     const agencyContext = ws?.agencyContext?.trim() ?? "";
+    const services = (ws?.services ?? []).filter(
+      (s): s is string => typeof s === "string" && s.trim().length > 0
+    );
+
     const agencyBlock = agencyContext
-      ? `CONTEXTO DE LA AGENCIA (lo que sabe el equipo de growth, qué busca detectar):\n${agencyContext}\n\n`
+      ? `CONTEXTO DE LA AGENCIA (background, no son reglas literales — usalo para informar el criterio):\n${agencyContext}\n\n`
       : "";
+    const servicesBlock =
+      services.length > 0
+        ? `CARTERA DE SERVICIOS DE LA AGENCIA (cosas que pueden ofrecer al cliente):\n- ${services.join("\n- ")}\n\n`
+        : "";
 
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
@@ -58,11 +72,16 @@ export const detectSignals = task({
       messages: [
         {
           role: "user",
-          content: `Sos un analista experto en gestión de cuentas para agencias de growth.
+          content: `Sos un analista experto en gestión de cuentas para agencias de growth. Tu rol es estar UN PASO ADELANTE: si el cliente menciona un dolor que la agencia podría resolver con uno de sus servicios, marcalo aunque el equipo no haya pedido explícitamente esa señal.
 
-${agencyBlock}Analizá el siguiente resumen de reunión y estado de cuenta, y:
-1. Detectá señales relevantes (riesgos de churn, oportunidades de crecimiento, oportunidades de upsell, flags de inactividad). Si la agencia describió señales específicas que le interesan, priorizá esas.
-2. Determiná el estado de salud general de la cuenta
+${agencyBlock}${servicesBlock}Analizá el siguiente resumen de reunión y estado de cuenta y devolvé:
+1. Señales relevantes — riesgos de churn, oportunidades de crecimiento, oportunidades de upsell o cross-sell (servicios que podríamos sumar), flags de inactividad. Sé proactivo: si el cliente dice "tengo problemas con X" y X coincide con algún servicio de la cartera, ES una señal aunque el contexto de la agencia no lo haya listado. Cada señal debe ser accionable y específica.
+2. Estado de salud general de la cuenta.
+
+REGLAS:
+- "upsell_opportunity" = sumar más del MISMO servicio que ya tiene.
+- "growth_opportunity" = SUMAR un servicio NUEVO de la cartera (cross-sell). Citá el servicio puntual.
+- Sé creativo pero honesto: si el cliente no mencionó algo concreto, NO inventes una oportunidad.
 
 RESUMEN DE REUNIÓN:
 ${payload.summaryText}
@@ -79,7 +98,7 @@ Respondé ÚNICAMENTE con un JSON válido:
   "healthJustification": "..."
 }
 
-Solo incluí señales con confianza media o alta. Si no hay señales claras, usá un array vacío.`,
+Solo incluí señales con confianza media o alta. Si no hay señales claras, devolvé un array vacío.`,
         },
       ],
     });

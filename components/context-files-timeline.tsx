@@ -280,10 +280,19 @@ export function ContextFilesTimeline({
         const { Icon, label } = meta;
         const isOpen = expanded === d.id;
         const hasBody = !!(d.notes || d.extractedText || d.aiSummary);
-        const canSummarize =
-          !d.aiSummary &&
-          (d.extractedText?.trim().length ?? 0) >= 200;
+        const extractedLen = d.extractedText?.trim().length ?? 0;
+        const hasEnoughText = extractedLen >= 200;
         const isSummarizing = summarizingId === d.id;
+        const summarizeLabel = isSummarizing
+          ? "Generando…"
+          : d.aiSummary
+          ? "Regenerar"
+          : "Resumir";
+        const summarizeTitle = !hasEnoughText
+          ? "Necesita al menos ~200 caracteres de texto extraído"
+          : d.aiSummary
+          ? "Regenerar el resumen con IA"
+          : "Generar resumen con IA";
 
         return (
           <div
@@ -318,22 +327,20 @@ export function ContextFilesTimeline({
                 </div>
               </button>
               <div className="flex items-center gap-2 shrink-0">
-                {canSummarize && (
-                  <button
-                    type="button"
-                    onClick={() => handleSummarize(d.id)}
-                    disabled={isSummarizing}
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50"
-                    title="Generar resumen con IA"
-                  >
-                    {isSummarizing ? (
-                      <Loader2 size={12} className="animate-spin" />
-                    ) : (
-                      <Sparkles size={12} />
-                    )}
-                    {isSummarizing ? "Generando…" : "Resumir"}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => handleSummarize(d.id)}
+                  disabled={isSummarizing || !hasEnoughText}
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:text-muted-foreground disabled:opacity-60 disabled:cursor-not-allowed disabled:no-underline"
+                  title={summarizeTitle}
+                >
+                  {isSummarizing ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <Sparkles size={12} />
+                  )}
+                  {summarizeLabel}
+                </button>
                 {d.googleDriveFileId && (
                   <a
                     href={driveViewLinkForFile(d.googleDriveFileId, d.mimeType ?? undefined)}

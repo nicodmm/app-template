@@ -10,10 +10,11 @@ interface Props {
   canManage: boolean;
 }
 
-const PLACEHOLDER = `Ej: Somos una agencia de growth con foco en SaaS B2B en LATAM. Servicios: Meta Ads, Google Ads, CRO. Cliente ideal: empresas Series A+ con un budget de paid media >USD 30k/mes. Buscamos detectar:
-- Upsell: cuentas que escalaron presupuesto >50% en 90 días o que mencionan nuevos productos.
-- Riesgo: caída sostenida de spend, comparaciones con otra agencia, falta de respuesta a propuestas.
-- Crecimiento: oportunidades de cross-sell hacia CRO o LandingPages cuando el cliente ya está en Meta Ads.`;
+const PLACEHOLDER = `Ej: Somos una agencia de growth con foco en SaaS B2B en LATAM. Trabajamos con empresas Series A+ que ya tienen producto y necesitan escalar adquisición. Nuestro diferencial es combinar paid media con experimentación en producto.
+
+Cosas que nos sirve saber del cliente: en qué etapa está (validación, escala, optimización), si tiene equipo interno o terceriza todo, qué herramientas usa hoy.
+
+(La cartera de servicios la cargás aparte — la IA la usa para sugerir cross-sell automáticamente cuando el cliente menciona problemas que podemos resolver.)`;
 
 export function WorkspaceAgencyContextSection({
   initialValue,
@@ -49,8 +50,10 @@ export function WorkspaceAgencyContextSection({
         <div>
           <h2 className="font-semibold">Contexto de la agencia</h2>
           <p className="text-xs text-muted-foreground">
-            La IA usa esto para detectar señales de upsell, crecimiento y riesgo
-            específicas a tu agencia. Cuanto más concreto, mejor el detector.
+            Background sobre quién es tu agencia y qué tipo de cliente buscás.
+            La IA combina esto con tu cartera de servicios para inferir
+            señales de upsell y cross-sell — no hace falta que pongas reglas
+            literales.
           </p>
         </div>
       </div>
