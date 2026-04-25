@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, uniqueIndex, boolean } from "drizzle-orm/pg-core";
 import { workspaces } from "./workspaces";
 import { users } from "./users";
 
@@ -20,6 +20,7 @@ export const driveConnections = pgTable(
 
     folderId: text("folder_id"),
     folderName: text("folder_name"),
+    linkOnlySync: boolean("link_only_sync").notNull().default(false),
 
     status: text("status"),
     lastSyncAt: timestamp("last_sync_at"),

@@ -6,6 +6,7 @@ import { FolderInput, RefreshCw, Unplug, Loader2 } from "lucide-react";
 import {
   listDriveFoldersForWorkspace,
   setDriveFolder,
+  setDriveLinkOnlySync,
   disconnectDrive,
   syncDriveNow,
 } from "@/app/actions/drive";
@@ -198,6 +199,31 @@ export function WorkspaceDriveSection({
           {syncMessage && (
             <p className="text-xs text-muted-foreground">{syncMessage}</p>
           )}
+
+          <label className="flex items-start gap-2 rounded-md border border-border bg-background/50 px-3 py-2.5 cursor-pointer hover:bg-accent/50 transition-colors">
+            <input
+              type="checkbox"
+              defaultChecked={connection.linkOnlySync}
+              onChange={(e) => {
+                const next = e.currentTarget.checked;
+                startTransition(async () => {
+                  await setDriveLinkOnlySync(next);
+                  router.refresh();
+                });
+              }}
+              disabled={pending}
+              className="mt-0.5 h-4 w-4 rounded border-input"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium leading-none">Solo guardar links (modo liviano)</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Cuando está prendido, los archivos sincronizados se guardan como referencia
+                con el link a Drive. <strong>No se descarga el contenido</strong> y no se extraen
+                tareas, contactos ni resumen automático. Bajás el peso de la app a costa de las
+                features de IA sobre esos archivos.
+              </p>
+            </div>
+          </label>
 
           {pickerOpen && (
             <div className="rounded-md border border-border bg-background p-3 space-y-2">

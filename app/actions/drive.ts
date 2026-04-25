@@ -51,6 +51,22 @@ export async function listDriveFoldersForWorkspace(
   }
 }
 
+export async function setDriveLinkOnlySync(
+  enabled: boolean
+): Promise<{ error?: string }> {
+  try {
+    const { workspaceId } = await ensureManager();
+    await db
+      .update(driveConnections)
+      .set({ linkOnlySync: enabled, updatedAt: new Date() })
+      .where(eq(driveConnections.workspaceId, workspaceId));
+    revalidatePath("/app/settings/workspace");
+    return {};
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Error" };
+  }
+}
+
 export async function setDriveFolder(
   folderId: string,
   folderName: string

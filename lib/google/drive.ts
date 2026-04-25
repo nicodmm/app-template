@@ -93,12 +93,14 @@ export async function listDriveFolders(
 
 export async function listDriveFolderFiles(
   accessToken: string,
-  folderId: string
+  folderId: string,
+  options: { limit?: number } = {}
 ): Promise<DriveFileMeta[]> {
+  const limit = Math.min(Math.max(options.limit ?? 100, 1), 1000);
   const query = `'${folderId}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`;
   const params = new URLSearchParams({
     q: query,
-    pageSize: "100",
+    pageSize: String(Math.min(limit, 100)),
     fields: "files(id,name,mimeType,modifiedTime,size)",
     orderBy: "modifiedTime desc",
   });
@@ -106,7 +108,7 @@ export async function listDriveFolderFiles(
     `/files?${params.toString()}`,
     accessToken
   );
-  return res.files;
+  return res.files.slice(0, limit);
 }
 
 const GOOGLE_DOC_MIME = "application/vnd.google-apps.document";

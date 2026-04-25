@@ -76,7 +76,17 @@ export const syncDriveFolder = task({
 
     try {
       const accessToken = await ensureFreshAccessToken(connection.id);
-      const files = await listDriveFolderFiles(accessToken, connection.folderId);
+
+      // First sync (lastSyncAt is null) is capped at the 24 most recent files
+      // by modifiedTime — gives a 6-month-ish historical window without
+      // dragging in years of meeting docs. Subsequent syncs scan up to 100
+      // (top of folder) and let the dedup index keep things idempotent.
+      const isFirstSync = connection.lastSyncAt === null;
+      const HISTORICAL_LIMIT = 24;
+      const INCREMENTAL_LIMIT = 100;
+      const files = await listDriveFolderFiles(accessToken, connection.folderId, {
+        limit: isFirstSync ? HISTORICAL_LIMIT : INCREMENTAL_LIMIT,
+      });
 
       const workspaceAccounts = await db
         .select({ id: accounts.id, name: accounts.name })
@@ -106,6 +116,7 @@ export const syncDriveFolder = task({
           accountId: matched.id,
           uploadedByUserId: connection.connectedByUserId,
           source: "drive_sync",
+          linkOnly: connection.linkOnlySync ?? false,
         });
         if (outcome === "imported") imported += 1;
         else skipped += 1;

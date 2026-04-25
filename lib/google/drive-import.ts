@@ -23,6 +23,12 @@ interface ImportOptions {
   userNotes?: string | null;
   /** how the import is being triggered — shows up in context_documents.notes when empty */
   source?: "drive_sync" | "drive_link";
+  /**
+   * When true, skip downloading the file. We just persist a context_document
+   * row with metadata + Drive link, no AI pipeline. Used by the workspace
+   * "link-only sync" mode to keep storage minimal.
+   */
+  linkOnly?: boolean;
 }
 
 function hashContent(content: string): string {
@@ -96,6 +102,42 @@ export async function importDriveFileForAccount(
   if (existingContext.length > 0) return "duplicate";
 
   const shape = classifyDriveFile(file.name, file.mimeType);
+
+  // Link-only mode: persist as context_document with metadata + Drive link.
+  // No download, no extraction, no AI pipeline. Skip transcript route entirely.
+  if (opts.linkOnly) {
+    const insert = await db
+      .insert(contextDocuments)
+      .values({
+        workspaceId: opts.workspaceId,
+        accountId: opts.accountId,
+        uploadedByUserId: opts.uploadedByUserId,
+        docType: shape.contextDocType,
+        title: file.name,
+        notes:
+          opts.userNotes && opts.userNotes.trim().length > 0
+            ? opts.userNotes.trim()
+            : "Sincronizado desde Drive (solo link, sin descarga).",
+        fileName: file.name,
+        mimeType: file.mimeType,
+        fileSize: file.size ? Number(file.size) : null,
+        extractedText: null,
+        googleDriveFileId: file.id,
+      })
+      .onConflictDoNothing({ target: contextDocuments.googleDriveFileId })
+      .returning({ id: contextDocuments.id });
+    if (insert.length === 0) return "duplicate";
+    try {
+      const { tasks } = await import("@trigger.dev/sdk/v3");
+      await tasks.trigger("refresh-account-summary", {
+        accountId: opts.accountId,
+        workspaceId: opts.workspaceId,
+      });
+    } catch {
+      // best-effort
+    }
+    return "imported";
+  }
 
   let downloaded: { data: ArrayBuffer; mimeType: string } | null = null;
   try {
