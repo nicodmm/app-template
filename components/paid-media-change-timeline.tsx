@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { BarChart3, Target, PlaySquare, Circle } from "lucide-react";
 import type { ChangeEventRow } from "@/lib/queries/paid-media";
 
@@ -65,13 +65,39 @@ function describeEvent(event: ChangeEventRow): string {
   }
 }
 
+const INITIAL_VISIBLE = 6;
+const STEP_INCREMENT = 5;
+const MAX_STEPS = 3;
+
 export function PaidMediaChangeTimeline({ events, totalAvailable, onLoadMore, loadingMore }: Props) {
   const [level, setLevel] = useState<"all" | "campaign" | "ad_set" | "ad">("all");
+  const [visible, setVisible] = useState<number>(INITIAL_VISIBLE);
+  const [stepsTaken, setStepsTaken] = useState<number>(0);
 
   const filtered = useMemo(
     () => (level === "all" ? events : events.filter((e) => e.entityType === level)),
     [events, level]
   );
+
+  // Reset progressive count whenever the filter changes.
+  useEffect(() => {
+    setVisible(INITIAL_VISIBLE);
+    setStepsTaken(0);
+  }, [level]);
+
+  const trimmed = filtered.slice(0, visible);
+  const remaining = filtered.length - trimmed.length;
+  const stepsLeft = MAX_STEPS - stepsTaken;
+  const showAllNext = stepsLeft <= 0;
+
+  function loadMoreLocal() {
+    if (showAllNext) {
+      setVisible(filtered.length);
+      return;
+    }
+    setVisible((v) => v + STEP_INCREMENT);
+    setStepsTaken((s) => s + 1);
+  }
 
   return (
     <div className="rounded-xl backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
@@ -98,25 +124,41 @@ export function PaidMediaChangeTimeline({ events, totalAvailable, onLoadMore, lo
         </div>
       ) : (
         <ul className="divide-y divide-[var(--glass-border)]">
-          {filtered.map((e) => {
+          {trimmed.map((e) => {
             const Icon = ENTITY_ICON[e.entityType] ?? Circle;
             return (
-            <li key={e.id} className="p-3 text-sm flex items-start gap-3">
-              <Icon size={14} className="text-muted-foreground mt-1 shrink-0" aria-hidden />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="font-medium truncate">{e.entityName ?? e.entityMetaId}</span>
-                  <span className="text-xs text-muted-foreground">{timeAgo(e.occurredAt)}</span>
+              <li key={e.id} className="p-3 text-sm flex items-start gap-3">
+                <Icon size={14} className="text-muted-foreground mt-1 shrink-0" aria-hidden />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="font-medium truncate">{e.entityName ?? e.entityMetaId}</span>
+                    <span className="text-xs text-muted-foreground">{timeAgo(e.occurredAt)}</span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">{describeEvent(e)}</div>
                 </div>
-                <div className="text-sm text-muted-foreground">{describeEvent(e)}</div>
-              </div>
-            </li>
-          );
+              </li>
+            );
           })}
         </ul>
       )}
 
-      {events.length < totalAvailable && onLoadMore && (
+      {remaining > 0 && (
+        <div className="[border-top:1px_solid_var(--glass-border)] p-3 text-center">
+          <button
+            type="button"
+            onClick={loadMoreLocal}
+            className="rounded-md px-3 py-1 text-xs font-medium text-primary hover:bg-accent"
+          >
+            {showAllNext
+              ? `Mostrar todos (${remaining} más)`
+              : `Mostrar más (${Math.min(STEP_INCREMENT, remaining)})`}
+          </button>
+        </div>
+      )}
+
+      {/* Pagination from the parent — only kicks in once we've shown all
+          locally-loaded events and there's still server-side pagination. */}
+      {remaining === 0 && events.length < totalAvailable && onLoadMore && (
         <div className="[border-top:1px_solid_var(--glass-border)] p-3 text-center">
           <button
             type="button"
@@ -124,7 +166,7 @@ export function PaidMediaChangeTimeline({ events, totalAvailable, onLoadMore, lo
             disabled={loadingMore}
             className="rounded-md px-3 py-1 text-xs font-medium text-primary hover:bg-accent disabled:opacity-50"
           >
-            {loadingMore ? "Cargando…" : "Ver más"}
+            {loadingMore ? "Cargando…" : "Cargar más del servidor"}
           </button>
         </div>
       )}

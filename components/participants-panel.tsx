@@ -39,7 +39,10 @@ function formatDate(date: string | Date | null): string {
 
 function timeAgo(date: Date | string | null): string {
   if (!date) return "";
-  const d = typeof date === "string" ? new Date(date) : date;
+  const d =
+    typeof date === "string"
+      ? new Date(date + (date.length === 10 ? "T12:00:00" : ""))
+      : date;
   const diff = Date.now() - d.getTime();
   const days = Math.floor(diff / 86400000);
   if (days === 0) return "hoy";
@@ -164,7 +167,7 @@ export function ParticipantsPanel({ participants }: ParticipantsPanelProps) {
                     </span>
                     <span className="inline-flex items-center gap-1">
                       <CalendarDays size={11} />
-                      Última {timeAgo(p.lastSeenAt)}
+                      Última {timeAgo(p.lastMeetingDate ?? p.lastSeenAt)}
                       {p.lastMeetingDate && ` · ${formatDate(p.lastMeetingDate)}`}
                     </span>
                     {p.appearanceCount > 1 && p.firstMeetingDate && (

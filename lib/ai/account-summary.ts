@@ -228,15 +228,19 @@ Con toda esa información generá dos salidas en JSON:
    - NO menciones fechas salvo deadlines críticos.
    - Máximo 200 palabras.
 
-2. "accountSituation" — Resumen de situación para el equipo, en DOS secciones con este formato EXACTO (dos párrafos separados por doble salto de línea, cada uno con su header en **negritas**):
+2. "accountSituation" — Resumen ESTRATÉGICO para el equipo, en DOS secciones con este formato EXACTO (dos párrafos separados por doble salto de línea, cada uno con su header en **negritas**):
 
 **Contexto del cliente**
 Una oración que use LOS DATOS DUROS: "{N} meses como cliente. Fee mensual USD {fee}. Servicios contratados: {scope}." Seguí con: "Hoy el proyecto está enfocado en {prioridades del último mes — sacalas de la transcripción Y de los archivos de contexto si son recientes}." Si corresponde cerrá con "Atención: {riesgo u oportunidad que habría que mirar — priorizá lo que surja de los archivos de contexto o la última reunión}." Omití cualquier cláusula cuyo dato no esté disponible — no inventes.
 
 **Estado de la cuenta**
-Una oración tipo: "Cuenta en estado {verde|amarillo|rojo} porque {razón basada en la transcripción, el estado actual Y los archivos de contexto cuando aporten evidencia}." Luego: "Le interesa principalmente {X — puede venir del objetivo declarado, la transcripción o los archivos de contexto}." Luego: "{Nombre del interlocutor del lado del cliente} se lo nota {bien|mal|confiado|preocupado|etc. — inferido de cómo habla}." Cerrá con "Próximos pasos: {acciones concretas}."
+ESTRATÉGICO, NO operativo. Una oración tipo: "Cuenta en estado {verde|amarillo|rojo} porque {razón estratégica — ej. consolidando relación de largo plazo, evaluando renovación, en período de prueba, en escala, en optimización, en recuperación de confianza, etc.}." Luego: "Le interesa principalmente {X — el objetivo de negocio, no el tactic}." Luego: "{Nombre del interlocutor del lado del cliente} se lo nota {bien|mal|confiado|preocupado|etc. — inferido de cómo habla}." Cerrá con "Próximos pasos: {acciones de alto nivel — qué tipo de movimiento toca, no qué métrica subir}."
 
-Elegí al interlocutor desde la lista de participantes frecuentes (no de la agencia). Si no estás seguro, omití el nombre y decí "el interlocutor".
+REGLAS DURAS:
+- NO menciones métricas operativas (CTR, CPC, CPM, CVR, ROAS puntual, % específicos de variación) salvo que sean la PALANCA estratégica del momento.
+- Sí podés mencionar el momento estratégico ("la cuenta está en escala", "en prueba de concepto", "en riesgo de churn", "candidata a upsell").
+- NADA de "subió X%" / "bajó Y%" — eso vive en el módulo de Paid Media, no acá.
+- Elegí al interlocutor desde la lista de participantes frecuentes (no de la agencia). Si no estás seguro, omití el nombre y decí "el interlocutor".
 
 Prosa, NO bullets, NO fechas específicas. Máximo 180 palabras la sección "accountSituation" completa.
 

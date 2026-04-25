@@ -25,6 +25,12 @@ export type LatestMeetingSummary = {
 
 /**
  * Returns the most recent completed transcript that has a meetingSummary.
+ *
+ * When several transcripts share the most recent meeting_date (e.g. a
+ * partial 3-min recording uploaded alongside the full one), pick the one
+ * with the highest word count — the longest recording is almost always
+ * the canonical source. Only after that do we tiebreak on createdAt.
+ *
  * Used by the account detail page to show a "last meeting" card without
  * forcing the user to open the full transcripts list.
  */
@@ -48,6 +54,7 @@ export async function getLatestMeetingSummary(
     )
     .orderBy(
       sql`${transcripts.meetingDate} DESC NULLS LAST`,
+      desc(transcripts.wordCount),
       desc(transcripts.createdAt)
     )
     .limit(1);
