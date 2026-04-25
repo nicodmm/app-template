@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, FileText, AlertCircle, X, Loader2, StickyNote, Paperclip, Link as LinkIcon } from "lucide-react";
 import mammoth from "mammoth";
@@ -102,9 +102,17 @@ export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
   const [driveLinkState, setDriveLinkState] = useState<
     | { phase: "idle" }
     | { phase: "submitting" }
+    | { phase: "polling"; message: string }
     | { phase: "done"; message: string }
     | { phase: "error"; message: string }
   >({ phase: "idle" });
+  const driveLinkPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (driveLinkPollRef.current) clearInterval(driveLinkPollRef.current);
+    };
+  }, []);
 
   const pasteWordCount = pasteContent.trim() ? pasteContent.trim().split(/\s+/).length : 0;
 
@@ -299,16 +307,41 @@ export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
       return;
     }
     const name = result.fileName ?? "el archivo";
-    const msg =
-      result.outcome === "queued"
-        ? `Encolamos "${name}". Va a aparecer en Archivos de contexto en unos segundos.`
-        : result.outcome === "duplicate"
-          ? `"${name}" ya estaba importado previamente.`
-          : `No pudimos procesar "${name}". Probá revisar permisos en Drive.`;
-    setDriveLinkState({ phase: "done", message: msg });
+
+    if (result.outcome === "duplicate") {
+      setDriveLinkState({
+        phase: "done",
+        message: `"${name}" ya estaba importado previamente.`,
+      });
+      setDriveLinkUrl("");
+      setDriveLinkNotes("");
+      return;
+    }
+
     setDriveLinkUrl("");
     setDriveLinkNotes("");
-    router.refresh();
+    setDriveLinkState({
+      phase: "polling",
+      message: `Importando "${name}" desde Drive — va a aparecer en Archivos de contexto.`,
+    });
+
+    // The Trigger task runs async — schedule a few page refreshes so the new
+    // row + extracted tasks show up without the user having to F5 manually.
+    if (driveLinkPollRef.current) clearInterval(driveLinkPollRef.current);
+    let attempts = 0;
+    const maxAttempts = 18; // 18 × 5s = 90s window
+    driveLinkPollRef.current = setInterval(() => {
+      router.refresh();
+      attempts += 1;
+      if (attempts >= maxAttempts && driveLinkPollRef.current) {
+        clearInterval(driveLinkPollRef.current);
+        driveLinkPollRef.current = null;
+        setDriveLinkState({
+          phase: "done",
+          message: `Listo. Si no ves "${name}" todavía, refrescá la página.`,
+        });
+      }
+    }, 5000);
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -732,6 +765,12 @@ export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
               </p>
             </div>
           )}
+          {driveLinkState.phase === "polling" && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-start gap-2">
+              <Loader2 size={14} className="animate-spin text-primary mt-0.5 shrink-0" />
+              <p className="text-sm text-primary">{driveLinkState.message}</p>
+            </div>
+          )}
 
           <input
             type="url"
@@ -749,11 +788,17 @@ export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
           />
           <button
             onClick={handleDriveLinkSubmit}
-            disabled={!driveLinkUrl.trim() || driveLinkState.phase === "submitting"}
+            disabled={
+              !driveLinkUrl.trim() ||
+              driveLinkState.phase === "submitting" ||
+              driveLinkState.phase === "polling"
+            }
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
             {driveLinkState.phase === "submitting" ? (
-              <><Loader2 size={14} className="animate-spin" /> Importando...</>
+              <><Loader2 size={14} className="animate-spin" /> Encolando...</>
+            ) : driveLinkState.phase === "polling" ? (
+              <><Loader2 size={14} className="animate-spin" /> Esperando import...</>
             ) : (
               <><LinkIcon size={14} /> Importar desde link</>
             )}
