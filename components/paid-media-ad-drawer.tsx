@@ -70,9 +70,9 @@ export function PaidMediaAdDrawer({ ad, onClose, adAccountId, currency, isEcomme
 
   return (
     <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="flex-1 bg-black/55 backdrop-blur-sm" />
+      <div className="flex-1 bg-black/40 backdrop-blur-sm" />
       <aside
-        className="w-full max-w-xl overflow-y-auto p-6 backdrop-blur-[28px] [background:var(--glass-bg-strong)] [border-left:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]"
+        className="w-full max-w-xl overflow-y-auto bg-card p-6 [border-left:1px_solid_var(--border)] [box-shadow:0_-12px_40px_-16px_rgba(0,0,0,0.4)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between mb-4">

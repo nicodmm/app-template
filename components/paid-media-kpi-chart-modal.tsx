@@ -87,11 +87,11 @@ export function PaidMediaKpiChartModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
       onClick={close}
     >
       <div
-        className="w-full max-w-3xl rounded-xl p-6 backdrop-blur-[28px] [background:var(--glass-bg-strong)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]"
+        className="w-full max-w-3xl rounded-xl bg-card p-6 [border:1px_solid_var(--border)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between mb-4">

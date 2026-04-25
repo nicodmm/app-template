@@ -42,7 +42,7 @@ function timeAgo(d: Date | null): string {
 }
 
 const TILE_CLASS =
-  "rounded-lg p-3 [background:rgba(255,255,255,0.4)] dark:[background:rgba(255,255,255,0.04)] [border:1px_solid_var(--glass-border)]";
+  "rounded-lg p-3 [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)]";
 
 export async function CrmMiniCard({ workspaceId, accountId }: CrmMiniCardProps) {
   const state = await getCrmConnectionState(workspaceId, accountId);

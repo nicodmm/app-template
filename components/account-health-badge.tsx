@@ -10,24 +10,25 @@ const SIGNAL_CONFIG: Record<
   green: {
     label: "En buen estado",
     className:
-      "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 ring-1 ring-emerald-500/20",
+      "bg-emerald-500 text-white dark:bg-emerald-600 ring-1 ring-emerald-700/50 shadow-sm shadow-emerald-500/20",
     Icon: CircleCheck,
   },
   yellow: {
     label: "Requiere atención",
     className:
-      "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200 ring-1 ring-amber-500/30",
+      "bg-amber-500 text-white dark:bg-amber-500 dark:text-amber-950 ring-1 ring-amber-700/50 shadow-sm shadow-amber-500/25",
     Icon: AlertTriangle,
   },
   red: {
     label: "En riesgo",
     className:
-      "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300 ring-1 ring-red-500/30",
+      "bg-red-600 text-white ring-1 ring-red-800/50 shadow-sm shadow-red-500/25",
     Icon: AlertOctagon,
   },
   inactive: {
     label: "Sin actividad",
-    className: "bg-muted text-muted-foreground ring-1 ring-border",
+    className:
+      "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 ring-1 ring-slate-300 dark:ring-slate-700",
     Icon: MinusCircle,
   },
 };

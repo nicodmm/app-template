@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { ChevronLeft } from "lucide-react";
 import { CrmSummaryTab } from "./crm-summary-tab";
 import { CrmDealsTab } from "./crm-deals-tab";
 import type {
@@ -77,6 +78,13 @@ export function CrmDashboard(props: Props) {
 
   return (
     <div className="mx-auto max-w-6xl p-6">
+      <Link
+        href={`/app/accounts/${props.accountId}`}
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+      >
+        <ChevronLeft size={15} />
+        {props.accountName}
+      </Link>
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold">CRM — {props.accountName}</h1>

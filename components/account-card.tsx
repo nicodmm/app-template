@@ -7,24 +7,25 @@ const HEALTH_CONFIG = {
   green: {
     label: "Al día",
     className:
-      "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30",
+      "bg-emerald-500 text-white dark:bg-emerald-600 dark:text-white ring-1 ring-emerald-700/50 shadow-sm shadow-emerald-500/20",
     Icon: CircleCheck,
   },
   yellow: {
     label: "Atención",
     className:
-      "bg-amber-400/20 text-amber-800 dark:text-amber-200 ring-1 ring-amber-500/30",
+      "bg-amber-500 text-white dark:bg-amber-500 dark:text-amber-950 ring-1 ring-amber-700/50 shadow-sm shadow-amber-500/25",
     Icon: AlertTriangle,
   },
   red: {
     label: "En riesgo",
     className:
-      "bg-red-500/15 text-red-700 dark:text-red-300 ring-1 ring-red-500/30",
+      "bg-red-600 text-white dark:bg-red-600 dark:text-white ring-1 ring-red-800/50 shadow-sm shadow-red-500/25",
     Icon: AlertOctagon,
   },
   inactive: {
     label: "Sin actividad",
-    className: "bg-muted text-muted-foreground ring-1 ring-border",
+    className:
+      "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 ring-1 ring-slate-300 dark:ring-slate-700",
     Icon: MinusCircle,
   },
 } as const;

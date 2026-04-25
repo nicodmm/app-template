@@ -16,7 +16,7 @@ import {
   getWorkspaceMember,
 } from "@/lib/queries/workspace";
 import { getAccountById } from "@/lib/queries/accounts";
-import { getTranscriptHistory } from "@/lib/queries/transcripts";
+import { getTranscriptHistory, getLatestMeetingSummary } from "@/lib/queries/transcripts";
 import { getAccountContextDocuments } from "@/lib/queries/context-documents";
 import { getAccountTasks } from "@/lib/queries/tasks";
 import { getAccountParticipants } from "@/lib/queries/participants";
@@ -28,6 +28,7 @@ import {
 import { deleteAccount, updateAccount, updateHealthSignal } from "@/app/actions/accounts";
 import { AccountHealthBadge } from "@/components/account-health-badge";
 import { HealthStripChart } from "@/components/health-strip-chart";
+import { LastMeetingCard } from "@/components/last-meeting-card";
 import { EditAccountForm } from "@/components/edit-account-form";
 import { ContextUploadForm } from "@/components/context-upload-form";
 import { ContextFilesTimeline } from "@/components/context-files-timeline";
@@ -72,6 +73,7 @@ export default async function AccountDetailPage({
     accountSignals,
     healthHistory,
     healthSparkline,
+    lastMeetingSummary,
   ] = await Promise.all([
     getAccountById(accountId, workspace.id, { userId, role: viewerMember.role }),
     getTranscriptHistory(accountId, 50),
@@ -82,6 +84,7 @@ export default async function AccountDetailPage({
     getAccountSignals(accountId),
     getAccountHealthHistory(accountId),
     getWeeklyHealthSparkline(accountId, 12),
+    getLatestMeetingSummary(accountId),
   ]);
 
   if (!account) notFound();
@@ -367,6 +370,10 @@ export default async function AccountDetailPage({
           <CrmMiniCard workspaceId={workspace.id} accountId={accountId} />
         </div>
       )}
+
+      {/* Last meeting quick summary */}
+      {isModuleEnabled(account.enabledModules, "context_upload") &&
+        lastMeetingSummary && <LastMeetingCard summary={lastMeetingSummary} />}
 
       {/* Context Upload */}
       {isModuleEnabled(account.enabledModules, "context_upload") && (

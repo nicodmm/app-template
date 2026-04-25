@@ -74,6 +74,9 @@
   --glass-bg: rgba(255, 255, 255, 0.55);
   --glass-bg-strong: rgba(255, 255, 255, 0.72);
   --glass-border: rgba(255, 255, 255, 0.65);
+  /* Stronger border for nested tiles inside a glass card so the seam reads. */
+  --glass-tile-bg: rgba(255, 255, 255, 0.75);
+  --glass-tile-border: rgba(15, 18, 53, 0.10);
   --glass-shadow: 0 8px 32px -12px rgba(15, 18, 53, 0.18),
                   0 1px 0 rgba(255, 255, 255, 0.6) inset;
 
@@ -128,6 +131,8 @@
   --glass-bg: rgba(30, 32, 64, 0.45);
   --glass-bg-strong: rgba(40, 42, 80, 0.65);
   --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-tile-bg: rgba(255, 255, 255, 0.05);
+  --glass-tile-border: rgba(255, 255, 255, 0.14);
   --glass-shadow: 0 12px 40px -16px rgba(0, 0, 0, 0.6),
                   0 1px 0 rgba(255, 255, 255, 0.05) inset;
 
@@ -152,5 +157,7 @@ body {
     --glass-bg: var(--card);
     --glass-bg-strong: var(--card);
     --glass-border: var(--border);
+    --glass-tile-bg: var(--card);
+    --glass-tile-border: var(--border);
   }
 }

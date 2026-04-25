@@ -27,9 +27,9 @@ export function PaidMediaKpiCard({
 
   const cardBody = (
     <div
-      className={`rounded-lg p-3 [background:rgba(255,255,255,0.4)] dark:[background:rgba(255,255,255,0.04)] [border:1px_solid_var(--glass-border)]${
+      className={`rounded-lg p-3 [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)]${
         metricKey
-          ? " transition-colors hover:[background:rgba(255,255,255,0.6)] dark:hover:[background:rgba(255,255,255,0.08)] cursor-pointer"
+          ? " transition-colors hover:bg-white/30 dark:hover:bg-white/10 cursor-pointer"
           : ""
       }`}
     >

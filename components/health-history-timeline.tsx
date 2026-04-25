@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { CircleCheck, AlertTriangle, AlertOctagon, MinusCircle } from "lucide-react";
+import {
+  CircleCheck,
+  AlertTriangle,
+  AlertOctagon,
+  MinusCircle,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HealthHistoryEntry } from "@/lib/queries/signals";
 
@@ -127,6 +134,7 @@ function TimelineItem({
   entry: HealthHistoryEntry;
   isChange: boolean;
 }) {
+  const [open, setOpen] = useState(false);
   const config = getConfig(entry.healthSignal);
   const Icon = config.Icon;
   const displayDate = entry.meetingDate
@@ -146,7 +154,7 @@ function TimelineItem({
         <Icon size={11} className="text-foreground/80" />
       </span>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
           <span
             className={cn(
@@ -165,9 +173,20 @@ function TimelineItem({
         </div>
 
         {entry.justification && (
-          <p className="text-sm text-foreground/90 leading-relaxed">
-            {entry.justification}
-          </p>
+          <>
+            <button
+              onClick={() => setOpen((v) => !v)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              {open ? "Ocultar justificación" : "Ver justificación"}
+            </button>
+            {open && (
+              <p className="text-xs text-muted-foreground leading-relaxed rounded-md bg-white/40 dark:bg-white/5 p-2 mt-1 [border:1px_solid_var(--glass-border)]">
+                {entry.justification}
+              </p>
+            )}
+          </>
         )}
 
         {entry.transcriptFileName && (

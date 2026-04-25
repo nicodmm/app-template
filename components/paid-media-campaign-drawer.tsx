@@ -81,9 +81,9 @@ export function PaidMediaCampaignDrawer({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/55 backdrop-blur-sm z-40" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-full sm:w-[560px] z-50 overflow-y-auto backdrop-blur-[28px] [background:var(--glass-bg-strong)] [border-left:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
-        <div className="p-5 sticky top-0 [background:var(--glass-bg-strong)] backdrop-blur-[28px] [border-bottom:1px_solid_var(--glass-border)] flex items-start justify-between gap-3 z-10">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={onClose} />
+      <div className="fixed right-0 top-0 h-full w-full sm:w-[560px] z-50 overflow-y-auto bg-card [border-left:1px_solid_var(--border)] [box-shadow:0_-12px_40px_-16px_rgba(0,0,0,0.4)]">
+        <div className="p-5 sticky top-0 bg-card [border-bottom:1px_solid_var(--border)] flex items-start justify-between gap-3 z-10">
           <div>
             <h3 className="font-semibold text-sm">{campaign.name}</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -198,7 +198,7 @@ export function PaidMediaCampaignDrawer({
                 Sin anuncios con actividad en el período.
               </p>
             ) : (
-              <ul className="rounded-lg [background:rgba(255,255,255,0.4)] dark:[background:rgba(255,255,255,0.04)] [border:1px_solid_var(--glass-border)] divide-y divide-[var(--glass-border)]">
+              <ul className="rounded-lg [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)] divide-y divide-[var(--glass-tile-border)]">
                 {drawerData.ads.map((ad) => (
                   <li key={ad.id} className="p-2 flex items-center gap-3">
                     <Thumbnail

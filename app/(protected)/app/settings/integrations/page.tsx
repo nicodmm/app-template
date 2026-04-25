@@ -123,7 +123,7 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
           <h2 className="font-semibold mb-4">Ad accounts disponibles</h2>
           <div className="space-y-3">
             {adAccounts.map((aa) => (
-              <div key={aa.id} className="rounded-lg p-3 space-y-2 [background:rgba(255,255,255,0.4)] dark:[background:rgba(255,255,255,0.04)] [border:1px_solid_var(--glass-border)]">
+              <div key={aa.id} className="rounded-lg p-3 space-y-2 [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)]">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div>
                     <p className="text-sm font-medium">{aa.name}</p>
