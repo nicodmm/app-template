@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
+import { AppBackground } from "@/components/app-background";
 
 export const metadata: Metadata = {
   title: "nao.fyi",
@@ -12,8 +15,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
-      <body>{children}</body>
+    <html
+      lang="es"
+      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      suppressHydrationWarning
+    >
+      <body className="font-sans antialiased">
+        <AppBackground />
+        {children}
+      </body>
     </html>
   );
 }
