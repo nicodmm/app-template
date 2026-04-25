@@ -127,6 +127,13 @@
       "when": 1777085666846,
       "tag": "0017_quiet_pretty_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1777087796551,
+      "tag": "0018_fearless_sleeper",
+      "breakpoints": true
     }
   ]
 }
