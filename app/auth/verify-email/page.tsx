@@ -1,16 +1,17 @@
 import Link from "next/link";
+import { Mail } from "lucide-react";
 
 export default function VerifyEmailPage() {
   return (
     <div className="flex flex-col gap-6 text-center">
       <div className="flex flex-col items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-2xl">
-          ✉️
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Mail size={22} aria-hidden />
         </div>
         <h1 className="text-xl font-semibold">Revisá tu email</h1>
         <p className="text-sm text-muted-foreground leading-relaxed">
           Te enviamos un link de confirmación. Hacé clic en el link para
-          activar tu cuenta y acceder a plani.fyi.
+          activar tu cuenta y acceder a nao.fyi.
         </p>
       </div>
 

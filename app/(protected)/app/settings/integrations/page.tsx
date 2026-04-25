@@ -49,7 +49,7 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
       {connected === "meta" && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-800 p-3 mb-6">
           <p className="text-sm text-emerald-700 dark:text-emerald-400">
-            ✓ Meta Ads conectado. Ahora mapeá los ad accounts a cuentas plani.fyi.
+            ✓ Meta Ads conectado. Ahora mapeá los ad accounts a cuentas nao.fyi.
           </p>
         </div>
       )}

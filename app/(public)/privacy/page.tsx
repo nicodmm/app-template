@@ -1,4 +1,4 @@
-export const metadata = { title: "Política de Privacidad — plani.fyi" };
+export const metadata = { title: "Política de Privacidad — nao.fyi" };
 
 export default function PrivacyPage() {
   return (
@@ -22,7 +22,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-lg font-semibold mb-3">2. Cómo usamos la información</h2>
           <p className="text-muted-foreground leading-relaxed">
-            Usamos tu información para brindar el servicio de plani.fyi:
+            Usamos tu información para brindar el servicio de nao.fyi:
             procesar transcripciones con IA, generar resúmenes y señales de
             salud, y mantener el estado actualizado de tus cuentas. No
             vendemos ni compartimos datos personales con terceros, excepto
@@ -55,7 +55,7 @@ export default function PrivacyPage() {
           <p className="text-muted-foreground leading-relaxed">
             Tenés derecho a acceder, corregir, exportar y eliminar tus datos
             personales en cualquier momento. Para ejercer estos derechos,
-            contactanos en hola@plani.fyi.
+            contactanos en hola@nao.fyi.
           </p>
         </section>
 
@@ -70,7 +70,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-lg font-semibold mb-3">7. Contacto</h2>
           <p className="text-muted-foreground leading-relaxed">
-            Para consultas sobre privacidad: hola@plani.fyi
+            Para consultas sobre privacidad: hola@nao.fyi
           </p>
         </section>
       </div>

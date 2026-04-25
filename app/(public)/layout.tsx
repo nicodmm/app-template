@@ -7,10 +7,12 @@ export default function PublicLayout({
 }) {
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-sm">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-6">
+      <header className="fixed top-0 left-0 right-0 z-50">
+        <div
+          className="mx-auto mt-3 flex h-12 max-w-5xl items-center justify-between rounded-full px-5 backdrop-blur-[18px] [background:var(--glass-bg-strong)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]"
+        >
           <Link href="/" className="font-semibold text-sm tracking-tight">
-            plani.fyi
+            nao.fyi
           </Link>
           <nav className="flex items-center gap-2">
             <Link
@@ -21,14 +23,14 @@ export default function PublicLayout({
             </Link>
             <Link
               href="/auth/signup"
-              className="text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors rounded-md px-3 py-1.5"
+              className="text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors rounded-full px-4 py-1.5"
             >
               Empezar gratis
             </Link>
           </nav>
         </div>
       </header>
-      <div className="pt-14">{children}</div>
+      <div className="pt-20">{children}</div>
     </>
   );
 }

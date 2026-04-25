@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GlassCard } from "@/components/ui/glass-card";
 
 export default function AuthLayout({
   children,
@@ -6,18 +7,16 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-muted/30">
-      <div className="mb-8">
-        <Link
-          href="/"
-          className="text-xl font-semibold tracking-tight text-foreground"
-        >
-          plani.fyi
-        </Link>
-      </div>
-      <div className="w-full max-w-sm rounded-xl border border-border bg-background p-8 shadow-sm">
+    <div className="flex min-h-dvh flex-col items-center justify-center p-4">
+      <Link
+        href="/"
+        className="mb-8 text-xl font-semibold tracking-tight text-foreground"
+      >
+        nao.fyi
+      </Link>
+      <GlassCard variant="strong" className="w-full max-w-sm p-8">
         {children}
-      </div>
+      </GlassCard>
     </div>
   );
 }

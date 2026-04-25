@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { CheckIcon } from "lucide-react";
+import { GlassCard } from "@/components/ui/glass-card";
 
 export default function LandingPage() {
   return (
     <main>
       {/* Hero */}
       <section className="mx-auto max-w-5xl px-6 py-24 text-center">
-        <div className="inline-flex items-center rounded-full border border-border bg-muted px-3 py-1 text-xs text-muted-foreground mb-6">
+        <div className="inline-flex items-center rounded-full px-4 py-1.5 text-xs text-muted-foreground mb-6 backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
           Inteligencia de cuentas para agencias de growth
         </div>
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl text-foreground mb-6">
@@ -16,7 +17,7 @@ export default function LandingPage() {
           sin depender de la memoria del equipo
         </h1>
         <p className="mx-auto max-w-2xl text-lg text-muted-foreground mb-8">
-          Subí la transcripción de una reunión y plani.fyi extrae las tareas,
+          Subí la transcripción de una reunión y nao.fyi extrae las tareas,
           detecta riesgos y oportunidades, y actualiza el estado de la cuenta
           automáticamente — para que tu equipo siempre tenga el contexto
           completo sin esfuerzo manual.
@@ -24,13 +25,13 @@ export default function LandingPage() {
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/auth/signup"
-            className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
           >
             Empezá gratis — procesá tu primera transcripción
           </Link>
           <Link
             href="/auth/login"
-            className="inline-flex h-11 items-center justify-center rounded-md border border-border px-8 text-sm font-medium hover:bg-accent transition-colors"
+            className="inline-flex h-11 items-center justify-center rounded-md px-8 text-sm font-medium hover:bg-accent/50 transition-colors backdrop-blur-[16px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)]"
           >
             Ya tengo cuenta
           </Link>
@@ -41,7 +42,7 @@ export default function LandingPage() {
       </section>
 
       {/* Problem */}
-      <section className="bg-muted/50 border-y border-border">
+      <section>
         <div className="mx-auto max-w-5xl px-6 py-16">
           <p className="text-center text-sm font-medium text-muted-foreground mb-8 uppercase tracking-wider">
             La información crítica de cada cliente está dispersa en
@@ -55,12 +56,12 @@ export default function LandingPage() {
               "Asana, Notion y similares",
               "La memoria de cada AM",
             ].map((item) => (
-              <div
+              <GlassCard
                 key={item}
-                className="rounded-lg border border-border bg-background px-4 py-3 text-sm text-center text-muted-foreground"
+                className="px-4 py-3 text-sm text-center text-muted-foreground"
               >
                 {item}
-              </div>
+              </GlassCard>
             ))}
           </div>
           <p className="text-center text-base font-medium text-foreground mt-8 max-w-xl mx-auto">
@@ -87,7 +88,7 @@ export default function LandingPage() {
             {
               step: "02",
               title: "La IA procesa en segundos",
-              desc: "plani.fyi extrae tareas y próximos pasos, genera el resumen de situación y detecta señales de riesgo u oportunidad.",
+              desc: "nao.fyi extrae tareas y próximos pasos, genera el resumen de situación y detecta señales de riesgo u oportunidad.",
             },
             {
               step: "03",
@@ -95,21 +96,21 @@ export default function LandingPage() {
               desc: "El portfolio se actualiza solo. Cualquiera del equipo puede abrir una cuenta y entender el contexto completo al instante.",
             },
           ].map((item) => (
-            <div key={item.step} className="rounded-xl border border-border bg-card p-6">
-              <div className="text-3xl font-bold text-primary/20 mb-3">
+            <GlassCard key={item.step} className="p-6">
+              <div className="text-3xl font-bold text-primary/30 mb-3 font-mono">
                 {item.step}
               </div>
               <h3 className="font-semibold mb-2">{item.title}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {item.desc}
               </p>
-            </div>
+            </GlassCard>
           ))}
         </div>
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="bg-muted/50 border-y border-border">
+      <section id="pricing">
         <div className="mx-auto max-w-5xl px-6 py-20">
           <h2 className="text-center text-2xl font-bold mb-3">Planes y precios</h2>
           <p className="text-center text-muted-foreground mb-12">
@@ -117,7 +118,7 @@ export default function LandingPage() {
           </p>
           <div className="grid sm:grid-cols-3 gap-6">
             {/* Free */}
-            <div className="rounded-xl border border-border bg-background p-6 flex flex-col">
+            <GlassCard className="p-6 flex flex-col">
               <div className="mb-4">
                 <div className="text-sm font-medium text-muted-foreground mb-1">Free</div>
                 <div className="text-3xl font-bold">$0</div>
@@ -138,16 +139,19 @@ export default function LandingPage() {
               </ul>
               <Link
                 href="/auth/signup"
-                className="block text-center rounded-md border border-border px-4 py-2.5 text-sm font-medium hover:bg-accent transition-colors"
+                className="block text-center rounded-md px-4 py-2.5 text-sm font-medium hover:bg-accent/50 transition-colors backdrop-blur-[16px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)]"
               >
                 Empezar gratis
               </Link>
-            </div>
+            </GlassCard>
 
             {/* Starter */}
-            <div className="rounded-xl border-2 border-primary bg-background p-6 flex flex-col relative">
+            <GlassCard
+              variant="strong"
+              className="p-6 flex flex-col relative ring-2 ring-primary/60"
+            >
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-full">
+                <span className="bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-full shadow-lg shadow-primary/20">
                   Más popular
                 </span>
               </div>
@@ -172,14 +176,14 @@ export default function LandingPage() {
               </ul>
               <Link
                 href="/auth/signup"
-                className="block text-center rounded-md bg-primary text-primary-foreground px-4 py-2.5 text-sm font-medium hover:bg-primary/90 transition-colors"
+                className="block text-center rounded-md bg-primary text-primary-foreground px-4 py-2.5 text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
               >
                 Empezar con Starter
               </Link>
-            </div>
+            </GlassCard>
 
             {/* Pro */}
-            <div className="rounded-xl border border-border bg-background p-6 flex flex-col">
+            <GlassCard className="p-6 flex flex-col">
               <div className="mb-4">
                 <div className="text-sm font-medium text-muted-foreground mb-1">Pro</div>
                 <div className="text-3xl font-bold">$99</div>
@@ -201,11 +205,11 @@ export default function LandingPage() {
               </ul>
               <Link
                 href="/auth/signup"
-                className="block text-center rounded-md border border-border px-4 py-2.5 text-sm font-medium hover:bg-accent transition-colors"
+                className="block text-center rounded-md px-4 py-2.5 text-sm font-medium hover:bg-accent/50 transition-colors backdrop-blur-[16px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)]"
               >
                 Empezar con Pro
               </Link>
-            </div>
+            </GlassCard>
           </div>
         </div>
       </section>
@@ -213,59 +217,72 @@ export default function LandingPage() {
       {/* FAQ */}
       <section className="mx-auto max-w-3xl px-6 py-20">
         <h2 className="text-center text-2xl font-bold mb-12">Preguntas frecuentes</h2>
-        <div className="space-y-6">
-          {[
-            {
-              q: "¿Qué formatos de transcripción acepta?",
-              a: "Podés pegar el texto directamente en la app o subir un archivo .txt. El soporte para .docx está en desarrollo.",
-            },
-            {
-              q: "¿Cuántas cuentas puedo gestionar?",
-              a: "Depende del plan: Free permite 2 cuentas, Starter hasta 10 y Pro hasta 30. Si necesitás más, contactanos para un plan Enterprise.",
-            },
-            {
-              q: "¿Los clientes pueden ver su cuenta?",
-              a: "La vista de cliente (read-only) está en desarrollo para el plan Pro. Por ahora el acceso es solo para el equipo interno.",
-            },
-            {
-              q: "¿Qué pasa si el AI no extrae bien una tarea o señal?",
-              a: "Todo lo que genera el AI es editable. Podés corregir tareas, señales y resúmenes directamente desde la cuenta, y también agregar notas manuales en cualquier momento.",
-            },
-            {
-              q: "¿Los datos son privados y seguros?",
-              a: "Sí. Los datos se almacenan en servidores seguros (Supabase / AWS) y nunca se comparten con terceros. Las transcripciones se usan solo para el procesamiento de tu cuenta.",
-            },
-          ].map((item) => (
-            <div key={item.q} className="border-b border-border pb-6">
-              <h3 className="font-medium mb-2">{item.q}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{item.a}</p>
-            </div>
-          ))}
-        </div>
+        <GlassCard className="p-2 sm:p-4">
+          <div className="divide-y divide-[var(--glass-border)]">
+            {[
+              {
+                q: "¿Qué formatos de transcripción acepta?",
+                a: "Podés pegar el texto directamente en la app o subir un archivo .txt, .md, .docx o .pdf. También podés conectar Google Drive y nao.fyi importa los archivos automáticamente, matcheándolos al nombre de la cuenta.",
+              },
+              {
+                q: "¿Cuántas cuentas puedo gestionar?",
+                a: "Depende del plan: Free permite 2 cuentas, Starter hasta 10 y Pro hasta 30. Si necesitás más, contactanos para un plan Enterprise.",
+              },
+              {
+                q: "¿Los clientes pueden ver su cuenta?",
+                a: "La vista de cliente (read-only) está en desarrollo para el plan Pro. Por ahora el acceso es solo para el equipo interno.",
+              },
+              {
+                q: "¿Qué pasa si el AI no extrae bien una tarea o señal?",
+                a: "Todo lo que genera el AI es editable. Podés corregir tareas, señales y resúmenes directamente desde la cuenta, y también agregar notas manuales en cualquier momento.",
+              },
+              {
+                q: "¿Los datos son privados y seguros?",
+                a: "Sí. Los datos se almacenan en servidores seguros (Supabase / AWS) y nunca se comparten con terceros. Las transcripciones se usan solo para el procesamiento de tu cuenta.",
+              },
+            ].map((item) => (
+              <div key={item.q} className="px-4 py-5">
+                <h3 className="font-medium mb-2">{item.q}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{item.a}</p>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
       </section>
 
       {/* CTA footer */}
-      <section className="bg-primary">
-        <div className="mx-auto max-w-5xl px-6 py-16 text-center">
-          <h2 className="text-2xl font-bold text-primary-foreground mb-3">
+      <section className="mx-auto max-w-5xl px-6 py-16">
+        <GlassCard
+          variant="strong"
+          className="px-8 py-14 text-center relative overflow-hidden"
+        >
+          <div
+            aria-hidden
+            className="absolute inset-0 -z-10 opacity-90"
+            style={{
+              background:
+                "radial-gradient(circle at 30% 50%, hsl(243 85% 60% / 0.35), transparent 60%), radial-gradient(circle at 75% 30%, hsl(280 75% 60% / 0.25), transparent 55%)",
+            }}
+          />
+          <h2 className="text-2xl font-bold text-foreground mb-3">
             Empezá a gestionar tu cartera con claridad
           </h2>
-          <p className="text-primary-foreground/70 mb-8 max-w-xl mx-auto">
+          <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
             Gratis. Sin tarjeta de crédito. Tu primer transcript en menos de un minuto.
           </p>
           <Link
             href="/auth/signup"
-            className="inline-flex h-11 items-center rounded-md bg-background text-foreground hover:bg-background/90 transition-colors px-8 text-sm font-medium"
+            className="inline-flex h-11 items-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/30"
           >
             Crear cuenta gratuita
           </Link>
-        </div>
+        </GlassCard>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border">
+      <footer>
         <div className="mx-auto max-w-5xl px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">plani.fyi</span>
+          <span className="font-medium text-foreground">nao.fyi</span>
           <div className="flex gap-6">
             <Link href="/privacy" className="hover:text-foreground transition-colors">
               Privacidad
@@ -274,7 +291,7 @@ export default function LandingPage() {
               Términos
             </Link>
           </div>
-          <span>© {new Date().getFullYear()} plani.fyi</span>
+          <span>© {new Date().getFullYear()} nao.fyi</span>
         </div>
       </footer>
     </main>

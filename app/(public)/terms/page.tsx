@@ -1,4 +1,4 @@
-export const metadata = { title: "Términos de Servicio — plani.fyi" };
+export const metadata = { title: "Términos de Servicio — nao.fyi" };
 
 export default function TermsPage() {
   return (
@@ -12,7 +12,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg font-semibold mb-3">1. Aceptación de los términos</h2>
           <p className="text-muted-foreground leading-relaxed text-sm">
-            Al usar plani.fyi aceptás estos términos de servicio. Si no estás
+            Al usar nao.fyi aceptás estos términos de servicio. Si no estás
             de acuerdo, no uses el servicio.
           </p>
         </section>
@@ -20,7 +20,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg font-semibold mb-3">2. Descripción del servicio</h2>
           <p className="text-muted-foreground leading-relaxed text-sm">
-            plani.fyi es una plataforma de inteligencia de cuentas que procesa
+            nao.fyi es una plataforma de inteligencia de cuentas que procesa
             transcripciones de reuniones con IA para extraer tareas, generar
             resúmenes y detectar señales de salud por cuenta. El servicio se
             ofrece a través de planes de suscripción.
@@ -49,7 +49,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg font-semibold mb-3">5. Propiedad intelectual</h2>
           <p className="text-muted-foreground leading-relaxed text-sm">
-            Los datos y contenido que subís pertenecen a vos. plani.fyi no
+            Los datos y contenido que subís pertenecen a vos. nao.fyi no
             reclama propiedad sobre tu contenido. Nos otorgás una licencia
             limitada para procesar el contenido y brindar el servicio.
           </p>
@@ -58,7 +58,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg font-semibold mb-3">6. Limitación de responsabilidad</h2>
           <p className="text-muted-foreground leading-relaxed text-sm">
-            plani.fyi se provee "tal como está". No garantizamos que el
+            nao.fyi se provee "tal como está". No garantizamos que el
             procesamiento de IA sea 100% preciso — los resultados deben ser
             revisados por el usuario. No somos responsables por decisiones
             tomadas basándose en la información generada por la plataforma.
@@ -68,7 +68,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg font-semibold mb-3">7. Contacto</h2>
           <p className="text-muted-foreground leading-relaxed text-sm">
-            Para consultas sobre estos términos: hola@plani.fyi
+            Para consultas sobre estos términos: hola@nao.fyi
           </p>
         </section>
       </div>
