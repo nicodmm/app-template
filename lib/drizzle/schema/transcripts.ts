@@ -18,6 +18,7 @@ export const transcripts = pgTable(
     }),
     fileName: text("file_name"),
     sourceType: text("source_type").notNull().default("paste"),
+    googleDriveFileId: text("google_drive_file_id"),
     content: text("content").notNull(),
     contentHash: text("content_hash").notNull(),
     wordCount: integer("word_count").notNull().default(0),
@@ -36,6 +37,7 @@ export const transcripts = pgTable(
     index("transcripts_status_idx").on(table.status),
     index("transcripts_account_hash_idx").on(table.accountId, table.contentHash),
     index("transcripts_account_created_idx").on(table.accountId, table.createdAt),
+    index("transcripts_drive_file_idx").on(table.googleDriveFileId),
   ]
 );
 

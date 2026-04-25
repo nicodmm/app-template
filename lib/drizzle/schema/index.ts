@@ -25,3 +25,4 @@ export * from "./crm_sources";
 export * from "./crm_deals";
 export * from "./context_documents";
 export * from "./workspace_invites";
+export * from "./drive_connections";

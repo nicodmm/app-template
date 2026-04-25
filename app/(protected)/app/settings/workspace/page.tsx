@@ -8,9 +8,18 @@ import {
   getWorkspaceMembers,
 } from "@/lib/queries/workspace";
 import { getPendingWorkspaceInvites } from "@/lib/queries/workspace-invites";
+import { getDriveConnectionForWorkspace } from "@/lib/queries/drive";
 import { WorkspaceSettingsClient } from "@/components/workspace-settings-client";
+import { WorkspaceDriveSection } from "@/components/workspace-drive-section";
+import { isGoogleOAuthConfigured } from "@/lib/google/oauth";
 
-export default async function WorkspaceSettingsPage(): Promise<React.ReactElement> {
+interface PageProps {
+  searchParams: Promise<{ drive?: string; drive_error?: string }>;
+}
+
+export default async function WorkspaceSettingsPage({
+  searchParams,
+}: PageProps): Promise<React.ReactElement> {
   const userId = await requireUserId();
   const workspace = await getWorkspaceByUserId(userId);
   if (!workspace) redirect("/auth/login");
@@ -18,12 +27,16 @@ export default async function WorkspaceSettingsPage(): Promise<React.ReactElemen
   const member = await getWorkspaceMember(workspace.id, userId);
   if (!member) redirect("/auth/login");
 
-  const [members, pendingInvites] = await Promise.all([
+  const { drive, drive_error: driveError } = await searchParams;
+
+  const [members, pendingInvites, driveConnection] = await Promise.all([
     getWorkspaceMembers(workspace.id),
     getPendingWorkspaceInvites(workspace.id),
+    getDriveConnectionForWorkspace(workspace.id),
   ]);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const canManage = member.role === "owner" || member.role === "admin";
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -37,18 +50,28 @@ export default async function WorkspaceSettingsPage(): Promise<React.ReactElemen
 
       <h1 className="text-2xl font-semibold mb-1">Workspace</h1>
       <p className="text-sm text-muted-foreground mb-8">
-        Gestioná el equipo y las invitaciones.
+        Gestioná el equipo, las invitaciones y las integraciones.
       </p>
 
-      <WorkspaceSettingsClient
-        workspaceId={workspace.id}
-        workspaceName={workspace.name}
-        currentUserId={userId}
-        currentUserRole={member.role}
-        members={members}
-        pendingInvites={pendingInvites}
-        appUrl={appUrl}
-      />
+      <div className="space-y-8">
+        <WorkspaceSettingsClient
+          workspaceId={workspace.id}
+          workspaceName={workspace.name}
+          currentUserId={userId}
+          currentUserRole={member.role}
+          members={members}
+          pendingInvites={pendingInvites}
+          appUrl={appUrl}
+        />
+
+        <WorkspaceDriveSection
+          connection={driveConnection}
+          isConfigured={isGoogleOAuthConfigured()}
+          canManage={canManage}
+          driveSuccess={drive}
+          driveError={driveError}
+        />
+      </div>
     </div>
   );
 }

@@ -25,6 +25,7 @@ export const contextDocuments = pgTable(
     mimeType: text("mime_type"),
     fileSize: integer("file_size"),
     extractedText: text("extracted_text"),
+    googleDriveFileId: text("google_drive_file_id"),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -36,6 +37,7 @@ export const contextDocuments = pgTable(
       table.accountId,
       table.createdAt
     ),
+    index("context_documents_drive_file_idx").on(table.googleDriveFileId),
   ]
 );
 
