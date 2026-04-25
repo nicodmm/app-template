@@ -49,7 +49,7 @@ export function AppHeader({
             />
             <div
               role="menu"
-              className="absolute right-0 top-10 z-20 w-56 rounded-xl py-1 backdrop-blur-[28px] [background:var(--glass-bg-strong)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]"
+              className="absolute right-0 top-10 z-20 w-56 rounded-xl py-1 backdrop-blur-[18px] [background:var(--glass-bg-strong)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]"
             >
               <div className="px-3 py-2 text-xs text-muted-foreground truncate">
                 {userEmail}

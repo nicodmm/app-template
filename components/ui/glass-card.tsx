@@ -17,7 +17,8 @@ interface GlassCardProps extends HTMLAttributes<HTMLDivElement> {
 export const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(
   function GlassCard({ variant = "default", as = "div", className, ...rest }, ref) {
     const Tag = as as "div";
-    const blur = variant === "strong" ? "backdrop-blur-[28px]" : "backdrop-blur-[20px]";
+    const blur =
+      variant === "strong" ? "backdrop-blur-[18px]" : "backdrop-blur-[14px]";
     return (
       <Tag
         ref={ref}

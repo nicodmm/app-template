@@ -151,6 +151,16 @@ body {
   min-height: 100dvh;
 }
 
+/* Top navigation progress bar — slides L→R while a route transition is pending. */
+@keyframes nav-progress {
+  0% { transform: translateX(-100%); }
+  60% { transform: translateX(180%); }
+  100% { transform: translateX(360%); }
+}
+.animate-nav-progress {
+  animation: nav-progress 1.1s ease-in-out infinite;
+}
+
 /* prefers-reduced-transparency fallback: opaque surfaces */
 @media (prefers-reduced-transparency: reduce) {
   :root {

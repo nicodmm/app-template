@@ -74,7 +74,7 @@ export function PaidMediaChangeTimeline({ events, totalAvailable, onLoadMore, lo
   );
 
   return (
-    <div className="rounded-xl backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+    <div className="rounded-xl backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
       <div className="flex items-center gap-2 p-3 [border-bottom:1px_solid_var(--glass-border)]">
         {LEVEL_LABELS.map((l) => (
           <button

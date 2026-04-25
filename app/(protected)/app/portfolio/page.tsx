@@ -40,7 +40,7 @@ export default async function PortfolioPage() {
       </div>
 
       {accounts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl py-20 text-center backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_dashed_var(--glass-border)]">
+        <div className="flex flex-col items-center justify-center rounded-xl py-20 text-center backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_dashed_var(--glass-border)]">
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Briefcase size={26} aria-hidden />
           </div>

@@ -3,10 +3,16 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
 import { ChevronLeft } from "lucide-react";
+import { DateRangePicker, type DateRangePreset } from "@/components/ui/date-range-picker";
 import { CrmSummaryTab } from "./crm-summary-tab";
 import { CrmDealsTab } from "./crm-deals-tab";
+
+const PRESETS: DateRangePreset[] = [
+  { id: "7", label: "Últimos 7 días", days: 7 },
+  { id: "30", label: "Últimos 30 días", days: 30 },
+  { id: "90", label: "Últimos 90 días", days: 90 },
+];
 import type {
   CrmKpis,
   SourceBreakdownRow,
@@ -47,9 +53,6 @@ interface Props {
 export function CrmDashboard(props: Props) {
   const router = useRouter();
   const sp = useSearchParams();
-  const [customOpen, setCustomOpen] = useState(props.preset === "custom");
-  const [sinceDraft, setSinceDraft] = useState(props.since);
-  const [untilDraft, setUntilDraft] = useState(props.until);
 
   function setTab(tab: "resumen" | "deals") {
     const next = new URLSearchParams(sp.toString());
@@ -57,22 +60,19 @@ export function CrmDashboard(props: Props) {
     router.push(`?${next.toString()}`);
   }
 
-  function setPreset(preset: "7" | "30" | "90") {
+  function setPreset(preset: DateRangePreset) {
     const next = new URLSearchParams(sp.toString());
-    next.set("preset", preset);
+    next.set("preset", preset.id);
     next.delete("since");
     next.delete("until");
-    setCustomOpen(false);
     router.push(`?${next.toString()}`);
   }
 
-  function applyCustom() {
-    if (!sinceDraft || !untilDraft) return;
-    if (new Date(sinceDraft) > new Date(untilDraft)) return;
+  function applyCustom({ since, until }: { since: string; until: string }) {
     const next = new URLSearchParams(sp.toString());
-    next.set("since", sinceDraft);
-    next.set("until", untilDraft);
-    next.delete("preset");
+    next.set("since", since);
+    next.set("until", until);
+    next.set("preset", "custom");
     router.push(`?${next.toString()}`);
   }
 
@@ -87,7 +87,7 @@ export function CrmDashboard(props: Props) {
       </Link>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-bold">CRM — {props.accountName}</h1>
+          <h1 className="text-2xl font-semibold">CRM · {props.accountName}</h1>
           <p className="text-xs text-muted-foreground">
             Conectado a {props.connection.provider}
             {props.connection.externalCompanyDomain && ` · ${props.connection.externalCompanyDomain}`}
@@ -108,58 +108,18 @@ export function CrmDashboard(props: Props) {
         </div>
       )}
 
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <div className="inline-flex rounded-md border border-border">
-          {(["7", "30", "90"] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPreset(p)}
-              className={`px-3 py-1 text-xs ${props.preset === p ? "bg-accent" : "bg-transparent hover:bg-accent/30"}`}
-            >
-              {p}d
-            </button>
-          ))}
-          <button
-            onClick={() => setCustomOpen((v) => !v)}
-            className={`px-3 py-1 text-xs border-l border-border ${
-              props.preset === "custom" || customOpen
-                ? "bg-accent"
-                : "bg-transparent hover:bg-accent/30"
-            }`}
-          >
-            Personalizado
-          </button>
-        </div>
-        {customOpen && (
-          <div className="inline-flex items-center gap-2 rounded-md border border-border px-2 py-1">
-            <input
-              type="date"
-              value={sinceDraft}
-              onChange={(e) => setSinceDraft(e.target.value)}
-              className="bg-transparent text-xs outline-none"
-              max={untilDraft}
-            />
-            <span className="text-xs text-muted-foreground">→</span>
-            <input
-              type="date"
-              value={untilDraft}
-              onChange={(e) => setUntilDraft(e.target.value)}
-              className="bg-transparent text-xs outline-none"
-              min={sinceDraft}
-              max={new Date().toISOString().slice(0, 10)}
-            />
-            <button
-              type="button"
-              onClick={applyCustom}
-              className="rounded bg-primary px-2 py-0.5 text-xs text-primary-foreground hover:bg-primary/90"
-            >
-              Aplicar
-            </button>
-          </div>
-        )}
-        <div className="text-xs text-muted-foreground">
-          {props.since} → {props.until}
-        </div>
+      <div className="flex items-center justify-end mb-4">
+        <DateRangePicker
+          presets={PRESETS}
+          value={props.preset}
+          customRange={
+            props.preset === "custom"
+              ? { since: props.since, until: props.until }
+              : undefined
+          }
+          onPreset={setPreset}
+          onCustom={applyCustom}
+        />
       </div>
 
       <div className="flex gap-4 border-b border-border mb-4">

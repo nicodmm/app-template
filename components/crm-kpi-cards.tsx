@@ -42,7 +42,7 @@ export function CrmKpiCards({ kpis }: { kpis: CrmKpis }) {
 
 function Card({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-lg p-3 backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+    <div className="rounded-lg p-3 backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
       <div className="text-xs text-muted-foreground mb-1">{label}</div>
       {value}
     </div>

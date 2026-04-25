@@ -44,7 +44,7 @@ export function WorkspaceDriveSection({
 
   if (!isConfigured) {
     return (
-      <section className="rounded-xl p-6 backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+      <section className="rounded-xl p-6 backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
         <h2 className="font-semibold mb-2">Google Drive</h2>
         <p className="text-sm text-muted-foreground">
           La integración no está configurada todavía. Necesitamos que el dueño del proyecto cree

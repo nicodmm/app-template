@@ -60,7 +60,7 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      <div className="rounded-xl p-6 mb-6 backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+      <div className="rounded-xl p-6 mb-6 backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold inline-flex items-center gap-2">
             <BarChart3 size={16} className="text-primary" aria-hidden /> Meta Ads
@@ -119,7 +119,7 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
       </div>
 
       {adAccounts.length > 0 && (
-        <div className="rounded-xl p-6 backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+        <div className="rounded-xl p-6 backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
           <h2 className="font-semibold mb-4">Ad accounts disponibles</h2>
           <div className="space-y-3">
             {adAccounts.map((aa) => (

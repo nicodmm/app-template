@@ -63,7 +63,7 @@ export function AccountCard({ account }: AccountCardProps) {
     <Link
       href={`/app/accounts/${account.id}`}
       className={cn(
-        "group block rounded-xl p-5 backdrop-blur-[20px] transition-all",
+        "group block rounded-xl p-5 backdrop-blur-[14px] transition-all",
         "[background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]",
         "hover:[background:var(--glass-bg-strong)] hover:translate-y-[-1px] hover:[box-shadow:0_14px_44px_-14px_rgba(15,18,53,0.22)]"
       )}

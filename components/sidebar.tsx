@@ -93,7 +93,7 @@ export function Sidebar({
         )}
       </nav>
 
-      <div className="mx-3 mb-3 rounded-lg p-3 backdrop-blur-[20px] [background:var(--glass-bg-strong)] [border:1px_solid_var(--glass-border)]">
+      <div className="mx-3 mb-3 rounded-lg p-3 backdrop-blur-[14px] [background:var(--glass-bg-strong)] [border:1px_solid_var(--glass-border)]">
         <div className="text-xs text-muted-foreground mb-2">
           {transcriptsLimit > 0 ? (
             <>

@@ -101,7 +101,7 @@ export function CrmFunnelSection({
 
       {/* Cycle time + summary stats */}
       <section className="grid sm:grid-cols-2 gap-3">
-        <div className="rounded-lg p-4 backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+        <div className="rounded-lg p-4 backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
           <p className="text-xs text-muted-foreground mb-1">Tiempo promedio de cierre</p>
           <p className="text-2xl font-semibold">
             {cycleTime.avgDays !== null ? `${cycleTime.avgDays} d` : "—"}
@@ -112,7 +112,7 @@ export function CrmFunnelSection({
               : "Aún no hay deals ganados en este período"}
           </p>
         </div>
-        <div className="rounded-lg p-4 backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+        <div className="rounded-lg p-4 backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
           <p className="text-xs text-muted-foreground mb-1">Estancados (&gt; 14 días sin mover)</p>
           <p className="text-2xl font-semibold">{stalled.length}</p>
           <p className="text-xs text-muted-foreground mt-1">

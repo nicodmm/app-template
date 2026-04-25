@@ -33,7 +33,7 @@ export function CollapsibleSection({
     <section
       id={id}
       className={cn(
-        "rounded-xl overflow-hidden backdrop-blur-[20px]",
+        "rounded-xl overflow-hidden backdrop-blur-[14px]",
         "[background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]"
       )}
     >

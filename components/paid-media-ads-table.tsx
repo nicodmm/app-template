@@ -24,7 +24,7 @@ export function PaidMediaAdsTable({ ads, currency, isEcommerce, adAccountId, sin
 
   if (sorted.length === 0) {
     return (
-      <div className="rounded-xl p-6 text-sm text-muted-foreground backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+      <div className="rounded-xl p-6 text-sm text-muted-foreground backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
         No hay anuncios con gasto o resultados en el período seleccionado.
       </div>
     );
@@ -32,7 +32,7 @@ export function PaidMediaAdsTable({ ads, currency, isEcommerce, adAccountId, sin
 
   return (
     <>
-      <div className="rounded-xl overflow-hidden backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+      <div className="rounded-xl overflow-hidden backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
         <table className="w-full text-sm">
           <thead className="bg-white/30 dark:bg-white/5">
             <tr className="text-left text-xs text-muted-foreground">
