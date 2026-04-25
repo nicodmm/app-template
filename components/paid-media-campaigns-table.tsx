@@ -101,9 +101,9 @@ export function PaidMediaCampaignsTable({
         </p>
       </div>
 
-      <div className="rounded-lg border border-border bg-card overflow-x-auto">
+      <div className="rounded-lg overflow-x-auto backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
         <table className="w-full text-xs">
-          <thead className="border-b border-border bg-muted/30 text-muted-foreground">
+          <thead className="[border-bottom:1px_solid_var(--glass-border)] bg-white/30 dark:bg-white/5 text-muted-foreground">
             <tr>
               <Header k="name" label="Campaña" />
               <Header k="status" label="Estado" />

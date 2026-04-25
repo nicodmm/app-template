@@ -84,7 +84,7 @@ export function WorkspaceSettingsClient(props: WorkspaceSettingsClientProps) {
   return (
     <div className="space-y-8">
       {/* Workspace name */}
-      <section className="rounded-xl border border-border bg-card p-6">
+      <section className="rounded-xl p-6 backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
         <h2 className="font-semibold mb-3">Nombre del workspace</h2>
         {canManage ? (
           <div className="flex flex-col sm:flex-row gap-2">
@@ -110,7 +110,7 @@ export function WorkspaceSettingsClient(props: WorkspaceSettingsClientProps) {
       </section>
 
       {/* Members */}
-      <section className="rounded-xl border border-border bg-card p-6">
+      <section className="rounded-xl p-6 backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
         <h2 className="font-semibold mb-4">Miembros ({props.members.length})</h2>
         <div className="divide-y divide-border">
           {props.members.map((m) => {
@@ -176,7 +176,7 @@ export function WorkspaceSettingsClient(props: WorkspaceSettingsClientProps) {
 
       {/* Invites */}
       {canManage && (
-        <section className="rounded-xl border border-border bg-card p-6">
+        <section className="rounded-xl p-6 backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
           <h2 className="font-semibold mb-4">Invitar a alguien</h2>
           <div className="flex flex-col sm:flex-row gap-2 mb-3">
             <input

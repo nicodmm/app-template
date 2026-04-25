@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { Target } from "lucide-react";
+import { Target, ArrowRight } from "lucide-react";
 import {
   getCrmConnectionState,
   getCrmMiniCardKpis,
   type CurrencyBucket,
 } from "@/lib/queries/crm";
+import { GlassCard } from "@/components/ui/glass-card";
 
 interface CrmMiniCardProps {
   workspaceId: string;
@@ -40,12 +41,15 @@ function timeAgo(d: Date | null): string {
   return `hace ${days} d`;
 }
 
+const TILE_CLASS =
+  "rounded-lg p-3 [background:rgba(255,255,255,0.4)] dark:[background:rgba(255,255,255,0.04)] [border:1px_solid_var(--glass-border)]";
+
 export async function CrmMiniCard({ workspaceId, accountId }: CrmMiniCardProps) {
   const state = await getCrmConnectionState(workspaceId, accountId);
 
   if (state.state === "no_connection") {
     return (
-      <div className="rounded-xl border border-border bg-card p-6">
+      <GlassCard className="p-6">
         <div className="flex items-center gap-2 mb-3">
           <Target size={16} className="text-muted-foreground" />
           <h2 className="font-semibold">CRM</h2>
@@ -55,17 +59,17 @@ export async function CrmMiniCard({ workspaceId, accountId }: CrmMiniCardProps) 
         </p>
         <Link
           href={`/api/auth/crm/pipedrive/login?accountId=${accountId}`}
-          className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-md shadow-primary/20"
         >
           Conectar Pipedrive
         </Link>
-      </div>
+      </GlassCard>
     );
   }
 
   if (state.state === "not_configured") {
     return (
-      <div className="rounded-xl border border-border bg-card p-6 space-y-3">
+      <GlassCard className="p-6 space-y-3">
         <div className="flex items-center gap-2">
           <Target size={16} className="text-muted-foreground" />
           <h2 className="font-semibold">CRM</h2>
@@ -75,18 +79,18 @@ export async function CrmMiniCard({ workspaceId, accountId }: CrmMiniCardProps) 
         </p>
         <Link
           href={`/app/accounts/${accountId}/crm/setup`}
-          className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors"
+          className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium transition-colors backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] hover:bg-white/40 dark:hover:bg-white/10"
         >
           Configurar CRM
         </Link>
-      </div>
+      </GlassCard>
     );
   }
 
   const kpis = await getCrmMiniCardKpis(state.connection.id);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 space-y-3">
+    <GlassCard className="p-6 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Target size={16} className="text-muted-foreground" />
@@ -95,28 +99,30 @@ export async function CrmMiniCard({ workspaceId, accountId }: CrmMiniCardProps) 
         </div>
         <Link
           href={`/app/accounts/${accountId}/crm`}
-          className="text-xs text-primary hover:underline"
+          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
         >
-          Ver todo →
+          Ver todo <ArrowRight size={11} aria-hidden />
         </Link>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-lg border border-border bg-background p-3">
+        <div className={TILE_CLASS}>
           <p className="text-xs text-muted-foreground mb-1">Oportunidades</p>
-          <p className="text-lg font-semibold">{kpis.oportunidades}</p>
+          <p className="text-lg font-semibold font-mono tabular-nums">{kpis.oportunidades}</p>
         </div>
-        <div className="rounded-lg border border-border bg-background p-3">
+        <div className={TILE_CLASS}>
           <p className="text-xs text-muted-foreground mb-1">Propuestas</p>
-          <p className="text-lg font-semibold">{kpis.propuestas}</p>
+          <p className="text-lg font-semibold font-mono tabular-nums">{kpis.propuestas}</p>
         </div>
-        <div className="rounded-lg border border-border bg-background p-3">
+        <div className={TILE_CLASS}>
           <p className="text-xs text-muted-foreground mb-1">Valor pipeline</p>
-          <p className="text-lg font-semibold">{dominantCurrencyLabel(kpis.valuePipeline)}</p>
+          <p className="text-lg font-semibold font-mono tabular-nums">
+            {dominantCurrencyLabel(kpis.valuePipeline)}
+          </p>
         </div>
-        <div className="rounded-lg border border-border bg-background p-3">
+        <div className={TILE_CLASS}>
           <p className="text-xs text-muted-foreground mb-1">Ganados 30d</p>
-          <p className="text-lg font-semibold">{kpis.wonLast30d}</p>
+          <p className="text-lg font-semibold font-mono tabular-nums">{kpis.wonLast30d}</p>
         </div>
       </div>
 
@@ -129,6 +135,6 @@ export async function CrmMiniCard({ workspaceId, accountId }: CrmMiniCardProps) 
           Configurar
         </Link>
       </p>
-    </div>
+    </GlassCard>
   );
 }

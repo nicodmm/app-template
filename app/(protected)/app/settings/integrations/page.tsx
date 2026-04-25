@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { BarChart3 } from "lucide-react";
 import { eq } from "drizzle-orm";
 import { requireUserId } from "@/lib/auth";
 import { db } from "@/lib/drizzle/db";
@@ -59,9 +60,11 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      <div className="rounded-xl border border-border bg-card p-6 mb-6">
+      <div className="rounded-xl p-6 mb-6 backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold">📊 Meta Ads</h2>
+          <h2 className="font-semibold inline-flex items-center gap-2">
+            <BarChart3 size={16} className="text-primary" aria-hidden /> Meta Ads
+          </h2>
           {connections.length === 0 && (
             <Link
               href="/api/auth/meta/login"
@@ -116,11 +119,11 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
       </div>
 
       {adAccounts.length > 0 && (
-        <div className="rounded-xl border border-border bg-card p-6">
+        <div className="rounded-xl p-6 backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
           <h2 className="font-semibold mb-4">Ad accounts disponibles</h2>
           <div className="space-y-3">
             {adAccounts.map((aa) => (
-              <div key={aa.id} className="rounded-lg border border-border p-3 space-y-2">
+              <div key={aa.id} className="rounded-lg p-3 space-y-2 [background:rgba(255,255,255,0.4)] dark:[background:rgba(255,255,255,0.04)] [border:1px_solid_var(--glass-border)]">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div>
                     <p className="text-sm font-medium">{aa.name}</p>

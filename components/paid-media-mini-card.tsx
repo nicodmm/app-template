@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, ArrowRight } from "lucide-react";
 import { getPaidMediaState, getKpisWithComparison } from "@/lib/queries/paid-media";
 import { getPaidMediaLabels } from "@/lib/meta/labels";
+import { GlassCard } from "@/components/ui/glass-card";
 import { PaidMediaKpiCard } from "./paid-media-kpi-card";
 import { PaidMediaReconnectBanner } from "./paid-media-reconnect-banner";
 
@@ -38,7 +39,7 @@ export async function PaidMediaMiniCard({ workspaceId, accountId }: PaidMediaMin
 
   if (state.state === "no_connection") {
     return (
-      <div className="rounded-xl border border-border bg-card p-6">
+      <GlassCard className="p-6">
         <div className="flex items-center gap-2 mb-3">
           <BarChart3 size={16} className="text-muted-foreground" />
           <h2 className="font-semibold">Paid Media</h2>
@@ -48,17 +49,17 @@ export async function PaidMediaMiniCard({ workspaceId, accountId }: PaidMediaMin
         </p>
         <Link
           href="/api/auth/meta/login"
-          className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-md shadow-primary/20"
         >
           Conectar Meta Ads
         </Link>
-      </div>
+      </GlassCard>
     );
   }
 
   if (state.state === "no_mapping") {
     return (
-      <div className="rounded-xl border border-border bg-card p-6 space-y-3">
+      <GlassCard className="p-6 space-y-3">
         {state.connectionStatus === "expired" && <PaidMediaReconnectBanner />}
         <div className="flex items-center gap-2">
           <BarChart3 size={16} className="text-muted-foreground" />
@@ -67,11 +68,11 @@ export async function PaidMediaMiniCard({ workspaceId, accountId }: PaidMediaMin
         <p className="text-sm text-muted-foreground">Vinculá un ad account a esta cuenta.</p>
         <Link
           href="/app/settings/integrations"
-          className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors"
+          className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium transition-colors backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] hover:bg-white/40 dark:hover:bg-white/10"
         >
           Ir a integraciones
         </Link>
-      </div>
+      </GlassCard>
     );
   }
 
@@ -81,7 +82,7 @@ export async function PaidMediaMiniCard({ workspaceId, accountId }: PaidMediaMin
   const labels = getPaidMediaLabels(state.adAccount.isEcommerce);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 space-y-3">
+    <GlassCard className="p-6 space-y-3">
       {state.connectionStatus === "expired" && <PaidMediaReconnectBanner />}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -91,9 +92,9 @@ export async function PaidMediaMiniCard({ workspaceId, accountId }: PaidMediaMin
         </div>
         <Link
           href={`/app/accounts/${accountId}/paid-media`}
-          className="text-xs text-primary hover:underline"
+          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
         >
-          Ver todo →
+          Ver todo <ArrowRight size={11} aria-hidden />
         </Link>
       </div>
 
@@ -134,6 +135,6 @@ export async function PaidMediaMiniCard({ workspaceId, accountId }: PaidMediaMin
           Configurar
         </Link>
       </p>
-    </div>
+    </GlassCard>
   );
 }

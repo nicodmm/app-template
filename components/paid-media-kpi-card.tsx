@@ -27,12 +27,14 @@ export function PaidMediaKpiCard({
 
   const cardBody = (
     <div
-      className={`rounded-lg border border-border bg-card p-3${
-        metricKey ? " transition-colors hover:bg-accent/40 cursor-pointer" : ""
+      className={`rounded-lg p-3 [background:rgba(255,255,255,0.4)] dark:[background:rgba(255,255,255,0.04)] [border:1px_solid_var(--glass-border)]${
+        metricKey
+          ? " transition-colors hover:[background:rgba(255,255,255,0.6)] dark:hover:[background:rgba(255,255,255,0.08)] cursor-pointer"
+          : ""
       }`}
     >
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-lg font-semibold mt-0.5">{value}</p>
+      <p className="text-lg font-semibold mt-0.5 font-mono tabular-nums">{value}</p>
       {deltaFormatted && (
         <p
           className={`text-xs flex items-center gap-0.5 mt-0.5 ${
