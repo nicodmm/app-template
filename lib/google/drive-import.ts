@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import mammoth from "mammoth";
+import { extractText as extractPdfText } from "unpdf";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/drizzle/db";
 import { transcripts, contextDocuments } from "@/lib/drizzle/schema";
@@ -62,7 +63,16 @@ async function extractTextFromBuffer(
     const result = await mammoth.extractRawText({ buffer: Buffer.from(data) });
     return result.value;
   }
-  // PDFs not extracted server-side in this pass.
+  if (mimeType === "application/pdf" || lower.endsWith(".pdf")) {
+    try {
+      const { text } = await extractPdfText(new Uint8Array(data), {
+        mergePages: true,
+      });
+      return text;
+    } catch {
+      return null;
+    }
+  }
   return null;
 }
 
