@@ -201,7 +201,11 @@ export function PaidMediaCampaignDrawer({
               <ul className="rounded-lg border border-border bg-card divide-y divide-border">
                 {drawerData.ads.map((ad) => (
                   <li key={ad.id} className="p-2 flex items-center gap-3">
-                    <Thumbnail src={ad.thumbnailUrl} alt={ad.name} size={40} />
+                    <Thumbnail
+                      src={ad.thumbnailUrl ? `/api/meta/image/ad/${ad.id}` : null}
+                      alt={ad.name}
+                      size={40}
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-medium truncate">{ad.name}</div>
                       <div className="text-[11px] text-muted-foreground">
