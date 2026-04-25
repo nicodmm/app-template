@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentType } from "react";
+import { BarChart3, Target, PlaySquare, Circle } from "lucide-react";
 import type { ChangeEventRow } from "@/lib/queries/paid-media";
 
 interface Props {
@@ -10,10 +11,12 @@ interface Props {
   loadingMore?: boolean;
 }
 
-const ENTITY_ICON: Record<string, string> = {
-  campaign: "📊",
-  ad_set: "🎯",
-  ad: "▶️",
+type IconComponent = ComponentType<{ size?: number; className?: string }>;
+
+const ENTITY_ICON: Record<string, IconComponent> = {
+  campaign: BarChart3,
+  ad_set: Target,
+  ad: PlaySquare,
 };
 
 const LEVEL_LABELS = [
@@ -71,8 +74,8 @@ export function PaidMediaChangeTimeline({ events, totalAvailable, onLoadMore, lo
   );
 
   return (
-    <div className="rounded-xl border border-border bg-card">
-      <div className="flex items-center gap-2 p-3 border-b border-border">
+    <div className="rounded-xl backdrop-blur-[20px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+      <div className="flex items-center gap-2 p-3 [border-bottom:1px_solid_var(--glass-border)]">
         {LEVEL_LABELS.map((l) => (
           <button
             key={l.value}
@@ -94,10 +97,12 @@ export function PaidMediaChangeTimeline({ events, totalAvailable, onLoadMore, lo
           Sin cambios registrados en el período.
         </div>
       ) : (
-        <ul className="divide-y divide-border">
-          {filtered.map((e) => (
+        <ul className="divide-y divide-[var(--glass-border)]">
+          {filtered.map((e) => {
+            const Icon = ENTITY_ICON[e.entityType] ?? Circle;
+            return (
             <li key={e.id} className="p-3 text-sm flex items-start gap-3">
-              <span className="text-lg leading-none mt-0.5">{ENTITY_ICON[e.entityType] ?? "•"}</span>
+              <Icon size={14} className="text-muted-foreground mt-1 shrink-0" aria-hidden />
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2 flex-wrap">
                   <span className="font-medium truncate">{e.entityName ?? e.entityMetaId}</span>
@@ -106,12 +111,13 @@ export function PaidMediaChangeTimeline({ events, totalAvailable, onLoadMore, lo
                 <div className="text-sm text-muted-foreground">{describeEvent(e)}</div>
               </div>
             </li>
-          ))}
+          );
+          })}
         </ul>
       )}
 
       {events.length < totalAvailable && onLoadMore && (
-        <div className="border-t border-border p-3 text-center">
+        <div className="[border-top:1px_solid_var(--glass-border)] p-3 text-center">
           <button
             type="button"
             onClick={onLoadMore}

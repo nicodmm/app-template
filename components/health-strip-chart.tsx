@@ -44,7 +44,14 @@ export function HealthStripChart({
   function handleClick() {
     if (!scrollTo) return;
     const el = document.getElementById(scrollTo);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!el) return;
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    el.scrollIntoView({
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+      block: "start",
+    });
   }
 
   const Wrapper = scrollTo ? "button" : "div";
