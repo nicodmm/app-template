@@ -229,7 +229,7 @@ async function processFile(
     const wordCount = text.trim().split(/\s+/).length;
     const contentHash = hashContent(text);
 
-    const [inserted] = await db
+    const inserted = await db
       .insert(transcripts)
       .values({
         accountId: matched.id,
@@ -243,14 +243,20 @@ async function processFile(
         wordCount,
         status: "pending",
       })
+      .onConflictDoNothing({ target: transcripts.googleDriveFileId })
       .returning({ id: transcripts.id });
+
+    if (inserted.length === 0) {
+      // Another concurrent sync already inserted this file — treat as skipped.
+      return "skipped";
+    }
 
     try {
       const { processTranscript } = await import(
         "@/trigger/workflows/process-transcript"
       );
       const run = await processTranscript.trigger({
-        transcriptId: inserted.id,
+        transcriptId: inserted[0].id,
         accountId: matched.id,
         workspaceId: connection.workspaceId,
         content: text,
@@ -258,7 +264,7 @@ async function processFile(
       await db
         .update(transcripts)
         .set({ triggerJobId: run.id })
-        .where(eq(transcripts.id, inserted.id));
+        .where(eq(transcripts.id, inserted[0].id));
     } catch (err) {
       logger.error("Failed to enqueue process-transcript for Drive file", {
         fileName: file.name,
@@ -270,19 +276,28 @@ async function processFile(
 
   // Otherwise persist as a context_document (best-effort text extraction).
   const extractedText = text ?? null;
-  await db.insert(contextDocuments).values({
-    workspaceId: connection.workspaceId,
-    accountId: matched.id,
-    uploadedByUserId: connection.connectedByUserId,
-    docType: shape.contextDocType,
-    title: file.name,
-    notes: `Importado automáticamente desde Google Drive.`,
-    fileName: file.name,
-    mimeType: downloaded.mimeType,
-    fileSize,
-    extractedText,
-    googleDriveFileId: file.id,
-  });
+  const contextInsert = await db
+    .insert(contextDocuments)
+    .values({
+      workspaceId: connection.workspaceId,
+      accountId: matched.id,
+      uploadedByUserId: connection.connectedByUserId,
+      docType: shape.contextDocType,
+      title: file.name,
+      notes: `Importado automáticamente desde Google Drive.`,
+      fileName: file.name,
+      mimeType: downloaded.mimeType,
+      fileSize,
+      extractedText,
+      googleDriveFileId: file.id,
+    })
+    .onConflictDoNothing({ target: contextDocuments.googleDriveFileId })
+    .returning({ id: contextDocuments.id });
+
+  if (contextInsert.length === 0) {
+    // Concurrent sync already imported it.
+    return "skipped";
+  }
 
   // Refresh account summary so the new context lands in "Resumen de situación"
   try {

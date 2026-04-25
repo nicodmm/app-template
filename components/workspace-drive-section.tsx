@@ -85,15 +85,20 @@ export function WorkspaceDriveSection({
     });
   }
 
-  async function handleSyncNow() {
+  function handleSyncNow() {
+    if (pending) return;
     setSyncMessage(null);
-    const result = await syncDriveNow();
-    if (result.error) {
-      setSyncMessage(`Error: ${result.error}`);
-    } else {
-      setSyncMessage("Sync disparado — los archivos van a aparecer en unos segundos.");
-      setTimeout(() => router.refresh(), 5000);
-    }
+    startTransition(async () => {
+      const result = await syncDriveNow();
+      if (result.error) {
+        setSyncMessage(`Error: ${result.error}`);
+      } else {
+        setSyncMessage(
+          "Sync disparado — los archivos van a aparecer en unos segundos."
+        );
+        setTimeout(() => router.refresh(), 5000);
+      }
+    });
   }
 
   return (
@@ -170,10 +175,14 @@ export function WorkspaceDriveSection({
               <button
                 onClick={handleSyncNow}
                 disabled={pending}
-                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <RefreshCw size={14} />
-                Sincronizar ahora
+                {pending ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={14} />
+                )}
+                {pending ? "Sincronizando..." : "Sincronizar ahora"}
               </button>
             )}
             <button

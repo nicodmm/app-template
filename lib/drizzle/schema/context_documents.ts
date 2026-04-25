@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp, uuid, integer, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, integer, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { accounts } from "./accounts";
 import { workspaces } from "./workspaces";
 import { users } from "./users";
@@ -37,7 +38,9 @@ export const contextDocuments = pgTable(
       table.accountId,
       table.createdAt
     ),
-    index("context_documents_drive_file_idx").on(table.googleDriveFileId),
+    uniqueIndex("context_documents_drive_file_unique_idx")
+      .on(table.googleDriveFileId)
+      .where(sql`${table.googleDriveFileId} IS NOT NULL`),
   ]
 );
 

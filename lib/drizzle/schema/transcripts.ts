@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp, uuid, integer, index, date } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, integer, index, date, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { accounts } from "./accounts";
 import { workspaces } from "./workspaces";
 import { users } from "./users";
@@ -37,7 +38,9 @@ export const transcripts = pgTable(
     index("transcripts_status_idx").on(table.status),
     index("transcripts_account_hash_idx").on(table.accountId, table.contentHash),
     index("transcripts_account_created_idx").on(table.accountId, table.createdAt),
-    index("transcripts_drive_file_idx").on(table.googleDriveFileId),
+    uniqueIndex("transcripts_drive_file_unique_idx")
+      .on(table.googleDriveFileId)
+      .where(sql`${table.googleDriveFileId} IS NOT NULL`),
   ]
 );
 

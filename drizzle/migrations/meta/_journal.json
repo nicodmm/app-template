@@ -120,6 +120,13 @@
       "when": 1777082551313,
       "tag": "0016_same_shinobi_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1777085666846,
+      "tag": "0017_quiet_pretty_boy",
+      "breakpoints": true
     }
   ]
 }
