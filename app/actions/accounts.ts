@@ -161,6 +161,12 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
   const fee = parseFee(formData.get("fee") as string | null);
   const websiteUrl = parseUrl(formData.get("websiteUrl") as string | null);
   const linkedinUrl = parseUrl(formData.get("linkedinUrl") as string | null);
+  const industry = ((formData.get("industry") as string) || "").trim() || null;
+  const employeeCount =
+    ((formData.get("employeeCount") as string) || "").trim() || null;
+  const location = ((formData.get("location") as string) || "").trim() || null;
+  const companyDescription =
+    ((formData.get("companyDescription") as string) || "").trim() || null;
   const enabledModules = buildEnabledModulesFromForm(
     formData.getAll("enabledModules") as string[]
   );
@@ -182,6 +188,10 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
       enabledModules,
       websiteUrl,
       linkedinUrl,
+      industry,
+      employeeCount,
+      location,
+      companyDescription,
       ...(websiteChanged && websiteUrl
         ? { enrichmentStatus: "pending", enrichmentError: null }
         : {}),
