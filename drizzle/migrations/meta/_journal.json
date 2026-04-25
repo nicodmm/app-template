@@ -141,6 +141,13 @@
       "when": 1777088937105,
       "tag": "0019_nostalgic_wrecking_crew",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1777089443513,
+      "tag": "0020_tidy_bishop",
+      "breakpoints": true
     }
   ]
 }

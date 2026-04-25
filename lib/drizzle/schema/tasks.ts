@@ -2,6 +2,7 @@ import { pgTable, text, timestamp, uuid, integer, index } from "drizzle-orm/pg-c
 import { accounts } from "./accounts";
 import { workspaces } from "./workspaces";
 import { transcripts } from "./transcripts";
+import { contextDocuments } from "./context_documents";
 import { users } from "./users";
 
 export const tasks = pgTable(
@@ -17,6 +18,10 @@ export const tasks = pgTable(
     transcriptId: uuid("transcript_id").references(() => transcripts.id, {
       onDelete: "set null",
     }),
+    contextDocumentId: uuid("context_document_id").references(
+      () => contextDocuments.id,
+      { onDelete: "set null" }
+    ),
     createdBy: uuid("created_by").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -37,6 +42,7 @@ export const tasks = pgTable(
     index("tasks_account_status_idx").on(table.accountId, table.status),
     index("tasks_workspace_idx").on(table.workspaceId),
     index("tasks_transcript_idx").on(table.transcriptId),
+    index("tasks_context_document_idx").on(table.contextDocumentId),
   ]
 );
 

@@ -28,6 +28,23 @@ async function triggerSummaryRefresh(
   }
 }
 
+async function triggerContextDocumentAnalysis(
+  contextDocumentId: string,
+  accountId: string,
+  workspaceId: string
+): Promise<void> {
+  try {
+    const { tasks } = await import("@trigger.dev/sdk/v3");
+    await tasks.trigger("analyze-context-document", {
+      contextDocumentId,
+      accountId,
+      workspaceId,
+    });
+  } catch (err) {
+    console.error("Failed to enqueue analyze-context-document", err);
+  }
+}
+
 interface UploadContextDocumentInput {
   accountId: string;
   docType: string;
@@ -78,6 +95,10 @@ export async function uploadContextDocument(
   // Re-generate the account summary in the background so the new context
   // document influences "Resumen de situación" right away.
   await triggerSummaryRefresh(input.accountId, workspace.id);
+
+  // Also pull tasks/commitments out of the document if it has any narrative
+  // content. Skips automatically inside the task if the body is too thin.
+  await triggerContextDocumentAnalysis(row.id, input.accountId, workspace.id);
 
   revalidatePath(`/app/accounts/${input.accountId}`);
   return { id: row.id };

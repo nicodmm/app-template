@@ -1,0 +1,3 @@
+ALTER TABLE "tasks" ADD COLUMN "context_document_id" uuid;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_context_document_id_context_documents_id_fk" FOREIGN KEY ("context_document_id") REFERENCES "public"."context_documents"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "tasks_context_document_idx" ON "tasks" USING btree ("context_document_id");

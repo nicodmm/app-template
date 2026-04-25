@@ -133,6 +133,13 @@ export async function importDriveFileForAccount(
         accountId: opts.accountId,
         workspaceId: opts.workspaceId,
       });
+      // Link-only docs typically have no extracted text, so analyze will
+      // skip them — but we still enqueue so any user notes get scanned.
+      await tasks.trigger("analyze-context-document", {
+        contextDocumentId: insert[0].id,
+        accountId: opts.accountId,
+        workspaceId: opts.workspaceId,
+      });
     } catch {
       // best-effort
     }
@@ -226,11 +233,16 @@ export async function importDriveFileForAccount(
 
   if (contextInsert.length === 0) return "duplicate";
 
-  // Kick off an account-summary refresh so the new context lands in the
-  // "Resumen de situación" right away.
+  // Kick off an account-summary refresh and a per-doc task analysis. The
+  // analyzer skips automatically if the doc has too little narrative text.
   try {
     const { tasks } = await import("@trigger.dev/sdk/v3");
     await tasks.trigger("refresh-account-summary", {
+      accountId,
+      workspaceId,
+    });
+    await tasks.trigger("analyze-context-document", {
+      contextDocumentId: contextInsert[0].id,
       accountId,
       workspaceId,
     });
