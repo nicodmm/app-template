@@ -2,7 +2,12 @@ import { task, metadata } from "@trigger.dev/sdk/v3";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { db } from "@/lib/drizzle/db";
-import { signals, accounts, accountHealthHistory } from "@/lib/drizzle/schema";
+import {
+  signals,
+  accounts,
+  accountHealthHistory,
+  workspaces,
+} from "@/lib/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 
 const client = new Anthropic();
@@ -35,6 +40,18 @@ export const detectSignals = task({
     await metadata.root.set("progress", 75);
     await metadata.root.set("currentStep", "Detectando señales...");
 
+    // Pull the workspace's agency context so the LLM can frame signals
+    // around what THIS agency cares about (services, ICP, upsell paths).
+    const [ws] = await db
+      .select({ agencyContext: workspaces.agencyContext })
+      .from(workspaces)
+      .where(eq(workspaces.id, payload.workspaceId))
+      .limit(1);
+    const agencyContext = ws?.agencyContext?.trim() ?? "";
+    const agencyBlock = agencyContext
+      ? `CONTEXTO DE LA AGENCIA (lo que sabe el equipo de growth, qué busca detectar):\n${agencyContext}\n\n`
+      : "";
+
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1024,
@@ -43,8 +60,8 @@ export const detectSignals = task({
           role: "user",
           content: `Sos un analista experto en gestión de cuentas para agencias de growth.
 
-Analizá el siguiente resumen de reunión y estado de cuenta, y:
-1. Detectá señales relevantes (riesgos de churn, oportunidades de crecimiento, oportunidades de upsell, flags de inactividad)
+${agencyBlock}Analizá el siguiente resumen de reunión y estado de cuenta, y:
+1. Detectá señales relevantes (riesgos de churn, oportunidades de crecimiento, oportunidades de upsell, flags de inactividad). Si la agencia describió señales específicas que le interesan, priorizá esas.
 2. Determiná el estado de salud general de la cuenta
 
 RESUMEN DE REUNIÓN:

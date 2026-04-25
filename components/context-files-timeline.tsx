@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   FileText,
@@ -13,9 +13,15 @@ import {
   Download,
   RotateCcw,
   ExternalLink,
+  Search,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import { deleteTranscript, retryTranscript } from "@/app/actions/transcripts";
-import { deleteContextDocument } from "@/app/actions/context-documents";
+import {
+  deleteContextDocument,
+  summarizeContextDocument,
+} from "@/app/actions/context-documents";
 import { driveViewLinkForFile } from "@/lib/google/drive-links";
 import type { Transcript } from "@/lib/drizzle/schema";
 import type { ContextDocument } from "@/lib/queries/context-documents";
@@ -81,6 +87,12 @@ export function ContextFilesTimeline({
   accountId,
 }: ContextFilesTimelineProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [summarizingId, setSummarizingId] = useState<string | null>(null);
+  const [summaryError, setSummaryError] = useState<{
+    id: string;
+    message: string;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -97,6 +109,43 @@ export function ContextFilesTimeline({
     })),
   ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((item) => {
+      if (item.kind === "transcript") {
+        const t = item.t;
+        const haystack = [t.fileName, t.content, t.meetingSummary]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(q);
+      }
+      const d = item.d;
+      const haystack = [d.title, d.fileName, d.notes, d.aiSummary, d.extractedText]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [items, search]);
+
+  async function handleSummarize(docId: string) {
+    setSummaryError(null);
+    setSummarizingId(docId);
+    try {
+      const result = await summarizeContextDocument(docId);
+      if (result.error) {
+        setSummaryError({ id: docId, message: result.error });
+      } else {
+        setExpanded(docId);
+        router.refresh();
+      }
+    } finally {
+      setSummarizingId(null);
+    }
+  }
+
   if (items.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -107,7 +156,33 @@ export function ContextFilesTimeline({
 
   return (
     <div className="space-y-2">
-      {items.map((item) => {
+      <div className="relative mb-1">
+        <Search
+          size={13}
+          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por nombre, contenido o resumen…"
+          className="w-full rounded-md border border-input bg-background pl-8 pr-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+        {search && (
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {filtered.length} de {items.length}
+          </p>
+        )}
+      </div>
+
+      {filtered.length === 0 && (
+        <p className="text-sm text-muted-foreground py-2">
+          Sin resultados para &quot;{search}&quot;.
+        </p>
+      )}
+
+      {filtered.map((item) => {
         if (item.kind === "transcript") {
           const t = item.t;
           const statusLabel = TRANSCRIPT_STATUS_LABEL[t.status] ?? t.status;
@@ -116,7 +191,7 @@ export function ContextFilesTimeline({
           return (
             <div
               key={`t-${t.id}`}
-              className="rounded-lg border border-border bg-card p-3 flex items-start justify-between gap-3"
+              className="rounded-lg [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)] p-3 flex items-start justify-between gap-3"
             >
               <div className="flex items-start gap-2 min-w-0 flex-1">
                 <Mic size={14} className="text-muted-foreground shrink-0 mt-0.5" />
@@ -204,10 +279,17 @@ export function ContextFilesTimeline({
         const meta = DOC_TYPE_META[d.docType] ?? DOC_TYPE_META.other;
         const { Icon, label } = meta;
         const isOpen = expanded === d.id;
-        const hasBody = !!(d.notes || d.extractedText);
+        const hasBody = !!(d.notes || d.extractedText || d.aiSummary);
+        const canSummarize =
+          !d.aiSummary &&
+          (d.extractedText?.trim().length ?? 0) >= 200;
+        const isSummarizing = summarizingId === d.id;
 
         return (
-          <div key={`d-${d.id}`} className="rounded-lg border border-border bg-card p-3">
+          <div
+            key={`d-${d.id}`}
+            className="rounded-lg [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)] p-3"
+          >
             <div className="flex items-start justify-between gap-3">
               <button
                 type="button"
@@ -236,6 +318,22 @@ export function ContextFilesTimeline({
                 </div>
               </button>
               <div className="flex items-center gap-2 shrink-0">
+                {canSummarize && (
+                  <button
+                    type="button"
+                    onClick={() => handleSummarize(d.id)}
+                    disabled={isSummarizing}
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50"
+                    title="Generar resumen con IA"
+                  >
+                    {isSummarizing ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Sparkles size={12} />
+                    )}
+                    {isSummarizing ? "Generando…" : "Resumir"}
+                  </button>
+                )}
                 {d.googleDriveFileId && (
                   <a
                     href={driveViewLinkForFile(d.googleDriveFileId, d.mimeType ?? undefined)}
@@ -266,8 +364,22 @@ export function ContextFilesTimeline({
               </div>
             </div>
 
+            {summaryError?.id === d.id && (
+              <p className="mt-2 text-xs text-destructive">
+                {summaryError.message}
+              </p>
+            )}
+
             {isOpen && hasBody && (
-              <div className="mt-3 pt-3 border-t border-border">
+              <div className="mt-3 pt-3 [border-top:1px_solid_var(--glass-tile-border)]">
+                {d.aiSummary && (
+                  <div className="mb-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-primary mb-1 inline-flex items-center gap-1">
+                      <Sparkles size={10} aria-hidden /> Resumen IA
+                    </p>
+                    <p className="text-sm leading-relaxed">{d.aiSummary}</p>
+                  </div>
+                )}
                 {d.notes && (
                   <p className="text-sm leading-relaxed whitespace-pre-wrap">{d.notes}</p>
                 )}

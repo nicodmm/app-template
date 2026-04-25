@@ -11,6 +11,8 @@ import { getPendingWorkspaceInvites } from "@/lib/queries/workspace-invites";
 import { getDriveConnectionForWorkspace } from "@/lib/queries/drive";
 import { WorkspaceSettingsClient } from "@/components/workspace-settings-client";
 import { WorkspaceDriveSection } from "@/components/workspace-drive-section";
+import { WorkspaceServicesSection } from "@/components/workspace-services-section";
+import { WorkspaceAgencyContextSection } from "@/components/workspace-agency-context-section";
 import { isGoogleOAuthConfigured } from "@/lib/google/oauth";
 
 interface PageProps {
@@ -62,6 +64,16 @@ export default async function WorkspaceSettingsPage({
           members={members}
           pendingInvites={pendingInvites}
           appUrl={appUrl}
+        />
+
+        <WorkspaceServicesSection
+          initialServices={workspace.services ?? []}
+          canManage={canManage}
+        />
+
+        <WorkspaceAgencyContextSection
+          initialValue={workspace.agencyContext}
+          canManage={canManage}
         />
 
         <WorkspaceDriveSection

@@ -148,6 +148,13 @@
       "when": 1777089443513,
       "tag": "0020_tidy_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1777153851758,
+      "tag": "0021_redundant_kang",
+      "breakpoints": true
     }
   ]
 }

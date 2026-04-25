@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { eq, and } from "drizzle-orm";
+import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/drizzle/db";
 import { contextDocuments, accounts } from "@/lib/drizzle/schema";
 import { requireUserId } from "@/lib/auth";
@@ -125,4 +126,79 @@ export async function deleteContextDocument(docId: string): Promise<void> {
 
   await db.delete(contextDocuments).where(eq(contextDocuments.id, docId));
   revalidatePath(`/app/accounts/${doc.accountId}`);
+}
+
+const MIN_CHARS_FOR_SUMMARY = 200;
+const MAX_INPUT_CHARS = 12000;
+
+/**
+ * On-demand AI summary for a context document. Reads the doc's extracted
+ * text and stores a 3-5 sentence summary in `ai_summary`. Triggered from
+ * the "Generar resumen" button in the context files timeline; not run
+ * automatically because most short notes don't justify the LLM call.
+ */
+export async function summarizeContextDocument(
+  docId: string
+): Promise<{ error?: string; summary?: string }> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) return { error: "Workspace no encontrado" };
+
+  const [doc] = await db
+    .select()
+    .from(contextDocuments)
+    .where(eq(contextDocuments.id, docId))
+    .limit(1);
+
+  if (!doc || doc.workspaceId !== workspace.id) {
+    return { error: "Documento no encontrado" };
+  }
+
+  const source = (doc.extractedText ?? "").trim();
+  if (source.length < MIN_CHARS_FOR_SUMMARY) {
+    return {
+      error:
+        "El archivo no tiene suficiente texto para resumir (mínimo ~200 caracteres).",
+    };
+  }
+
+  const client = new Anthropic();
+  const truncated = source.slice(0, MAX_INPUT_CHARS);
+
+  try {
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 400,
+      messages: [
+        {
+          role: "user",
+          content: `Resumí este archivo en 3-5 oraciones cortas (máximo ~120 palabras). Captá: el tema central, los puntos clave que un account manager necesitaría saber antes de leer el archivo completo, y cualquier compromiso, riesgo o decisión mencionada. NO uses bullets ni headers, solo prosa.
+
+ARCHIVO: ${doc.title}
+
+CONTENIDO:
+${truncated}`,
+        },
+      ],
+    });
+
+    const summary =
+      response.content[0]?.type === "text"
+        ? response.content[0].text.trim()
+        : "";
+
+    if (!summary) return { error: "La IA no devolvió un resumen" };
+
+    await db
+      .update(contextDocuments)
+      .set({ aiSummary: summary, updatedAt: new Date() })
+      .where(eq(contextDocuments.id, docId));
+
+    revalidatePath(`/app/accounts/${doc.accountId}`);
+    return { summary };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Error generando el resumen",
+    };
+  }
 }

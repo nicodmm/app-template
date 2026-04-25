@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -12,6 +13,7 @@ import {
   Trash2,
   RotateCcw,
   CalendarDays,
+  Bell,
 } from "lucide-react";
 import { resolveSignal, reopenSignal, deleteSignal } from "@/app/actions/signals";
 import type { SignalWithContext } from "@/lib/queries/signals";
@@ -189,11 +191,16 @@ function SignalRow({ signal, accountId }: SignalRowProps) {
 interface SignalsPanelProps {
   signals: SignalWithContext[];
   accountId: string;
+  hasAgencyContext: boolean;
 }
 
 type Tab = "active" | "resolved";
 
-export function SignalsPanel({ signals, accountId }: SignalsPanelProps) {
+export function SignalsPanel({
+  signals,
+  accountId,
+  hasAgencyContext,
+}: SignalsPanelProps) {
   const [tab, setTab] = useState<Tab>("active");
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
@@ -206,16 +213,39 @@ export function SignalsPanel({ signals, accountId }: SignalsPanelProps) {
       .filter((s) => typeFilter === "all" || s.type === typeFilter);
   }, [signals, tab, typeFilter]);
 
+  const banner = !hasAgencyContext && (
+    <div className="rounded-lg [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)] px-3 py-2.5 flex items-start gap-2">
+      <Bell size={14} className="text-primary mt-0.5 shrink-0" aria-hidden />
+      <div className="flex-1 text-xs leading-relaxed">
+        <span className="font-medium">Las señales pueden ser más precisas.</span>{" "}
+        <span className="text-muted-foreground">
+          Configurá el contexto de tu agencia (servicios, ICP, señales que te
+          interesan detectar) para que la IA priorice mejor.
+        </span>{" "}
+        <Link
+          href="/app/settings/workspace"
+          className="text-primary hover:underline underline-offset-2 font-medium"
+        >
+          Configurar →
+        </Link>
+      </div>
+    </div>
+  );
+
   if (signals.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground py-2">
-        No hay señales detectadas todavía. Se generan automáticamente al procesar transcripciones.
-      </p>
+      <div className="space-y-3">
+        {banner}
+        <p className="text-sm text-muted-foreground py-2">
+          No hay señales detectadas todavía. Se generan automáticamente al procesar transcripciones.
+        </p>
+      </div>
     );
   }
 
   return (
     <div className="space-y-3">
+      {banner}
       {/* Tabs */}
       <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit">
         {(

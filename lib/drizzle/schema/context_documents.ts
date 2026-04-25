@@ -25,6 +25,9 @@ export const contextDocuments = pgTable(
     mimeType: text("mime_type"),
     fileSize: integer("file_size"),
     extractedText: text("extracted_text"),
+    /** AI-generated summary of the file contents. Populated on demand
+     *  via the "Generar resumen" button in the context files timeline. */
+    aiSummary: text("ai_summary"),
     googleDriveFileId: text("google_drive_file_id"),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),

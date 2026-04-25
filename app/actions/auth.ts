@@ -4,6 +4,7 @@ import { db } from "@/lib/drizzle/db";
 import { users, workspaces, workspaceMembers, usageTracking } from "@/lib/drizzle/schema";
 import { eq } from "drizzle-orm";
 import { getWorkspaceByUserId } from "@/lib/queries/workspace";
+import { DEFAULT_WORKSPACE_SERVICES } from "@/lib/workspace/defaults";
 
 export async function ensureUserRecord(
   userId: string,
@@ -38,6 +39,7 @@ export async function createDefaultWorkspace(
       name: `${baseName}'s Workspace`,
       slug,
       ownerId: userId,
+      services: DEFAULT_WORKSPACE_SERVICES,
     })
     .returning();
 

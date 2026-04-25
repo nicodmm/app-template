@@ -250,3 +250,71 @@ export async function changeWorkspaceMemberRole(
   revalidatePath("/app/settings/workspace");
   return {};
 }
+
+const SERVICE_MAX_LEN = 60;
+const SERVICES_MAX_COUNT = 40;
+
+function normalizeServiceName(name: string): string {
+  return name.trim().replace(/\s+/g, " ");
+}
+
+export async function setWorkspaceServices(
+  services: string[]
+): Promise<{ error?: string }> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) return { error: "Workspace no encontrado" };
+  const member = await getWorkspaceMember(workspace.id, userId);
+  assertCanManage(member?.role);
+
+  const cleaned: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of services) {
+    if (typeof raw !== "string") continue;
+    const name = normalizeServiceName(raw);
+    if (!name || name.length > SERVICE_MAX_LEN) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    cleaned.push(name);
+    if (cleaned.length >= SERVICES_MAX_COUNT) break;
+  }
+
+  await db
+    .update(workspaces)
+    .set({ services: cleaned, updatedAt: new Date() })
+    .where(eq(workspaces.id, workspace.id));
+
+  revalidatePath("/app/settings/workspace");
+  return {};
+}
+
+const AGENCY_CONTEXT_MAX_LEN = 4000;
+
+export async function setWorkspaceAgencyContext(
+  context: string
+): Promise<{ error?: string }> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) return { error: "Workspace no encontrado" };
+  const member = await getWorkspaceMember(workspace.id, userId);
+  assertCanManage(member?.role);
+
+  const trimmed = context.trim();
+  if (trimmed.length > AGENCY_CONTEXT_MAX_LEN) {
+    return {
+      error: `Máximo ${AGENCY_CONTEXT_MAX_LEN} caracteres (recibidos ${trimmed.length}).`,
+    };
+  }
+
+  await db
+    .update(workspaces)
+    .set({
+      agencyContext: trimmed.length > 0 ? trimmed : null,
+      updatedAt: new Date(),
+    })
+    .where(eq(workspaces.id, workspace.id));
+
+  revalidatePath("/app/settings/workspace");
+  return {};
+}

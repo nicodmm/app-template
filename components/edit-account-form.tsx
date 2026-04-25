@@ -11,11 +11,12 @@ import { AccountModulesToggles } from "@/components/account-modules-toggles";
 interface EditAccountFormProps {
   account: AccountWithOwner;
   members: WorkspaceMemberWithUser[];
+  services: string[];
 }
 
 const initialState = { error: undefined as string | undefined };
 
-export function EditAccountForm({ account, members }: EditAccountFormProps) {
+export function EditAccountForm({ account, members, services }: EditAccountFormProps) {
   const [state, formAction, isPending] = useActionState(
     async (_prev: typeof initialState, formData: FormData) => {
       const result = await updateAccount(formData);
@@ -78,7 +79,10 @@ export function EditAccountForm({ account, members }: EditAccountFormProps) {
         <label className="block text-sm font-medium mb-2">
           Scope de servicio
         </label>
-        <ServiceScopeCheckboxes defaultValue={account.serviceScope} />
+        <ServiceScopeCheckboxes
+          options={services}
+          defaultValue={account.serviceScope}
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

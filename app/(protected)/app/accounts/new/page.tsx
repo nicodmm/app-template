@@ -20,6 +20,7 @@ export default async function NewAccountPage({ searchParams }: PageProps) {
   const workspace = await getWorkspaceByUserId(userId);
   if (!workspace) redirect("/auth/login");
   const members = await getWorkspaceMembers(workspace.id);
+  const services = workspace.services ?? [];
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
@@ -86,7 +87,7 @@ export default async function NewAccountPage({ searchParams }: PageProps) {
 
         <div className="flex flex-col gap-2">
           <Label>Scope de servicio</Label>
-          <ServiceScopeCheckboxes />
+          <ServiceScopeCheckboxes options={services} />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -152,7 +152,11 @@ export default async function AccountDetailPage({
       {isEditing && (
         <GlassCard variant="strong" className="p-6 mb-8 ring-1 ring-primary/20">
           <h2 className="font-semibold mb-4">Editar cuenta</h2>
-          <EditAccountForm account={account} members={members} />
+          <EditAccountForm
+            account={account}
+            members={members}
+            services={workspace.services ?? []}
+          />
         </GlassCard>
       )}
 
@@ -425,7 +429,11 @@ export default async function AccountDetailPage({
                   }`
             }
           >
-            <SignalsPanel signals={accountSignals} accountId={accountId} />
+            <SignalsPanel
+              signals={accountSignals}
+              accountId={accountId}
+              hasAgencyContext={Boolean(workspace.agencyContext?.trim())}
+            />
           </CollapsibleSection>
         )}
 
