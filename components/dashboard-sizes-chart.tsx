@@ -11,9 +11,13 @@ import {
 
 interface DashboardSizesChartProps {
   sizes: Array<{ employeeCount: string; count: number }>;
+  onSegmentClick?: (employeeCount: string) => void;
 }
 
-export function DashboardSizesChart({ sizes }: DashboardSizesChartProps) {
+export function DashboardSizesChart({
+  sizes,
+  onSegmentClick,
+}: DashboardSizesChartProps) {
   const data = sizes.slice(0, 8);
   return (
     <div className="rounded-xl p-4 backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
@@ -43,7 +47,18 @@ export function DashboardSizesChart({ sizes }: DashboardSizesChartProps) {
                 border: "1px solid var(--glass-border)",
               }}
             />
-            <Bar dataKey="count" fill="var(--primary)" radius={[0, 4, 4, 0]} />
+            <Bar
+              dataKey="count"
+              fill="var(--primary)"
+              radius={[0, 4, 4, 0]}
+              onClick={(item: unknown) => {
+                if (!onSegmentClick) return;
+                const payload = item as { employeeCount?: string } | undefined;
+                if (payload?.employeeCount)
+                  onSegmentClick(payload.employeeCount);
+              }}
+              style={{ cursor: onSegmentClick ? "pointer" : "default" }}
+            />
           </BarChart>
         </ResponsiveContainer>
       )}

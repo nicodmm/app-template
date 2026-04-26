@@ -15,15 +15,20 @@ import { DashboardIndustriesChart } from "@/components/dashboard-industries-char
 import { DashboardSizesChart } from "@/components/dashboard-sizes-chart";
 import { DashboardTopAccountsTable } from "@/components/dashboard-top-accounts-table";
 import { DashboardMetricDrawer } from "@/components/dashboard-metric-drawer";
+import { DashboardAccountsListDrawer } from "@/components/dashboard-accounts-list-drawer";
 import type {
+  AccountsListFilter,
   DashboardMetricKey,
   DashboardPeriod,
   DashboardSnapshot,
+  HealthBucket,
 } from "@/lib/queries/dashboard";
 
 interface DashboardSnapshotViewProps {
   snapshot: DashboardSnapshot;
   period: DashboardPeriod;
+  service: string | null;
+  ownerId: string | null;
 }
 
 function formatMoney(n: number): string {
@@ -46,25 +51,41 @@ function formatInteger(n: number): string {
   return new Intl.NumberFormat("es-AR").format(n);
 }
 
-interface OpenDrawer {
+interface OpenMetricDrawer {
   metric: DashboardMetricKey;
   label: string;
   formatValue: (value: number) => string;
 }
 
+interface OpenAccountsDrawer {
+  filter: AccountsListFilter;
+  title: string;
+}
+
+const HEALTH_LABEL: Record<HealthBucket, string> = {
+  green: "Al día",
+  yellow: "Atención",
+  red: "En riesgo",
+  inactive: "Sin actividad",
+};
+
 export function DashboardSnapshotView({
   snapshot,
   period,
+  service,
+  ownerId,
 }: DashboardSnapshotViewProps) {
-  const [drawer, setDrawer] = useState<OpenDrawer | null>(null);
+  const [metricDrawer, setMetricDrawer] = useState<OpenMetricDrawer | null>(
+    null
+  );
+  const [accountsDrawer, setAccountsDrawer] =
+    useState<OpenAccountsDrawer | null>(null);
 
   const noFeeHint =
     snapshot.totalAccounts > 0 &&
     snapshot.accountsWithoutFee / snapshot.totalAccounts > 0.25
       ? `${snapshot.accountsWithoutFee} sin fee no incluidas`
       : undefined;
-
-  const ltvHint = "Asume retención total — sin churn";
 
   return (
     <>
@@ -74,7 +95,7 @@ export function DashboardSnapshotView({
           value={formatInteger(snapshot.totalAccounts)}
           icon={<Briefcase size={13} />}
           onClick={() =>
-            setDrawer({
+            setMetricDrawer({
               metric: "total_accounts",
               label: "Clientes activos",
               formatValue: (v) => formatInteger(v),
@@ -87,7 +108,7 @@ export function DashboardSnapshotView({
           hint={noFeeHint}
           icon={<Wallet size={13} />}
           onClick={() =>
-            setDrawer({
+            setMetricDrawer({
               metric: "fee_total",
               label: "Fee total",
               formatValue: (v) => formatMoney(v),
@@ -100,7 +121,7 @@ export function DashboardSnapshotView({
           hint={noFeeHint}
           icon={<Coins size={13} />}
           onClick={() =>
-            setDrawer({
+            setMetricDrawer({
               metric: "ticket_average",
               label: "Ticket medio",
               formatValue: (v) => formatMoney(v),
@@ -112,7 +133,7 @@ export function DashboardSnapshotView({
           value={formatMonths(snapshot.durationMonthsAverage)}
           icon={<Calendar size={13} />}
           onClick={() =>
-            setDrawer({
+            setMetricDrawer({
               metric: "duration_months",
               label: "Duración media (meses)",
               formatValue: (v) => `${v.toFixed(1)} meses`,
@@ -122,12 +143,11 @@ export function DashboardSnapshotView({
         <DashboardKPITile
           label="LTV"
           value={formatMoneyOrDash(snapshot.ltv)}
-          hint={ltvHint}
           icon={<TrendingUp size={13} />}
           onClick={() =>
-            setDrawer({
+            setMetricDrawer({
               metric: "ltv",
-              label: "LTV (asume retención total)",
+              label: "LTV",
               formatValue: (v) => formatMoney(v),
             })
           }
@@ -137,30 +157,63 @@ export function DashboardSnapshotView({
           value={formatInteger(snapshot.opportunitiesCount)}
           hint="en período seleccionado"
           icon={<Sparkles size={13} />}
-        />
-      </div>
-
-      <div className="mt-6">
-        <DashboardHealthDistribution
-          distribution={snapshot.healthDistribution}
+          onClick={() =>
+            setAccountsDrawer({
+              filter: { type: "opportunities" },
+              title: "Oportunidades up/cross",
+            })
+          }
         />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <DashboardIndustriesChart industries={snapshot.industries} />
-        <DashboardSizesChart sizes={snapshot.sizes} />
-      </div>
-
-      <div className="mt-6">
+        <DashboardHealthDistribution
+          distribution={snapshot.healthDistribution}
+          onBucketClick={(bucket) =>
+            setAccountsDrawer({
+              filter: { type: "health", bucket },
+              title: `Salud — ${HEALTH_LABEL[bucket]}`,
+            })
+          }
+        />
         <DashboardTopAccountsTable rows={snapshot.topActivity} />
       </div>
 
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <DashboardIndustriesChart
+          industries={snapshot.industries}
+          onSegmentClick={(value) =>
+            setAccountsDrawer({
+              filter: { type: "industry", value },
+              title: `Industria — ${value}`,
+            })
+          }
+        />
+        <DashboardSizesChart
+          sizes={snapshot.sizes}
+          onSegmentClick={(value) =>
+            setAccountsDrawer({
+              filter: { type: "size", value },
+              title: `Tamaño — ${value}`,
+            })
+          }
+        />
+      </div>
+
       <DashboardMetricDrawer
-        metric={drawer?.metric ?? null}
-        metricLabel={drawer?.label ?? null}
+        metric={metricDrawer?.metric ?? null}
+        metricLabel={metricDrawer?.label ?? null}
         period={period}
-        formatValue={drawer?.formatValue ?? ((v) => String(v))}
-        onClose={() => setDrawer(null)}
+        formatValue={metricDrawer?.formatValue ?? ((v) => String(v))}
+        onClose={() => setMetricDrawer(null)}
+      />
+      <DashboardAccountsListDrawer
+        filter={accountsDrawer?.filter ?? null}
+        title={accountsDrawer?.title ?? null}
+        period={period}
+        service={service}
+        ownerId={ownerId}
+        onClose={() => setAccountsDrawer(null)}
       />
     </>
   );

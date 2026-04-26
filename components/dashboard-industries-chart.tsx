@@ -11,10 +11,12 @@ import {
 
 interface DashboardIndustriesChartProps {
   industries: Array<{ industry: string; count: number }>;
+  onSegmentClick?: (industry: string) => void;
 }
 
 export function DashboardIndustriesChart({
   industries,
+  onSegmentClick,
 }: DashboardIndustriesChartProps) {
   const data = industries.slice(0, 8);
   return (
@@ -45,7 +47,17 @@ export function DashboardIndustriesChart({
                 border: "1px solid var(--glass-border)",
               }}
             />
-            <Bar dataKey="count" fill="var(--primary)" radius={[0, 4, 4, 0]} />
+            <Bar
+              dataKey="count"
+              fill="var(--primary)"
+              radius={[0, 4, 4, 0]}
+              onClick={(item: unknown) => {
+                if (!onSegmentClick) return;
+                const payload = item as { industry?: string } | undefined;
+                if (payload?.industry) onSegmentClick(payload.industry);
+              }}
+              style={{ cursor: onSegmentClick ? "pointer" : "default" }}
+            />
           </BarChart>
         </ResponsiveContainer>
       )}

@@ -3,12 +3,14 @@ import { requireUserId } from "@/lib/auth";
 import {
   getWorkspaceByUserId,
   getWorkspaceMember,
+  getWorkspaceMembers,
 } from "@/lib/queries/workspace";
 import {
   getWorkspaceDashboardSnapshot,
   type DashboardPeriod,
 } from "@/lib/queries/dashboard";
 import { DashboardPeriodSelector } from "@/components/dashboard-period-selector";
+import { DashboardFilters } from "@/components/dashboard-filters";
 import { DashboardSnapshotView } from "@/components/dashboard-snapshot";
 
 interface DashboardPageProps {
@@ -16,6 +18,8 @@ interface DashboardPageProps {
     preset?: string;
     since?: string;
     until?: string;
+    service?: string;
+    owner?: string;
   }>;
 }
 
@@ -50,9 +54,20 @@ export default async function DashboardPage({
 
   const params = await searchParams;
   const period = resolvePeriod(params);
+  const service = params.service?.trim() || null;
+  const isElevated = member.role === "owner" || member.role === "admin";
+  const ownerId = isElevated ? params.owner?.trim() || null : null;
+
+  const members = isElevated ? await getWorkspaceMembers(workspace.id) : [];
 
   const snapshot = await getWorkspaceDashboardSnapshot(
-    { workspaceId: workspace.id, userId, role: member.role },
+    {
+      workspaceId: workspace.id,
+      userId,
+      role: member.role,
+      service,
+      ownerId,
+    },
     period
   );
 
@@ -71,7 +86,17 @@ export default async function DashboardPage({
                 } activos`}
           </p>
         </div>
-        <DashboardPeriodSelector />
+        <div className="flex items-center gap-3 flex-wrap">
+          <DashboardFilters
+            services={workspace.services}
+            members={members.map((m) => ({
+              userId: m.userId,
+              displayName: m.displayName,
+            }))}
+            showOwnerFilter={isElevated}
+          />
+          <DashboardPeriodSelector />
+        </div>
       </div>
 
       {snapshot.totalAccounts === 0 ? (
@@ -82,7 +107,12 @@ export default async function DashboardPage({
           </p>
         </div>
       ) : (
-        <DashboardSnapshotView snapshot={snapshot} period={period} />
+        <DashboardSnapshotView
+          snapshot={snapshot}
+          period={period}
+          service={service}
+          ownerId={ownerId}
+        />
       )}
     </div>
   );
