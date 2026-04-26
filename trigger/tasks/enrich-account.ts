@@ -4,7 +4,9 @@ import { z } from "zod";
 import { db } from "@/lib/drizzle/db";
 import { accounts } from "@/lib/drizzle/schema";
 import { eq } from "drizzle-orm";
+import { logLlmUsage } from "@/lib/ai/log-usage";
 
+const MODEL = "claude-haiku-4-5-20251001";
 const client = new Anthropic();
 
 const EnrichmentSchema = z.object({
@@ -105,7 +107,7 @@ export const enrichAccount = task({
       }
 
       const response = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
+        model: MODEL,
         max_tokens: 512,
         messages: [
           {
@@ -128,6 +130,14 @@ Devolvé SOLO JSON válido con estas claves. Si no podés inferir un dato con co
 }`,
           },
         ],
+      });
+
+      await logLlmUsage({
+        workspaceId: payload.workspaceId,
+        accountId: payload.accountId,
+        taskName: "enrich-account",
+        model: MODEL,
+        usage: response.usage,
       });
 
       const text = response.content[0]?.type === "text" ? response.content[0].text : "";

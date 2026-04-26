@@ -4,7 +4,9 @@ import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { db } from "@/lib/drizzle/db";
 import { tasks as tasksTable, contextDocuments } from "@/lib/drizzle/schema";
+import { logLlmUsage } from "@/lib/ai/log-usage";
 
+const MODEL = "claude-haiku-4-5-20251001";
 const anthropic = new Anthropic();
 
 const TaskItemSchema = z.object({
@@ -68,7 +70,7 @@ export const analyzeContextDocument = task({
     const docTypeLabel = DOC_TYPE_LABEL[doc.docType] ?? "un archivo de contexto";
 
     const response = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: MODEL,
       max_tokens: 2048,
       messages: [
         {
@@ -98,6 +100,14 @@ CONTENIDO:
 ${body.substring(0, 12000)}`,
         },
       ],
+    });
+
+    await logLlmUsage({
+      workspaceId: payload.workspaceId,
+      accountId: payload.accountId,
+      taskName: "analyze-context-document",
+      model: MODEL,
+      usage: response.usage,
     });
 
     const text = response.content[0]?.type === "text" ? response.content[0].text : "";

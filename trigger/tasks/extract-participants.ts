@@ -4,7 +4,9 @@ import { z } from "zod";
 import { db } from "@/lib/drizzle/db";
 import { participants, transcripts } from "@/lib/drizzle/schema";
 import { eq, sql } from "drizzle-orm";
+import { logLlmUsage } from "@/lib/ai/log-usage";
 
+const MODEL = "claude-haiku-4-5-20251001";
 const client = new Anthropic();
 
 const ParticipantSchema = z.object({
@@ -52,7 +54,7 @@ export const extractParticipants = task({
     await metadata.root.set("currentStep", "Identificando participantes...");
 
     const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: MODEL,
       max_tokens: 1024,
       messages: [
         {
@@ -70,6 +72,14 @@ TRANSCRIPCIÓN:
 ${payload.cleanedContent.substring(0, 8000)}`,
         },
       ],
+    });
+
+    await logLlmUsage({
+      workspaceId: payload.workspaceId,
+      accountId: payload.accountId,
+      taskName: "extract-participants",
+      model: MODEL,
+      usage: response.usage,
     });
 
     const text = response.content[0]?.type === "text" ? response.content[0].text : "";
