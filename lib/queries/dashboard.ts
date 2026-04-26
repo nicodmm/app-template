@@ -15,6 +15,10 @@ export interface DashboardScope {
   workspaceId: string;
   userId: string;
   role: string;
+  /** Optional service filter — matches accounts whose serviceScope (comma list) contains this label. */
+  service?: string | null;
+  /** Optional owner filter — restricts to accounts owned by this user (only honored when role allows). */
+  ownerId?: string | null;
 }
 
 export interface DashboardPeriod {
@@ -41,7 +45,7 @@ export interface DashboardSnapshot {
   accountsWithoutFee: number;
   /** Count of distinct accounts with active upsell/growth signals created in window. */
   opportunitiesCount: number;
-  /** Top 10 accounts by transcripts + context_documents in window. */
+  /** Top 10 accounts by transcripts + context_documents in window, ranked by lifetime monthly average. */
   topActivity: Array<{
     accountId: string;
     accountName: string;
@@ -49,6 +53,8 @@ export interface DashboardSnapshot {
     transcriptsCount: number;
     documentsCount: number;
     activityCount: number;
+    /** activityCount divided by months active. null when startDate is missing or account is < 1 month old. */
+    activityPerMonth: number | null;
   }>;
   /** Distribution by industry. Sorted desc by count. */
   industries: Array<{ industry: string; count: number }>;
@@ -63,6 +69,19 @@ function scopeConditions(scope: DashboardScope) {
   ];
   if (scope.role !== "owner" && scope.role !== "admin") {
     conds.push(eq(accounts.ownerId, scope.userId));
+  } else if (scope.ownerId) {
+    conds.push(eq(accounts.ownerId, scope.ownerId));
+  }
+  if (scope.service) {
+    if (scope.service === "Sin servicio") {
+      conds.push(
+        sql`(${accounts.serviceScope} IS NULL OR btrim(${accounts.serviceScope}) = '')`
+      );
+    } else {
+      conds.push(
+        sql`${accounts.serviceScope} ILIKE ${"%" + scope.service + "%"}`
+      );
+    }
   }
   return conds;
 }
@@ -196,21 +215,41 @@ export async function getWorkspaceDashboardSnapshot(
     );
     const docsByAccount = new Map(docRows.map((r) => [r.accountId, r.count]));
 
+    const MS_PER_MONTH_LOCAL = 1000 * 60 * 60 * 24 * (365.25 / 12);
     topActivity = inScopeAccounts
       .map((a) => {
         const tCount = transcriptsByAccount.get(a.id) ?? 0;
         const dCount = docsByAccount.get(a.id) ?? 0;
+        const activityCount = tCount + dCount;
+        let activityPerMonth: number | null = null;
+        if (a.startDate) {
+          const start = new Date(a.startDate).getTime();
+          const end = a.closedAt
+            ? new Date(a.closedAt).getTime()
+            : Date.now();
+          const months = (end - start) / MS_PER_MONTH_LOCAL;
+          if (Number.isFinite(months) && months >= 1) {
+            activityPerMonth = activityCount / months;
+          }
+        }
         return {
           accountId: a.id,
           accountName: a.name,
           fee: a.fee !== null ? Number(a.fee) : null,
           transcriptsCount: tCount,
           documentsCount: dCount,
-          activityCount: tCount + dCount,
+          activityCount,
+          activityPerMonth,
         };
       })
       .filter((row) => row.activityCount > 0)
-      .sort((a, b) => b.activityCount - a.activityCount)
+      .sort((a, b) => {
+        if (a.activityPerMonth === null && b.activityPerMonth === null)
+          return 0;
+        if (a.activityPerMonth === null) return 1;
+        if (b.activityPerMonth === null) return -1;
+        return b.activityPerMonth - a.activityPerMonth;
+      })
       .slice(0, 10);
   }
 
@@ -431,4 +470,124 @@ export async function getDashboardMetricBreakdown(
   }
 
   return { byService, byIndustry, bySize, byOwner };
+}
+
+export type AccountsListFilter =
+  | { type: "health"; bucket: HealthBucket }
+  | { type: "opportunities" }
+  | { type: "industry"; value: string }
+  | { type: "size"; value: string };
+
+export interface AccountsListRow {
+  id: string;
+  name: string;
+  serviceScope: string | null;
+  ownerName: string | null;
+  healthSignal: HealthBucket | null;
+}
+
+export async function getDashboardAccountsList(
+  scope: DashboardScope,
+  period: DashboardPeriod,
+  filter: AccountsListFilter
+): Promise<AccountsListRow[]> {
+  const baseConds = scopeConditions(scope);
+
+  const conds = [...baseConds];
+  if (filter.type === "health") {
+    if (filter.bucket === "inactive") {
+      conds.push(
+        sql`(${accounts.healthSignal} IS NULL OR ${accounts.healthSignal} = 'inactive')`
+      );
+    } else {
+      conds.push(eq(accounts.healthSignal, filter.bucket));
+    }
+  } else if (filter.type === "industry") {
+    if (filter.value === "Sin clasificar") {
+      conds.push(
+        sql`(${accounts.industry} IS NULL OR btrim(${accounts.industry}) = '')`
+      );
+    } else {
+      conds.push(eq(accounts.industry, filter.value));
+    }
+  } else if (filter.type === "size") {
+    if (filter.value === "Sin clasificar") {
+      conds.push(
+        sql`(${accounts.employeeCount} IS NULL OR btrim(${accounts.employeeCount}) = '')`
+      );
+    } else {
+      conds.push(eq(accounts.employeeCount, filter.value));
+    }
+  }
+
+  let rows: Array<{
+    id: string;
+    name: string;
+    serviceScope: string | null;
+    healthSignal: string | null;
+    ownerId: string | null;
+  }>;
+
+  if (filter.type === "opportunities") {
+    const sinceDate = new Date(`${period.since}T00:00:00Z`);
+    const untilDate = new Date(`${period.until}T23:59:59.999Z`);
+    rows = await db
+      .selectDistinct({
+        id: accounts.id,
+        name: accounts.name,
+        serviceScope: accounts.serviceScope,
+        healthSignal: accounts.healthSignal,
+        ownerId: accounts.ownerId,
+      })
+      .from(accounts)
+      .innerJoin(signals, eq(signals.accountId, accounts.id))
+      .where(
+        and(
+          ...baseConds,
+          inArray(signals.type, ["upsell_opportunity", "growth_opportunity"]),
+          eq(signals.status, "active"),
+          gte(signals.createdAt, sinceDate),
+          lte(signals.createdAt, untilDate)
+        )
+      );
+  } else {
+    rows = await db
+      .select({
+        id: accounts.id,
+        name: accounts.name,
+        serviceScope: accounts.serviceScope,
+        healthSignal: accounts.healthSignal,
+        ownerId: accounts.ownerId,
+      })
+      .from(accounts)
+      .where(and(...conds));
+  }
+
+  const ownerIds = [
+    ...new Set(rows.map((r) => r.ownerId).filter(Boolean)),
+  ] as string[];
+  const ownerNames = new Map<string, string>();
+  if (ownerIds.length > 0) {
+    const userRows = await db
+      .select({ id: users.id, fullName: users.fullName, email: users.email })
+      .from(users)
+      .where(inArray(users.id, ownerIds));
+    for (const u of userRows) {
+      ownerNames.set(u.id, u.fullName ?? u.email);
+    }
+  }
+
+  return rows
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      serviceScope: r.serviceScope,
+      ownerName: r.ownerId ? (ownerNames.get(r.ownerId) ?? null) : null,
+      healthSignal:
+        (r.healthSignal as HealthBucket | null) ??
+        (filter.type === "health" && filter.bucket === "inactive"
+          ? "inactive"
+          : null),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "es-AR"));
 }

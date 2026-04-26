@@ -7,6 +7,9 @@ import {
 } from "@/lib/queries/workspace";
 import {
   getDashboardMetricBreakdown,
+  getDashboardAccountsList,
+  type AccountsListFilter,
+  type AccountsListRow,
   type DashboardBreakdown,
   type DashboardMetricKey,
   type DashboardPeriod,
@@ -26,5 +29,30 @@ export async function fetchDashboardBreakdown(
     { workspaceId: workspace.id, userId, role: member.role },
     period,
     metric
+  );
+}
+
+export async function fetchDashboardAccountsList(
+  filter: AccountsListFilter,
+  period: DashboardPeriod,
+  service: string | null,
+  ownerId: string | null
+): Promise<AccountsListRow[]> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) throw new Error("Sin workspace");
+  const member = await getWorkspaceMember(workspace.id, userId);
+  if (!member) throw new Error("Sin membresía en el workspace");
+
+  return getDashboardAccountsList(
+    {
+      workspaceId: workspace.id,
+      userId,
+      role: member.role,
+      service,
+      ownerId,
+    },
+    period,
+    filter
   );
 }
