@@ -9,6 +9,7 @@ interface TopActivityRow {
   transcriptsCount: number;
   documentsCount: number;
   activityCount: number;
+  activityPerMonth: number | null;
 }
 
 interface DashboardTopAccountsTableProps {
@@ -24,6 +25,11 @@ function formatFee(n: number | null): string {
   }).format(n);
 }
 
+function formatPerMonth(n: number | null): string {
+  if (n === null) return "—";
+  return n >= 10 ? n.toFixed(0) : n.toFixed(1);
+}
+
 export function DashboardTopAccountsTable({
   rows,
 }: DashboardTopAccountsTableProps) {
@@ -32,7 +38,7 @@ export function DashboardTopAccountsTable({
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <h3 className="text-sm font-semibold">Top actividad</h3>
         <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-          en período seleccionado
+          promedio mensual del cliente
         </span>
       </div>
       {rows.length === 0 ? (
@@ -45,7 +51,12 @@ export function DashboardTopAccountsTable({
             <tr>
               <th className="px-4 py-2 text-left font-medium">Cliente</th>
               <th className="px-4 py-2 text-right font-medium">Fee</th>
-              <th className="px-4 py-2 text-right font-medium">Actividad</th>
+              <th
+                className="px-4 py-2 text-right font-medium"
+                title="Reuniones + archivos en el período, divididos por meses activos del cliente"
+              >
+                Act./mes
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -67,9 +78,9 @@ export function DashboardTopAccountsTable({
                 </td>
                 <td
                   className="px-4 py-2 text-right tabular-nums"
-                  title={`${r.transcriptsCount} reuniones · ${r.documentsCount} archivos`}
+                  title={`${r.transcriptsCount} reuniones · ${r.documentsCount} archivos en el período · total ${r.activityCount}`}
                 >
-                  {r.activityCount}
+                  {formatPerMonth(r.activityPerMonth)}
                 </td>
               </tr>
             ))}
