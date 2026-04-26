@@ -10,6 +10,7 @@ import { getPaidMediaLabels } from "@/lib/meta/labels";
 import { PaidMediaPeriodSelector } from "@/components/paid-media-period-selector";
 import { PaidMediaReconnectBanner } from "@/components/paid-media-reconnect-banner";
 import { PaidMediaKpiChartModal } from "@/components/paid-media-kpi-chart-modal";
+import { PaidMediaResyncButton } from "@/components/paid-media-resync-button";
 import { PaidMediaKpisSection } from "@/components/paid-media/kpis-section";
 import { PaidMediaCampaignsSection } from "@/components/paid-media/campaigns-section";
 import { PaidMediaAdsSection } from "@/components/paid-media/ads-section";
@@ -170,8 +171,23 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
             {timeAgo(state.adAccount.lastSyncedAt)}
           </p>
         </div>
-        <PaidMediaPeriodSelector />
+        <div className="flex items-center gap-2 flex-wrap">
+          <PaidMediaResyncButton adAccountId={adAccountId} />
+          <PaidMediaPeriodSelector />
+        </div>
       </div>
+
+      {state.adAccount.lastSyncedAt === null && (
+        <div className="mb-6 rounded-xl px-4 py-3 text-sm backdrop-blur-[14px] [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)]">
+          <p className="font-medium">Sincronización en curso</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            La cuenta publicitaria está conectada pero el primer backfill de 90
+            días aún no terminó. Puede tardar entre 1 y 5 minutos. Si seguís
+            viendo todo en cero pasado un rato, tocá <strong>Sincronizar
+            ahora</strong>.
+          </p>
+        </div>
+      )}
 
       <Suspense fallback={<KpisSkeleton />}>
         <PaidMediaKpisSection
