@@ -54,10 +54,11 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
   const workspace = await getWorkspaceByUserId(userId);
   if (!workspace) redirect("/auth/login");
 
-  const account = await getAccountById(accountId, workspace.id);
+  const [account, state] = await Promise.all([
+    getAccountById(accountId, workspace.id),
+    getPaidMediaState(workspace.id, accountId),
+  ]);
   if (!account) notFound();
-
-  const state = await getPaidMediaState(workspace.id, accountId);
   if (state.state !== "mapped") {
     return (
       <div className="p-6 max-w-4xl mx-auto">
