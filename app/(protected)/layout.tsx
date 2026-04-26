@@ -1,4 +1,4 @@
-import { requireUserId } from "@/lib/auth";
+import { requireUserId, isCurrentUserAdmin } from "@/lib/auth";
 import { getWorkspaceWithUsage } from "@/lib/queries/workspace";
 import { createDefaultWorkspace } from "@/app/actions/auth";
 import { Sidebar } from "@/components/sidebar";
@@ -32,6 +32,7 @@ export default async function ProtectedLayout({
   const transcriptsCount = workspaceData?.usage?.transcriptsCount ?? 0;
   const transcriptsLimit = 5;
   const plan = "Free";
+  const isPlatformAdmin = await isCurrentUserAdmin();
 
   return (
     <div className="flex h-dvh flex-col">
@@ -39,6 +40,7 @@ export default async function ProtectedLayout({
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           role={role}
+          isPlatformAdmin={isPlatformAdmin}
           transcriptsCount={transcriptsCount}
           transcriptsLimit={transcriptsLimit}
           plan={plan}

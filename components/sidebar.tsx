@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, User, BarChart2, Users } from "lucide-react";
+import { LayoutGrid, User, BarChart2, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
   role: string;
+  /** True when the user has global users.role === 'admin' (platform owner). */
+  isPlatformAdmin: boolean;
   transcriptsCount: number;
   transcriptsLimit: number;
   plan: string;
@@ -19,11 +21,12 @@ const navItems = [
 ];
 
 const adminItems = [
-  { label: "Usuarios", href: "/admin/users", icon: Users },
+  { label: "Plataforma", href: "/admin/dashboard", icon: Shield },
 ];
 
 export function Sidebar({
-  role,
+  role: _role,
+  isPlatformAdmin,
   transcriptsCount,
   transcriptsLimit,
   plan,
@@ -63,7 +66,7 @@ export function Sidebar({
           );
         })}
 
-        {(role === "admin" || role === "owner") && (
+        {isPlatformAdmin && (
           <>
             <div className="pt-4 pb-1 px-3">
               <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.12em]">
