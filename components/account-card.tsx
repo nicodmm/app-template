@@ -65,22 +65,30 @@ export function AccountCard({ account }: AccountCardProps) {
       className={cn(
         "group block rounded-xl p-5 backdrop-blur-[14px] transition-all",
         "[background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]",
-        "hover:[background:var(--glass-bg-strong)] hover:translate-y-[-1px] hover:[box-shadow:0_14px_44px_-14px_rgba(15,18,53,0.22)]"
+        "hover:[background:var(--glass-bg-strong)] hover:translate-y-[-1px] hover:[box-shadow:0_14px_44px_-14px_rgba(15,18,53,0.22)]",
+        account.closedAt && "opacity-60"
       )}
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <h3 className="font-semibold text-sm leading-tight group-hover:text-primary transition-colors line-clamp-2">
           {account.name}
         </h3>
-        <span
-          className={cn(
-            "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-            config.className
+        <div className="flex shrink-0 items-center gap-1.5">
+          {account.closedAt && (
+            <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300 ring-1 ring-slate-300 dark:ring-slate-700">
+              Cerrado
+            </span>
           )}
-        >
-          <Icon size={11} aria-hidden />
-          {config.label}
-        </span>
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+              config.className
+            )}
+          >
+            <Icon size={11} aria-hidden />
+            {config.label}
+          </span>
+        </div>
       </div>
 
       {account.healthJustification && (
