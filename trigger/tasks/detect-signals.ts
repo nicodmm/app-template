@@ -9,7 +9,9 @@ import {
   workspaces,
 } from "@/lib/drizzle/schema";
 import { eq, and } from "drizzle-orm";
+import { logLlmUsage } from "@/lib/ai/log-usage";
 
+const MODEL = "claude-haiku-4-5-20251001";
 const client = new Anthropic();
 
 const SignalSchema = z.object({
@@ -101,6 +103,14 @@ Respondé ÚNICAMENTE con un JSON válido:
 Solo incluí señales con confianza media o alta. Si no hay señales claras, devolvé un array vacío.`,
         },
       ],
+    });
+
+    await logLlmUsage({
+      workspaceId: payload.workspaceId,
+      accountId: payload.accountId,
+      taskName: "detect-signals",
+      model: MODEL,
+      usage: response.usage,
     });
 
     const text = response.content[0]?.type === "text" ? response.content[0].text : "";

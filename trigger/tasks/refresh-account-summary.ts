@@ -47,6 +47,7 @@ export const refreshAccountSummary = task({
 
     const parsed = await runAccountSummaryGeneration({
       accountId: payload.accountId,
+      workspaceId: payload.workspaceId,
       transcriptId: baseTranscript.id,
       cleanedContent: baseTranscript.content,
     });

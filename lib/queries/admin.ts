@@ -6,6 +6,7 @@ import {
   transcripts,
   signals,
   workspaceMembers,
+  llmUsage,
 } from "@/lib/drizzle/schema";
 import { and, eq, gte, isNull, sql, desc, inArray } from "drizzle-orm";
 
@@ -18,6 +19,22 @@ export interface AdminKpis {
   usersNew30d: number;
   accountsActive: number;
   transcriptsCompleted30d: number;
+  /** Sum of cost_usd across all llm_usage rows in the last 30 days. */
+  llmCostUsd30d: number;
+  /** Total tokens (input+output+cache) consumed in the last 30 days. */
+  llmTokensTotal30d: number;
+  /** Total tokens consumed since installation (lifetime). */
+  llmTokensLifetime: number;
+  /** Cost USD lifetime — useful first time you flip the switch. */
+  llmCostUsdLifetime: number;
+}
+
+export interface AdminLlmTaskRow {
+  taskName: string;
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
 }
 
 export interface AdminWorkspaceRow {
@@ -33,6 +50,8 @@ export interface AdminWorkspaceRow {
 export interface AdminDashboardSnapshot {
   kpis: AdminKpis;
   topWorkspaces: AdminWorkspaceRow[];
+  /** Per-task breakdown of LLM spend in the last 30 days. */
+  llmByTask30d: AdminLlmTaskRow[];
 }
 
 export async function getAdminDashboardMetrics(): Promise<AdminDashboardSnapshot> {
@@ -46,6 +65,9 @@ export async function getAdminDashboardMetrics(): Promise<AdminDashboardSnapshot
     usersNewRow,
     accountsActiveRow,
     transcriptsRow,
+    llmAgg30dRow,
+    llmAggLifetimeRow,
+    llmByTaskRows,
   ] = await Promise.all([
     db.select({ n: sql<number>`count(*)::int` }).from(workspaces),
     db
@@ -70,6 +92,30 @@ export async function getAdminDashboardMetrics(): Promise<AdminDashboardSnapshot
           gte(transcripts.createdAt, since)
         )
       ),
+    db
+      .select({
+        cost: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)::text`,
+        tokens: sql<number>`coalesce(sum(${llmUsage.inputTokens} + ${llmUsage.outputTokens} + ${llmUsage.cacheReadTokens} + ${llmUsage.cacheWriteTokens}), 0)::bigint`,
+      })
+      .from(llmUsage)
+      .where(gte(llmUsage.createdAt, since)),
+    db
+      .select({
+        cost: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)::text`,
+        tokens: sql<number>`coalesce(sum(${llmUsage.inputTokens} + ${llmUsage.outputTokens} + ${llmUsage.cacheReadTokens} + ${llmUsage.cacheWriteTokens}), 0)::bigint`,
+      })
+      .from(llmUsage),
+    db
+      .select({
+        taskName: llmUsage.taskName,
+        calls: sql<number>`count(*)::int`,
+        inputTokens: sql<number>`coalesce(sum(${llmUsage.inputTokens}), 0)::bigint`,
+        outputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)::bigint`,
+        costUsd: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)::text`,
+      })
+      .from(llmUsage)
+      .where(gte(llmUsage.createdAt, since))
+      .groupBy(llmUsage.taskName),
   ]);
 
   // Top workspaces: derive in-memory from a small set of focused queries
@@ -206,6 +252,16 @@ export async function getAdminDashboardMetrics(): Promise<AdminDashboardSnapshot
     }
   }
 
+  const llmByTask30d: AdminLlmTaskRow[] = llmByTaskRows
+    .map((r) => ({
+      taskName: r.taskName,
+      calls: r.calls,
+      inputTokens: Number(r.inputTokens),
+      outputTokens: Number(r.outputTokens),
+      costUsd: Number(r.costUsd ?? 0),
+    }))
+    .sort((a, b) => b.costUsd - a.costUsd);
+
   return {
     kpis: {
       workspacesTotal: workspacesTotalRow[0]?.n ?? 0,
@@ -214,7 +270,12 @@ export async function getAdminDashboardMetrics(): Promise<AdminDashboardSnapshot
       usersNew30d: usersNewRow[0]?.n ?? 0,
       accountsActive: accountsActiveRow[0]?.n ?? 0,
       transcriptsCompleted30d: transcriptsRow[0]?.n ?? 0,
+      llmCostUsd30d: Number(llmAgg30dRow[0]?.cost ?? 0),
+      llmTokensTotal30d: Number(llmAgg30dRow[0]?.tokens ?? 0),
+      llmCostUsdLifetime: Number(llmAggLifetimeRow[0]?.cost ?? 0),
+      llmTokensLifetime: Number(llmAggLifetimeRow[0]?.tokens ?? 0),
     },
     topWorkspaces,
+    llmByTask30d,
   };
 }

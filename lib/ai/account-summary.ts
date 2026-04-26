@@ -8,8 +8,10 @@ import {
   contextDocuments,
 } from "@/lib/drizzle/schema";
 import { eq, desc, ne, and } from "drizzle-orm";
+import { logLlmUsage } from "@/lib/ai/log-usage";
 
 const anthropic = new Anthropic();
+const SUMMARY_MODEL = "claude-haiku-4-5-20251001";
 
 const SummarySchema = z.object({
   meetingSummary: z.string(),
@@ -113,6 +115,7 @@ function buildContextDocsBlock(
 
 interface GenerateOptions {
   accountId: string;
+  workspaceId: string;
   transcriptId: string;
   cleanedContent: string;
   priorContextLimit?: number;
@@ -202,7 +205,7 @@ export async function runAccountSummaryGeneration(
     .join("\n\n");
 
   const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
+    model: SUMMARY_MODEL,
     max_tokens: 1200,
     messages: [
       {
@@ -248,6 +251,14 @@ Respondé SOLO con JSON válido (strings con \\n para saltos de línea):
 {"meetingSummary": "...", "accountSituation": "..."}`,
       },
     ],
+  });
+
+  await logLlmUsage({
+    workspaceId: opts.workspaceId,
+    accountId: opts.accountId,
+    taskName: "account-summary",
+    model: SUMMARY_MODEL,
+    usage: response.usage,
   });
 
   const text =

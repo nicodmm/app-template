@@ -4,7 +4,9 @@ import { z } from "zod";
 import { db } from "@/lib/drizzle/db";
 import { tasks, transcripts } from "@/lib/drizzle/schema";
 import { eq, and, inArray } from "drizzle-orm";
+import { logLlmUsage } from "@/lib/ai/log-usage";
 
+const MODEL = "claude-haiku-4-5-20251001";
 const client = new Anthropic();
 
 const TaskItemSchema = z.object({
@@ -129,6 +131,14 @@ TRANSCRIPCIÓN:
 ${payload.cleanedContent.substring(0, 8000)}`,
           },
         ],
+      });
+
+      await logLlmUsage({
+        workspaceId: payload.workspaceId,
+        accountId: payload.accountId,
+        taskName: "extract-tasks-completion",
+        model: MODEL,
+        usage: completionResponse.usage,
       });
 
       const completionText =

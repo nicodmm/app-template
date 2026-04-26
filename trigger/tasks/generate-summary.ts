@@ -25,6 +25,7 @@ export const generateSummary = task({
 
     const parsed = await runAccountSummaryGeneration({
       accountId: payload.accountId,
+      workspaceId: payload.workspaceId,
       transcriptId: payload.transcriptId,
       cleanedContent: payload.cleanedContent,
     });

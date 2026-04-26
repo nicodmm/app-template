@@ -5,11 +5,30 @@ import {
   TrendingUp,
   Users as UsersIcon,
   Building2,
+  DollarSign,
+  Zap,
+  Coins,
 } from "lucide-react";
 import { getAdminDashboardMetrics } from "@/lib/queries/admin";
 
 function formatInteger(n: number): string {
   return new Intl.NumberFormat("es-AR").format(n);
+}
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return new Intl.NumberFormat("es-AR").format(n);
+}
+
+function formatUsd(n: number): string {
+  if (n < 0.01 && n > 0) return "<$0.01";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
 }
 
 function formatDate(d: Date | null): string {
@@ -23,7 +42,7 @@ function formatDate(d: Date | null): string {
 
 export default async function AdminDashboardPage() {
   const snapshot = await getAdminDashboardMetrics();
-  const { kpis, topWorkspaces } = snapshot;
+  const { kpis, topWorkspaces, llmByTask30d } = snapshot;
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -76,6 +95,93 @@ export default async function AdminDashboardPage() {
           value={formatInteger(kpis.usersNew30d)}
           icon={<Sparkles size={13} />}
         />
+      </div>
+
+      <div className="mt-6">
+        <h2 className="text-sm font-semibold mb-3">Consumo de IA</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiTile
+            label="Costo USD (30d)"
+            value={formatUsd(kpis.llmCostUsd30d)}
+            icon={<DollarSign size={13} />}
+            hint="Calculado al momento de cada call"
+          />
+          <KpiTile
+            label="Tokens (30d)"
+            value={formatTokens(kpis.llmTokensTotal30d)}
+            icon={<Zap size={13} />}
+            hint="Input + output + cache"
+          />
+          <KpiTile
+            label="Costo lifetime"
+            value={formatUsd(kpis.llmCostUsdLifetime)}
+            icon={<Coins size={13} />}
+          />
+          <KpiTile
+            label="Tokens lifetime"
+            value={formatTokens(kpis.llmTokensLifetime)}
+            icon={<Zap size={13} />}
+          />
+        </div>
+
+        <div className="mt-4 rounded-xl backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+          <div className="flex items-center justify-between px-4 pt-4 pb-2">
+            <h3 className="text-sm font-semibold">Costo por tarea</h3>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              últimos 30 días
+            </span>
+          </div>
+          {llmByTask30d.length === 0 ? (
+            <p className="px-4 pb-4 text-xs text-muted-foreground">
+              Aún no hay registros de uso. Una vez que se ejecute un job de
+              IA, aparece acá.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2 text-left font-medium">Tarea</th>
+                    <th className="px-4 py-2 text-right font-medium">Calls</th>
+                    <th className="px-4 py-2 text-right font-medium">
+                      Input tokens
+                    </th>
+                    <th className="px-4 py-2 text-right font-medium">
+                      Output tokens
+                    </th>
+                    <th className="px-4 py-2 text-right font-medium">
+                      Costo USD
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {llmByTask30d.map((row) => (
+                    <tr
+                      key={row.taskName}
+                      className="[border-top:1px_solid_var(--glass-tile-border)]"
+                    >
+                      <td className="px-4 py-2 font-medium">
+                        <code className="text-xs">{row.taskName}</code>
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        {formatInteger(row.calls)}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+                        {formatTokens(row.inputTokens)}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+                        {formatTokens(row.outputTokens)}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums font-medium">
+                        {formatUsd(row.costUsd)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="mt-6 rounded-xl backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
