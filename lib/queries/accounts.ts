@@ -1,6 +1,6 @@
 import { db } from "@/lib/drizzle/db";
 import { accounts, users } from "@/lib/drizzle/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, isNull, sql } from "drizzle-orm";
 import type { Account } from "@/lib/drizzle/schema";
 
 export type AccountWithOwner = Account & {
@@ -12,6 +12,7 @@ export interface PortfolioScope {
   workspaceId: string;
   userId: string;
   role: string;
+  includeClosed?: boolean;
 }
 
 function canSeeAllAccounts(role: string): boolean {
@@ -21,12 +22,13 @@ function canSeeAllAccounts(role: string): boolean {
 export async function getPortfolioAccounts(
   scope: PortfolioScope
 ): Promise<AccountWithOwner[]> {
-  const whereClause = canSeeAllAccounts(scope.role)
-    ? eq(accounts.workspaceId, scope.workspaceId)
-    : and(
-        eq(accounts.workspaceId, scope.workspaceId),
-        eq(accounts.ownerId, scope.userId)
-      );
+  const conditions = [eq(accounts.workspaceId, scope.workspaceId)];
+  if (!canSeeAllAccounts(scope.role)) {
+    conditions.push(eq(accounts.ownerId, scope.userId));
+  }
+  if (!scope.includeClosed) {
+    conditions.push(isNull(accounts.closedAt));
+  }
 
   const rows = await db
     .select({
@@ -36,7 +38,7 @@ export async function getPortfolioAccounts(
     })
     .from(accounts)
     .leftJoin(users, eq(accounts.ownerId, users.id))
-    .where(whereClause)
+    .where(and(...conditions))
     .orderBy(
       sql`CASE
         WHEN ${accounts.healthSignal} = 'red' THEN 1
