@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Briefcase, Archive } from "lucide-react";
+import { Plus, Briefcase, Archive, Upload } from "lucide-react";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceWithMember } from "@/lib/queries/workspace";
 import {
@@ -55,13 +55,22 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
                 }`}
           </p>
         </div>
-        <Link
-          href="/app/accounts/new"
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <Plus size={15} />
-          Nueva cuenta
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/app/accounts/import"
+            className="inline-flex items-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-medium transition-colors backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] hover:bg-accent/50"
+          >
+            <Upload size={15} />
+            Importar CSV
+          </Link>
+          <Link
+            href="/app/accounts/new"
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <Plus size={15} />
+            Nueva cuenta
+          </Link>
+        </div>
       </div>
 
       <div className="mb-6">
