@@ -4,6 +4,7 @@ import {
   transcripts,
   contextDocuments,
   signals,
+  users,
 } from "@/lib/drizzle/schema";
 import { and, eq, isNull, gte, lte, inArray, sql } from "drizzle-orm";
 
@@ -242,4 +243,192 @@ export async function getWorkspaceDashboardSnapshot(
     industries,
     sizes,
   };
+}
+
+export type DashboardMetricKey =
+  | "total_accounts"
+  | "fee_total"
+  | "ticket_average"
+  | "duration_months"
+  | "ltv";
+
+export interface DashboardBreakdownRow {
+  /** Display label for this group. */
+  label: string;
+  /** Aggregate value of the metric for accounts in this group. */
+  value: number;
+  /** How many accounts fall into this group. */
+  accountsCount: number;
+}
+
+export interface DashboardBreakdown {
+  byService: DashboardBreakdownRow[];
+  byIndustry: DashboardBreakdownRow[];
+  bySize: DashboardBreakdownRow[];
+  /** Empty when scope.role === 'member'. */
+  byOwner: DashboardBreakdownRow[];
+}
+
+interface BreakdownAccount {
+  id: string;
+  fee: number | null;
+  startDate: string | null;
+  closedAt: Date | null;
+  serviceScope: string | null;
+  industry: string | null;
+  employeeCount: string | null;
+  ownerName: string | null;
+}
+
+function aggregateMetric(
+  group: BreakdownAccount[],
+  metric: DashboardMetricKey
+): number {
+  const fees = group
+    .map((a) => a.fee)
+    .filter((n): n is number => n !== null && Number.isFinite(n));
+  const MS_PER_MONTH = 1000 * 60 * 60 * 24 * (365.25 / 12);
+  const durations: number[] = [];
+  for (const a of group) {
+    if (!a.startDate) continue;
+    const start = new Date(a.startDate).getTime();
+    const end = a.closedAt ? new Date(a.closedAt).getTime() : Date.now();
+    const months = (end - start) / MS_PER_MONTH;
+    if (Number.isFinite(months) && months >= 0) durations.push(months);
+  }
+  const groupTicket =
+    fees.length > 0 ? fees.reduce((a, b) => a + b, 0) / fees.length : null;
+  const groupDuration =
+    durations.length > 0
+      ? durations.reduce((a, b) => a + b, 0) / durations.length
+      : null;
+
+  switch (metric) {
+    case "total_accounts":
+      return group.length;
+    case "fee_total":
+      return fees.reduce((a, b) => a + b, 0);
+    case "ticket_average":
+      return groupTicket ?? 0;
+    case "duration_months":
+      return groupDuration ?? 0;
+    case "ltv":
+      return groupTicket !== null && groupDuration !== null
+        ? groupTicket * groupDuration
+        : 0;
+  }
+}
+
+function expandServices(serviceScope: string | null): string[] {
+  if (!serviceScope) return ["Sin servicio"];
+  const items = serviceScope
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return items.length > 0 ? items : ["Sin servicio"];
+}
+
+export async function getDashboardMetricBreakdown(
+  scope: DashboardScope,
+  _period: DashboardPeriod,
+  metric: DashboardMetricKey
+): Promise<DashboardBreakdown> {
+  const baseConds = scopeConditions(scope);
+
+  const rows = await db
+    .select({
+      id: accounts.id,
+      fee: accounts.fee,
+      startDate: accounts.startDate,
+      closedAt: accounts.closedAt,
+      serviceScope: accounts.serviceScope,
+      industry: accounts.industry,
+      employeeCount: accounts.employeeCount,
+      ownerId: accounts.ownerId,
+    })
+    .from(accounts)
+    .where(and(...baseConds));
+
+  // Resolve owner display names via a single in-memory join.
+  const ownerIds = [
+    ...new Set(rows.map((r) => r.ownerId).filter(Boolean)),
+  ] as string[];
+  const ownerNames = new Map<string, string>();
+  if (ownerIds.length > 0) {
+    const userRows = await db
+      .select({ id: users.id, fullName: users.fullName, email: users.email })
+      .from(users)
+      .where(inArray(users.id, ownerIds));
+    for (const u of userRows) {
+      ownerNames.set(u.id, u.fullName ?? u.email);
+    }
+  }
+
+  const accountsTyped: BreakdownAccount[] = rows.map((r) => ({
+    id: r.id,
+    fee: r.fee !== null ? Number(r.fee) : null,
+    startDate: r.startDate,
+    closedAt: r.closedAt,
+    serviceScope: r.serviceScope,
+    industry: r.industry,
+    employeeCount: r.employeeCount,
+    ownerName: r.ownerId ? (ownerNames.get(r.ownerId) ?? "Sin nombre") : null,
+  }));
+
+  // Service grouping: an account in "Growth, Marketing" counts in BOTH
+  // service buckets (so the bars sum to > total accounts, by design — the
+  // user wanted "cuántas cuentas tocan cada servicio").
+  const byServiceMap = new Map<string, BreakdownAccount[]>();
+  for (const a of accountsTyped) {
+    for (const svc of expandServices(a.serviceScope)) {
+      if (!byServiceMap.has(svc)) byServiceMap.set(svc, []);
+      byServiceMap.get(svc)!.push(a);
+    }
+  }
+  const byService = [...byServiceMap.entries()]
+    .map(([label, group]) => ({
+      label,
+      value: aggregateMetric(group, metric),
+      accountsCount: group.length,
+    }))
+    .sort((a, b) => b.value - a.value);
+
+  // Industry / size groupings.
+  const groupBy = (key: "industry" | "employeeCount") => {
+    const m = new Map<string, BreakdownAccount[]>();
+    for (const a of accountsTyped) {
+      const label = (a[key] ?? "").trim() || "Sin clasificar";
+      if (!m.has(label)) m.set(label, []);
+      m.get(label)!.push(a);
+    }
+    return [...m.entries()]
+      .map(([label, group]) => ({
+        label,
+        value: aggregateMetric(group, metric),
+        accountsCount: group.length,
+      }))
+      .sort((a, b) => b.value - a.value);
+  };
+  const byIndustry = groupBy("industry");
+  const bySize = groupBy("employeeCount");
+
+  // Owner: only shown for owner/admin viewers.
+  let byOwner: DashboardBreakdownRow[] = [];
+  if (scope.role === "owner" || scope.role === "admin") {
+    const m = new Map<string, BreakdownAccount[]>();
+    for (const a of accountsTyped) {
+      const label = a.ownerName ?? "Sin responsable";
+      if (!m.has(label)) m.set(label, []);
+      m.get(label)!.push(a);
+    }
+    byOwner = [...m.entries()]
+      .map(([label, group]) => ({
+        label,
+        value: aggregateMetric(group, metric),
+        accountsCount: group.length,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }
+
+  return { byService, byIndustry, bySize, byOwner };
 }
