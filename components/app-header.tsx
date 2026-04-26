@@ -5,6 +5,7 @@ import { LogOut, User, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { GlobalSearch } from "@/components/global-search";
 
 export function AppHeader({
   userEmail,
@@ -29,6 +30,9 @@ export function AppHeader({
       <Link href="/app/portfolio" className="font-semibold text-sm tracking-tight">
         nao.fyi
       </Link>
+
+      <div className="flex items-center gap-2">
+        <GlobalSearch />
 
       <div className="relative">
         <button
@@ -84,6 +88,7 @@ export function AppHeader({
             </div>
           </>
         )}
+      </div>
       </div>
     </header>
   );
