@@ -177,6 +177,49 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Integrations strip */}
+      <section className="mx-auto max-w-6xl px-6 pb-12 pt-4">
+        <p className="text-center text-xs font-medium uppercase tracking-wider text-muted-foreground mb-5">
+          Conectá todo tu stack en un solo lugar
+        </p>
+        <div className="flex flex-wrap justify-center gap-2 max-w-4xl mx-auto">
+          {[
+            { label: "Meta Ads", Icon: Megaphone },
+            { label: "Google Ads", Icon: BarChart3 },
+            { label: "LinkedIn Ads", Icon: Linkedin },
+            { label: "TikTok Ads", Icon: Music2 },
+            { label: "Pipedrive", Icon: Database },
+            { label: "HubSpot", Icon: Database },
+            { label: "Salesforce", Icon: Cloud },
+            { label: "Notion", Icon: FileText },
+            { label: "Asana", Icon: ListChecks },
+            { label: "Trello", Icon: Trello },
+            { label: "Linear", Icon: GitBranch },
+            { label: "Google Drive", Icon: Folder },
+            { label: "Slack", Icon: MessageSquare },
+            { label: "Gmail", Icon: Mail },
+          ].map(({ label, Icon }) => (
+            <span
+              key={label}
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)]"
+            >
+              <Icon size={14} />
+              {label}
+            </span>
+          ))}
+        </div>
+        <p className="mt-5 text-center text-xs text-muted-foreground">
+          ¿No ves la que necesitás?{" "}
+          <a
+            href="mailto:hola@nao.fyi"
+            className="text-foreground underline underline-offset-2 hover:text-primary"
+          >
+            Escribinos
+          </a>{" "}
+          y la armamos.
+        </p>
+      </section>
+
       {/* Problem */}
       <section>
         <div className="mx-auto max-w-5xl px-6 py-16">
