@@ -16,14 +16,12 @@ import {
   getWorkspaceMembers,
 } from "@/lib/queries/workspace";
 import { getAccountById } from "@/lib/queries/accounts";
-import {
-  deleteAccount,
-} from "@/app/actions/accounts";
 import { AccountHealthBadge } from "@/components/account-health-badge";
 import { RichMarkdown } from "@/components/ui/rich-markdown";
 import { EditAccountForm } from "@/components/edit-account-form";
 import { ContextUploadForm } from "@/components/context-upload-form";
-import { DeleteButton } from "@/components/delete-button";
+import { AccountStatusActions } from "@/components/account-status-actions";
+import { ArchivedAccountBanner } from "@/components/archived-account-banner";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PaidMediaMiniCard } from "@/components/paid-media-mini-card";
 import { CrmMiniCard } from "@/components/crm-mini-card";
@@ -78,6 +76,14 @@ export default async function AccountDetailPage({
         Portfolio
       </Link>
 
+      {/* Archived banner */}
+      {account.closedAt && (
+        <ArchivedAccountBanner
+          accountId={accountId}
+          closedAt={account.closedAt}
+        />
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
         <div className="min-w-0">
@@ -105,16 +111,10 @@ export default async function AccountDetailPage({
           >
             Editar
           </Link>
-          <DeleteButton
-            action={async () => {
-              "use server";
-              await deleteAccount(accountId);
-            }}
-            confirmMessage={`¿Eliminar la cuenta "${account.name}"? Esta acción no se puede deshacer.`}
-            className="inline-flex items-center rounded-md text-destructive px-3 py-1.5 text-xs font-medium transition-colors backdrop-blur-[16px] [background:var(--glass-bg)] [border:1px_solid_rgb(239_68_68/0.3)] hover:bg-destructive/10"
-          >
-            Eliminar
-          </DeleteButton>
+          <AccountStatusActions
+            accountId={accountId}
+            closedAt={account.closedAt}
+          />
         </div>
       </div>
 
