@@ -78,7 +78,7 @@ function ShowcaseConstellation({ className }: { className?: string }) {
             <div className="text-xs leading-snug">
               <div className="font-medium text-foreground">Riesgo de churn</div>
               <div className="text-muted-foreground">
-                Bajó frecuencia de pagos los últimos 30 días
+                Algunas quejas recurrentes en las últimas reuniones
               </div>
             </div>
           </li>
@@ -91,7 +91,7 @@ function ShowcaseConstellation({ className }: { className?: string }) {
                 Up-sell oportunidad
               </div>
               <div className="text-muted-foreground">
-                Pidió audit de Google Ads en la última call
+                Quiere asesoría para automatizar procesos internos
               </div>
             </div>
           </li>
@@ -148,13 +148,13 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
               <Link
                 href="/auth/signup"
-                className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+                className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
               >
-                Empezá gratis — procesá tu primera transcripción
+                Empezá gratis
               </Link>
               <Link
                 href="/auth/login"
-                className="inline-flex h-11 items-center justify-center rounded-md px-8 text-sm font-medium hover:bg-accent/50 transition-colors backdrop-blur-[16px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)]"
+                className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-md px-6 text-sm font-medium hover:bg-accent/50 transition-colors backdrop-blur-[16px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)]"
               >
                 Ya tengo cuenta
               </Link>
@@ -191,6 +191,9 @@ export default function LandingPage() {
             { label: "Pipedrive", Icon: Database },
             { label: "HubSpot", Icon: Database },
             { label: "Salesforce", Icon: Cloud },
+            { label: "Kommo", Icon: Database },
+            { label: "Close", Icon: Database },
+            { label: "Zoho", Icon: Database },
             { label: "Notion", Icon: FileText },
             { label: "Asana", Icon: ListChecks },
             { label: "Trello", Icon: Trello },
