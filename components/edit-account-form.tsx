@@ -1,12 +1,17 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useTransition } from "react";
 import Link from "next/link";
-import { updateAccount } from "@/app/actions/accounts";
+import {
+  updateAccount,
+  closeAccount,
+  reopenAccount,
+} from "@/app/actions/accounts";
 import type { AccountWithOwner } from "@/lib/queries/accounts";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
 import { ServiceScopeCheckboxes } from "@/components/service-scope-checkboxes";
 import { AccountModulesToggles } from "@/components/account-modules-toggles";
+import { cn } from "@/lib/utils";
 
 interface EditAccountFormProps {
   account: AccountWithOwner;
@@ -221,6 +226,23 @@ export function EditAccountForm({ account, members, services }: EditAccountFormP
         <AccountModulesToggles defaultValue={account.enabledModules} />
       </div>
 
+      <div className="rounded-md p-3 [border:1px_solid_var(--glass-tile-border)] [background:var(--glass-tile-bg)]">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium">Estado del proyecto</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {account.closedAt
+                ? `Cerrado el ${new Date(account.closedAt).toLocaleDateString("es-AR")}`
+                : "Activo"}
+            </p>
+          </div>
+          <ProjectStatusToggle
+            accountId={account.id}
+            closedAt={account.closedAt}
+          />
+        </div>
+      </div>
+
       {state.error && (
         <p className="text-sm text-destructive">{state.error}</p>
       )}
@@ -241,5 +263,48 @@ export function EditAccountForm({ account, members, services }: EditAccountFormP
         </Link>
       </div>
     </form>
+  );
+}
+
+function ProjectStatusToggle({
+  accountId,
+  closedAt,
+}: {
+  accountId: string;
+  closedAt: Date | null;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const isClosed = closedAt !== null;
+
+  return (
+    <button
+      type="button"
+      disabled={isPending}
+      onClick={() =>
+        startTransition(async () => {
+          if (isClosed) {
+            await reopenAccount(accountId);
+          } else {
+            const ok = window.confirm(
+              "¿Cerrar este proyecto? Se va a quitar del portfolio activo y del dashboard. Podés reabrirlo cuando quieras."
+            );
+            if (!ok) return;
+            await closeAccount(accountId);
+          }
+        })
+      }
+      className={cn(
+        "inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50",
+        isClosed
+          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+          : "[border:1px_solid_var(--glass-border)] hover:bg-accent"
+      )}
+    >
+      {isPending
+        ? "Guardando..."
+        : isClosed
+          ? "Reabrir proyecto"
+          : "Cerrar proyecto"}
+    </button>
   );
 }
