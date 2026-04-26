@@ -51,6 +51,9 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
   const totalForCurrentTab = status === "active" ? counts.active : counts.archived;
   const showChecklist =
     onboarding !== null && !onboarding.isComplete && status === "active";
+  // Once the workspace has at least one account, switch the checklist to its
+  // compact one-line variant — the full panel feels intrusive after onboarding.
+  const checklistCompact = counts.active + counts.archived > 0;
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -95,7 +98,7 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
 
       {showChecklist && onboarding && (
         <div className="mb-6">
-          <OnboardingChecklist state={onboarding} />
+          <OnboardingChecklist state={onboarding} compact={checklistCompact} />
         </div>
       )}
 

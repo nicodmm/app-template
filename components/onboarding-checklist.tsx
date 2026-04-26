@@ -5,11 +5,19 @@ import type { OnboardingState } from "@/lib/queries/onboarding";
 
 interface OnboardingChecklistProps {
   state: OnboardingState;
+  /**
+   * Compact mode collapses to a single inline strip. Used once the user has
+   * at least one account — the full checklist would feel intrusive at that
+   * point. The full mode is reserved for fresh workspaces with zero accounts.
+   */
+  compact?: boolean;
 }
 
 interface StepConfig {
   key: keyof OnboardingState["steps"];
   title: string;
+  /** Lower-case action phrase used in the compact one-liner. */
+  shortTitle: string;
   description: string;
   hrefForState: (s: OnboardingState) => string;
 }
@@ -18,6 +26,7 @@ const STEPS: StepConfig[] = [
   {
     key: "agency",
     title: "Configurá tu agencia",
+    shortTitle: "configurar agencia",
     description:
       "El AI usa este contexto para generar señales más precisas para cada cliente.",
     hrefForState: () => "/app/settings/workspace#agency-context",
@@ -25,6 +34,7 @@ const STEPS: StepConfig[] = [
   {
     key: "services",
     title: "Definí tus servicios",
+    shortTitle: "definir servicios",
     description:
       "El catálogo se usa para etiquetar cuentas y filtrar el dashboard.",
     hrefForState: () => "/app/settings/workspace#services",
@@ -32,6 +42,7 @@ const STEPS: StepConfig[] = [
   {
     key: "account",
     title: "Creá tu primera cuenta",
+    shortTitle: "crear primera cuenta",
     description:
       "Cada cuenta representa un cliente. Podés crearlas una por una o importar un CSV.",
     hrefForState: () => "/app/accounts/new",
@@ -39,6 +50,7 @@ const STEPS: StepConfig[] = [
   {
     key: "context",
     title: "Subí tu primer contexto",
+    shortTitle: "subir un contexto",
     description:
       "Una transcripción o archivo de reunión dispara el análisis del AI.",
     hrefForState: (s) =>
@@ -50,10 +62,52 @@ const STEPS: StepConfig[] = [
 
 /**
  * Top-of-portfolio checklist for owners/admins. Returns null when complete
- * so the checklist self-removes once setup is done.
+ * so the checklist self-removes once setup is done. In `compact` mode it
+ * renders a single-line strip with the pending step titles as inline links,
+ * suitable for users that already have accounts and don't need the
+ * walkthrough panel anymore.
  */
-export function OnboardingChecklist({ state }: OnboardingChecklistProps) {
+export function OnboardingChecklist({
+  state,
+  compact = false,
+}: OnboardingChecklistProps) {
   if (state.isComplete) return null;
+
+  if (compact) {
+    const pending = STEPS.filter((s) => !state.steps[s.key]);
+    return (
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl px-4 py-2.5 text-sm backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)] ring-1 ring-primary/10">
+        <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+          <Sparkles size={14} className="text-primary" aria-hidden />
+          <span>
+            <span className="font-medium tabular-nums text-foreground">
+              {state.completedCount}/4
+            </span>{" "}
+            del setup completado
+          </span>
+        </span>
+        <span className="text-muted-foreground" aria-hidden>
+          ·
+        </span>
+        <span className="text-muted-foreground">Te falta:</span>
+        {pending.map((s, i) => (
+          <span key={s.key} className="inline-flex items-center gap-2">
+            <Link
+              href={s.hrefForState(state)}
+              className="font-medium text-primary hover:underline"
+            >
+              {s.shortTitle}
+            </Link>
+            {i < pending.length - 1 && (
+              <span className="text-muted-foreground" aria-hidden>
+                ·
+              </span>
+            )}
+          </span>
+        ))}
+      </div>
+    );
+  }
 
   const progressPct = (state.completedCount / 4) * 100;
 
