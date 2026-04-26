@@ -455,20 +455,20 @@ export default function LandingPage() {
           <div className="divide-y divide-[var(--glass-border)]">
             {[
               {
-                q: "¿Qué formatos de transcripción acepta?",
-                a: "Podés pegar el texto directamente en la app o subir un archivo .txt, .md, .docx o .pdf. También podés conectar Google Drive y nao.fyi importa los archivos automáticamente, matcheándolos al nombre de la cuenta.",
+                q: "¿Qué fuentes puedo conectar?",
+                a: "Transcripciones (.txt, .md, .docx, .pdf), Google Drive con import automático, Meta Ads y Google Ads para paid media, y Pipedrive para CRM. Más integraciones (HubSpot, Asana, Trello, Notion, Slack) en roadmap. ¿Te falta alguna? Escribinos a hola@nao.fyi y la armamos.",
               },
               {
                 q: "¿Cuántas cuentas puedo gestionar?",
                 a: "Depende del plan: Free permite 2 cuentas, Starter hasta 10 y Pro hasta 30. Si necesitás más, contactanos para un plan Enterprise.",
               },
               {
-                q: "¿Los clientes pueden ver su cuenta?",
-                a: "La vista de cliente (read-only) está en desarrollo para el plan Pro. Por ahora el acceso es solo para el equipo interno.",
+                q: "¿Funciona con paid media de mis clientes?",
+                a: "Sí. Conectás cuentas de Meta Ads y Google Ads en el plan Pro y nao.fyi cruza el performance de cada campaña con el contexto conversacional de la cuenta — para que el equipo entienda el porqué detrás de cada métrica.",
               },
               {
-                q: "¿Qué pasa si el AI no extrae bien una tarea o señal?",
-                a: "Todo lo que genera el AI es editable. Podés corregir tareas, señales y resúmenes directamente desde la cuenta, y también agregar notas manuales en cualquier momento.",
+                q: "¿Qué pasa si el AI extrae mal una tarea o señal?",
+                a: "Todo lo que genera el AI es editable. Podés corregir tareas, señales y resúmenes directamente desde la cuenta, y agregar notas manuales en cualquier momento.",
               },
               {
                 q: "¿Los datos son privados y seguros?",
