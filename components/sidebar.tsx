@@ -13,12 +13,12 @@ interface SidebarProps {
 }
 
 const navItems = [
+  { label: "Dashboard", href: "/app/dashboard", icon: BarChart2 },
   { label: "Portfolio", href: "/app/portfolio", icon: LayoutGrid },
   { label: "Perfil", href: "/app/profile", icon: User },
 ];
 
 const adminItems = [
-  { label: "Dashboard", href: "/admin/dashboard", icon: BarChart2 },
   { label: "Usuarios", href: "/admin/users", icon: Users },
 ];
 
