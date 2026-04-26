@@ -2,6 +2,7 @@ import { requireUserId } from "@/lib/auth";
 import { getWorkspaceWithUsage } from "@/lib/queries/workspace";
 import { createDefaultWorkspace } from "@/app/actions/auth";
 import { Sidebar } from "@/components/sidebar";
+import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { AppHeader } from "@/components/app-header";
 import { createClient } from "@/lib/supabase/server";
 
@@ -42,8 +43,9 @@ export default async function ProtectedLayout({
           transcriptsLimit={transcriptsLimit}
           plan={plan}
         />
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto pb-16 md:pb-0">{children}</main>
       </div>
+      <MobileTabBar />
     </div>
   );
 }
