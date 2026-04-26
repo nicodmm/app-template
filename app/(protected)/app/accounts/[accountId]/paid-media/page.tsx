@@ -1,40 +1,32 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId } from "@/lib/queries/workspace";
 import { getAccountById } from "@/lib/queries/accounts";
-import {
-  getPaidMediaState,
-  getKpisWithComparison,
-  getCampaignsWithKpis,
-  getActiveAdsWithKpis,
-  getChangeEventsForAdAccount,
-} from "@/lib/queries/paid-media";
+import { getPaidMediaState } from "@/lib/queries/paid-media";
 import { getPaidMediaLabels } from "@/lib/meta/labels";
-import { PaidMediaKpiCard } from "@/components/paid-media-kpi-card";
 import { PaidMediaPeriodSelector } from "@/components/paid-media-period-selector";
-import { PaidMediaCampaignsTable } from "@/components/paid-media-campaigns-table";
 import { PaidMediaReconnectBanner } from "@/components/paid-media-reconnect-banner";
 import { PaidMediaKpiChartModal } from "@/components/paid-media-kpi-chart-modal";
-import { PaidMediaAdsTable } from "@/components/paid-media-ads-table";
-import { PaidMediaChangeTimeline } from "@/components/paid-media-change-timeline";
+import { PaidMediaKpisSection } from "@/components/paid-media/kpis-section";
+import { PaidMediaCampaignsSection } from "@/components/paid-media/campaigns-section";
+import { PaidMediaAdsSection } from "@/components/paid-media/ads-section";
+import { PaidMediaChangesSection } from "@/components/paid-media/changes-section";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
-  searchParams: Promise<{ preset?: string; since?: string; until?: string; chart?: string }>;
+  searchParams: Promise<{
+    preset?: string;
+    since?: string;
+    until?: string;
+    chart?: string;
+  }>;
 }
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
-}
-
-function formatMoney(cents: number, currency: string): string {
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
 }
 
 function timeAgo(d: Date | null): string {
@@ -45,6 +37,45 @@ function timeAgo(d: Date | null): string {
   if (mins < 60) return `hace ${mins} min`;
   const hrs = Math.floor(mins / 60);
   return `hace ${hrs} h`;
+}
+
+function KpisSkeleton() {
+  return (
+    <>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-4 animate-pulse">
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <div
+            key={i}
+            className="rounded-lg p-3 [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)]"
+          >
+            <div className="h-3 w-16 rounded bg-muted/30 mb-2" />
+            <div className="h-6 w-20 rounded bg-muted/40" />
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-8 animate-pulse">
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="rounded-lg p-3 [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)]"
+          >
+            <div className="h-3 w-16 rounded bg-muted/30 mb-2" />
+            <div className="h-6 w-20 rounded bg-muted/40" />
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function TableSkeleton() {
+  return (
+    <div className="rounded-xl p-4 mb-4 space-y-2 backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)] animate-pulse">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="h-4 w-full rounded bg-muted/30" />
+      ))}
+    </div>
+  );
 }
 
 export default async function PaidMediaPage({ params, searchParams }: PageProps) {
@@ -59,6 +90,7 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
     getPaidMediaState(workspace.id, accountId),
   ]);
   if (!account) notFound();
+
   if (state.state !== "mapped") {
     return (
       <div className="p-6 max-w-4xl mx-auto">
@@ -84,7 +116,9 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
             }
             className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            {state.state === "no_connection" ? "Conectar Meta Ads" : "Ir a integraciones"}
+            {state.state === "no_connection"
+              ? "Conectar Meta Ads"
+              : "Ir a integraciones"}
           </Link>
         </div>
       </div>
@@ -108,15 +142,9 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
   const changeSince = isoDate(new Date(today.getTime() - 89 * 86400000));
   const changeUntil = isoDate(today);
 
-  const [{ current, deltas }, campaigns, ads, changeEvents] = await Promise.all([
-    getKpisWithComparison(state.adAccount.id, since, until),
-    getCampaignsWithKpis(state.adAccount.id, since, until),
-    getActiveAdsWithKpis(state.adAccount.id, since, until),
-    getChangeEventsForAdAccount(state.adAccount.id, changeSince, changeUntil, 100, 0),
-  ]);
-
   const currency = state.adAccount.currency;
   const labels = getPaidMediaLabels(state.adAccount.isEcommerce);
+  const adAccountId = state.adAccount.id;
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -145,109 +173,50 @@ export default async function PaidMediaPage({ params, searchParams }: PageProps)
         <PaidMediaPeriodSelector />
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
-        <PaidMediaKpiCard
-          label={labels.spend}
-          value={formatMoney(current.spend, currency)}
-          delta={deltas.spend}
-          metricKey="spend"
+      <Suspense fallback={<KpisSkeleton />}>
+        <PaidMediaKpisSection
+          adAccountId={adAccountId}
+          since={since}
+          until={until}
+          currency={currency}
+          isEcommerce={state.adAccount.isEcommerce}
+          labels={labels}
         />
-        <PaidMediaKpiCard
-          label={labels.impressions}
-          value={current.impressions.toLocaleString("es-AR")}
-          delta={deltas.impressions}
-          metricKey="impressions"
-        />
-        <PaidMediaKpiCard
-          label={labels.reach}
-          value={current.reach.toLocaleString("es-AR")}
-          delta={deltas.reach}
-          metricKey="reach"
-        />
-        <PaidMediaKpiCard
-          label={labels.clicks}
-          value={current.clicks.toLocaleString("es-AR")}
-          delta={deltas.clicks}
-          metricKey="clicks"
-        />
-        <PaidMediaKpiCard
-          label={labels.ctr}
-          value={`${current.ctr.toFixed(2)}%`}
-          delta={deltas.ctr}
-          metricKey="ctr"
-        />
-        <PaidMediaKpiCard
-          label={labels.cpm}
-          value={
-            current.impressions > 0
-              ? formatMoney(Math.round(current.cpm * 100), currency)
-              : "—"
-          }
-          delta={deltas.cpm}
-          invertColors
-          metricKey="cpm"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-8">
-        <PaidMediaKpiCard
-          label={labels.conversions}
-          value={current.conversions.toString()}
-          delta={deltas.conversions}
-          metricKey="conversions"
-        />
-        <PaidMediaKpiCard
-          label={labels.cpa}
-          value={
-            current.conversions > 0
-              ? formatMoney(Math.round(current.cpa * 100), currency)
-              : "—"
-          }
-          delta={deltas.cpa}
-          invertColors
-          metricKey="cpa"
-        />
-        <PaidMediaKpiCard
-          label={labels.frequency}
-          value={current.frequency.toFixed(2)}
-          delta={deltas.frequency}
-          invertColors
-          metricKey="frequency"
-        />
-        {state.adAccount.isEcommerce && (
-          <PaidMediaKpiCard
-            label={labels.roas}
-            value={current.roas != null ? current.roas.toFixed(2) + "x" : "—"}
-            delta={deltas.roas}
-            metricKey="roas"
-          />
-        )}
-      </div>
+      </Suspense>
 
       <h2 className="font-semibold mb-3">Campañas</h2>
-      <PaidMediaCampaignsTable
-        campaigns={campaigns}
-        currency={currency}
-        isEcommerce={state.adAccount.isEcommerce}
-        since={since}
-        until={until}
-      />
+      <Suspense fallback={<TableSkeleton />}>
+        <PaidMediaCampaignsSection
+          adAccountId={adAccountId}
+          since={since}
+          until={until}
+          currency={currency}
+          isEcommerce={state.adAccount.isEcommerce}
+        />
+      </Suspense>
 
       <h2 className="font-semibold mb-3 mt-8">Anuncios activos</h2>
-      <PaidMediaAdsTable
-        ads={ads}
-        currency={currency}
-        isEcommerce={state.adAccount.isEcommerce}
-        adAccountId={state.adAccount.id}
-        since={since}
-        until={until}
-      />
+      <Suspense fallback={<TableSkeleton />}>
+        <PaidMediaAdsSection
+          adAccountId={adAccountId}
+          since={since}
+          until={until}
+          currency={currency}
+          isEcommerce={state.adAccount.isEcommerce}
+        />
+      </Suspense>
 
       <h2 className="font-semibold mb-3 mt-8">Historial de cambios</h2>
-      <PaidMediaChangeTimeline events={changeEvents} totalAvailable={changeEvents.length} />
+      <Suspense fallback={<TableSkeleton />}>
+        <PaidMediaChangesSection
+          adAccountId={adAccountId}
+          since={changeSince}
+          until={changeUntil}
+        />
+      </Suspense>
 
       <PaidMediaKpiChartModal
-        adAccountId={state.adAccount.id}
+        adAccountId={adAccountId}
         since={since}
         until={until}
         currency={currency}

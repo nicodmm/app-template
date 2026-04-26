@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
@@ -15,38 +16,31 @@ import {
   getWorkspaceMembers,
 } from "@/lib/queries/workspace";
 import { getAccountById } from "@/lib/queries/accounts";
-import { getTranscriptHistory, getLatestMeetingSummary } from "@/lib/queries/transcripts";
-import { getAccountContextDocuments } from "@/lib/queries/context-documents";
-import { getAccountTasks } from "@/lib/queries/tasks";
-import { getAccountParticipants } from "@/lib/queries/participants";
 import {
-  getAccountSignals,
-  getAccountHealthHistory,
-} from "@/lib/queries/signals";
-import { deleteAccount, updateAccount, updateHealthSignal } from "@/app/actions/accounts";
+  deleteAccount,
+} from "@/app/actions/accounts";
 import { AccountHealthBadge } from "@/components/account-health-badge";
-import { LastMeetingCard } from "@/components/last-meeting-card";
 import { RichMarkdown } from "@/components/ui/rich-markdown";
 import { EditAccountForm } from "@/components/edit-account-form";
 import { ContextUploadForm } from "@/components/context-upload-form";
-import { ContextFilesTimeline } from "@/components/context-files-timeline";
 import { DeleteButton } from "@/components/delete-button";
-import { TasksPanel } from "@/components/tasks-panel";
-import { ParticipantsPanel } from "@/components/participants-panel";
-import { SignalsPanel } from "@/components/signals-panel";
-import { HealthHistoryTimeline } from "@/components/health-history-timeline";
-import { CollapsibleSection } from "@/components/collapsible-section";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PaidMediaMiniCard } from "@/components/paid-media-mini-card";
 import { CrmMiniCard } from "@/components/crm-mini-card";
 import { ReEnrichButton } from "@/components/re-enrich-button";
 import { isModuleEnabled } from "@/lib/modules-client";
+import { LastMeetingSection } from "@/components/account-detail/last-meeting-section";
+import { FilesSection } from "@/components/account-detail/files-section";
+import { TasksSection } from "@/components/account-detail/tasks-section";
+import { ParticipantsSection } from "@/components/account-detail/participants-section";
+import { SignalsSection } from "@/components/account-detail/signals-section";
+import { HealthSection } from "@/components/account-detail/health-section";
+import { SectionSkeleton } from "@/components/account-detail/section-skeleton";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
   searchParams: Promise<{ edit?: string; error?: string }>;
 }
-
 
 export default async function AccountDetailPage({
   params,
@@ -60,42 +54,18 @@ export default async function AccountDetailPage({
   if (!result) redirect("/auth/login");
   const { workspace, member: viewerMember } = result;
 
-  const [
-    account,
-    transcriptHistory,
-    contextDocs,
-    members,
-    accountTasks,
-    accountParticipants,
-    accountSignals,
-    healthHistory,
-    lastMeetingSummary,
-  ] = await Promise.all([
-    getAccountById(accountId, workspace.id, { userId, role: viewerMember.role }),
-    getTranscriptHistory(accountId, 50),
-    getAccountContextDocuments(accountId, 50),
+  const [account, members] = await Promise.all([
+    getAccountById(accountId, workspace.id, {
+      userId,
+      role: viewerMember.role,
+    }),
     getWorkspaceMembers(workspace.id),
-    getAccountTasks(accountId),
-    getAccountParticipants(accountId),
-    getAccountSignals(accountId),
-    getAccountHealthHistory(accountId),
-    getLatestMeetingSummary(accountId),
   ]);
 
   if (!account) notFound();
 
   const isEditing = edit === "1";
-
-  // Summaries shown in the collapsed header of each section
-  const pendingTasks = accountTasks.filter((t) => t.status === "pending").length;
-  const completedTasks = accountTasks.length - pendingTasks;
-  const activeSignals = accountSignals.filter((s) => s.status === "active").length;
-  const resolvedSignals = accountSignals.length - activeSignals;
-  const healthChanges = healthHistory.reduce(
-    (acc, e, i) =>
-      acc + (!healthHistory[i + 1] || healthHistory[i + 1].healthSignal !== e.healthSignal ? 1 : 0),
-    0
-  );
+  const hasAgencyContext = Boolean(workspace.agencyContext?.trim());
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -120,7 +90,9 @@ export default async function AccountDetailPage({
             {account.aiSummaryUpdatedAt && (
               <>
                 {" · "}Actualizado{" "}
-                {new Date(account.aiSummaryUpdatedAt).toLocaleDateString("es-AR")}
+                {new Date(account.aiSummaryUpdatedAt).toLocaleDateString(
+                  "es-AR"
+                )}
               </>
             )}
           </p>
@@ -253,7 +225,10 @@ export default async function AccountDetailPage({
                   Fee mensual
                 </p>
                 <p className="text-sm leading-relaxed">
-                  USD {Number(account.fee).toLocaleString("es-AR", { minimumFractionDigits: 2 })}
+                  USD{" "}
+                  {Number(account.fee).toLocaleString("es-AR", {
+                    minimumFractionDigits: 2,
+                  })}
                 </p>
               </div>
             )}
@@ -262,7 +237,9 @@ export default async function AccountDetailPage({
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
                   Empleados
                 </p>
-                <p className="text-sm leading-relaxed">{account.employeeCount}</p>
+                <p className="text-sm leading-relaxed">
+                  {account.employeeCount}
+                </p>
               </div>
             )}
             {account.location && (
@@ -312,7 +289,8 @@ export default async function AccountDetailPage({
 
           {account.enrichmentStatus && (
             <p className="text-xs text-muted-foreground mt-4">
-              {account.enrichmentStatus === "pending" && "Enriqueciendo perfil desde la web..."}
+              {account.enrichmentStatus === "pending" &&
+                "Enriqueciendo perfil desde la web..."}
               {account.enrichmentStatus === "ok" && account.enrichedAt && (
                 <>
                   Enriquecido el{" "}
@@ -325,7 +303,8 @@ export default async function AccountDetailPage({
               )}
               {account.enrichmentStatus === "failed" && (
                 <span className="text-destructive">
-                  Error al enriquecer: {account.enrichmentError ?? "desconocido"}
+                  Error al enriquecer:{" "}
+                  {account.enrichmentError ?? "desconocido"}
                 </span>
               )}
             </p>
@@ -347,9 +326,12 @@ export default async function AccountDetailPage({
         </div>
       )}
 
-      {/* Last meeting quick summary */}
-      {isModuleEnabled(account.enabledModules, "context_upload") &&
-        lastMeetingSummary && <LastMeetingCard summary={lastMeetingSummary} />}
+      {/* Last meeting (streamed) */}
+      {isModuleEnabled(account.enabledModules, "context_upload") && (
+        <Suspense fallback={null}>
+          <LastMeetingSection accountId={accountId} />
+        </Suspense>
+      )}
 
       {/* Context Upload */}
       {isModuleEnabled(account.enabledModules, "context_upload") && (
@@ -359,96 +341,74 @@ export default async function AccountDetailPage({
         </GlassCard>
       )}
 
-      {/* Collapsible modules (default closed) */}
+      {/* Collapsible modules — each streamed independently */}
       <div className="space-y-4">
-        {isModuleEnabled(account.enabledModules, "context_upload") &&
-          transcriptHistory.length + contextDocs.length > 0 && (
-            <CollapsibleSection
-              title="Archivos de contexto"
-              icon={<FolderOpen size={16} aria-hidden />}
-              summary={(() => {
-                const total = transcriptHistory.length + contextDocs.length;
-                const ts = transcriptHistory.length;
-                const cs = contextDocs.length;
-                if (ts > 0 && cs > 0) {
-                  return `${total} (${ts} transcripción${ts !== 1 ? "es" : ""} · ${cs} archivo${cs !== 1 ? "s" : ""})`;
-                }
-                if (ts > 0) return `${ts} transcripción${ts !== 1 ? "es" : ""}`;
-                return `${cs} archivo${cs !== 1 ? "s" : ""}`;
-              })()}
-            >
-              <ContextFilesTimeline
-                transcripts={transcriptHistory}
-                contextDocs={contextDocs}
-                accountId={accountId}
+        {isModuleEnabled(account.enabledModules, "context_upload") && (
+          <Suspense
+            fallback={
+              <SectionSkeleton
+                title="Archivos de contexto"
+                icon={<FolderOpen size={16} aria-hidden />}
               />
-            </CollapsibleSection>
-          )}
-
-        {isModuleEnabled(account.enabledModules, "tasks") && (
-          <CollapsibleSection
-            title="Tareas"
-            icon={<CheckSquare size={16} aria-hidden />}
-            summary={
-              accountTasks.length === 0
-                ? "sin tareas"
-                : `${pendingTasks} pendiente${pendingTasks !== 1 ? "s" : ""}${
-                    completedTasks > 0 ? ` · ${completedTasks} completada${completedTasks !== 1 ? "s" : ""}` : ""
-                  }`
             }
           >
-            <TasksPanel tasks={accountTasks} accountId={accountId} members={members} />
-          </CollapsibleSection>
+            <FilesSection accountId={accountId} />
+          </Suspense>
+        )}
+
+        {isModuleEnabled(account.enabledModules, "tasks") && (
+          <Suspense
+            fallback={
+              <SectionSkeleton
+                title="Tareas"
+                icon={<CheckSquare size={16} aria-hidden />}
+              />
+            }
+          >
+            <TasksSection accountId={accountId} members={members} />
+          </Suspense>
         )}
 
         {isModuleEnabled(account.enabledModules, "participants") && (
-          <CollapsibleSection
-            title="Contactos y Participantes"
-            icon={<UsersIcon size={16} aria-hidden />}
-            summary={
-              accountParticipants.length === 0
-                ? "sin contactos"
-                : `${accountParticipants.length} contacto${accountParticipants.length !== 1 ? "s" : ""}`
+          <Suspense
+            fallback={
+              <SectionSkeleton
+                title="Contactos y Participantes"
+                icon={<UsersIcon size={16} aria-hidden />}
+              />
             }
           >
-            <ParticipantsPanel participants={accountParticipants} />
-          </CollapsibleSection>
+            <ParticipantsSection accountId={accountId} />
+          </Suspense>
         )}
 
         {isModuleEnabled(account.enabledModules, "signals") && (
-          <CollapsibleSection
-            title="Señales"
-            icon={<Zap size={16} aria-hidden />}
-            summary={
-              accountSignals.length === 0
-                ? "sin señales"
-                : `${activeSignals} activa${activeSignals !== 1 ? "s" : ""}${
-                    resolvedSignals > 0 ? ` · ${resolvedSignals} resuelta${resolvedSignals !== 1 ? "s" : ""}` : ""
-                  }`
+          <Suspense
+            fallback={
+              <SectionSkeleton
+                title="Señales"
+                icon={<Zap size={16} aria-hidden />}
+              />
             }
           >
-            <SignalsPanel
-              signals={accountSignals}
+            <SignalsSection
               accountId={accountId}
-              hasAgencyContext={Boolean(workspace.agencyContext?.trim())}
+              hasAgencyContext={hasAgencyContext}
             />
-          </CollapsibleSection>
+          </Suspense>
         )}
 
         {isModuleEnabled(account.enabledModules, "health") && (
-          <CollapsibleSection
-            id="salud-section"
-            title="Evolución de salud"
-            icon={<TrendingUp size={16} aria-hidden />}
-            defaultOpen
-            summary={
-              healthHistory.length === 0
-                ? "sin historial"
-                : `${healthChanges} cambio${healthChanges !== 1 ? "s" : ""} de estado`
+          <Suspense
+            fallback={
+              <SectionSkeleton
+                title="Evolución de salud"
+                icon={<TrendingUp size={16} aria-hidden />}
+              />
             }
           >
-            <HealthHistoryTimeline entries={healthHistory} />
-          </CollapsibleSection>
+            <HealthSection accountId={accountId} />
+          </Suspense>
         )}
       </div>
     </div>
