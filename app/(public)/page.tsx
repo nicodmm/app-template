@@ -316,8 +316,8 @@ export default function LandingPage() {
           {[
             {
               step: "01",
-              title: "Subís la transcripción",
-              desc: "Pegá el texto directamente o subí el archivo. Sin formato especial, sin configuración previa.",
+              title: "Conectá tus fuentes",
+              desc: "Sumá transcripciones, archivos de reunión, paid media (Meta/Google), CRM (Pipedrive) y más. nao.fyi unifica todo en el contexto de cada cuenta.",
             },
             {
               step: "02",
