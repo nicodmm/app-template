@@ -1,44 +1,180 @@
 import Link from "next/link";
-import { CheckIcon } from "lucide-react";
+import {
+  CheckIcon,
+  Activity,
+  BarChart3,
+  Brain,
+  Circle,
+  Cloud,
+  Database,
+  FileText,
+  Folder,
+  GitBranch,
+  Linkedin,
+  ListChecks,
+  Mail,
+  Megaphone,
+  MessageSquare,
+  Mic,
+  Music2,
+  Sparkles,
+  TrendingDown,
+  TrendingUp,
+  Trello,
+} from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
+import { HealthStripChart } from "@/components/health-strip-chart";
+import type { WeeklyHealthBucket } from "@/lib/queries/signals";
+
+const MOCK_HEALTH_BUCKETS: WeeklyHealthBucket[] = [
+  { weekStart: "2026-02-02", signal: "yellow", carryForward: false },
+  { weekStart: "2026-02-09", signal: "yellow", carryForward: true },
+  { weekStart: "2026-02-16", signal: "red", carryForward: false },
+  { weekStart: "2026-02-23", signal: "yellow", carryForward: false },
+  { weekStart: "2026-03-02", signal: "yellow", carryForward: true },
+  { weekStart: "2026-03-09", signal: "green", carryForward: false },
+  { weekStart: "2026-03-16", signal: "green", carryForward: true },
+  { weekStart: "2026-03-23", signal: "green", carryForward: false },
+  { weekStart: "2026-03-30", signal: "green", carryForward: true },
+  { weekStart: "2026-04-06", signal: "green", carryForward: false },
+  { weekStart: "2026-04-13", signal: "green", carryForward: true },
+  { weekStart: "2026-04-20", signal: "green", carryForward: false },
+];
+
+function ShowcaseConstellation({ className }: { className?: string }) {
+  return (
+    <div className={`relative mx-auto w-full max-w-md ${className ?? ""}`}>
+      {/* Card A — Salud */}
+      <GlassCard
+        variant="strong"
+        className="relative z-10 -rotate-2 p-5 shadow-xl transition-transform hover:rotate-0"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="text-xs text-muted-foreground">Acme Corp</div>
+            <div className="text-sm font-semibold">Salud de la cuenta</div>
+          </div>
+          <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
+            <TrendingUp size={12} /> +12 esta semana
+          </span>
+        </div>
+        <HealthStripChart buckets={MOCK_HEALTH_BUCKETS} />
+        <div className="mt-2 text-[11px] text-muted-foreground">
+          Últimas 12 semanas
+        </div>
+      </GlassCard>
+
+      {/* Card B — Señales */}
+      <GlassCard
+        variant="strong"
+        className="relative z-20 mt-[-12px] ml-6 rotate-1 p-5 shadow-xl transition-transform hover:rotate-0"
+      >
+        <div className="mb-3 text-sm font-semibold">2 señales nuevas</div>
+        <ul className="space-y-2">
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400">
+              <TrendingDown size={14} />
+            </span>
+            <div className="text-xs leading-snug">
+              <div className="font-medium text-foreground">Riesgo de churn</div>
+              <div className="text-muted-foreground">
+                Bajó frecuencia de pagos los últimos 30 días
+              </div>
+            </div>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+              <TrendingUp size={14} />
+            </span>
+            <div className="text-xs leading-snug">
+              <div className="font-medium text-foreground">
+                Up-sell oportunidad
+              </div>
+              <div className="text-muted-foreground">
+                Pidió audit de Google Ads en la última call
+              </div>
+            </div>
+          </li>
+        </ul>
+      </GlassCard>
+
+      {/* Card C — Próximos pasos */}
+      <GlassCard
+        variant="strong"
+        className="relative z-30 mt-[-12px] -ml-2 -rotate-1 p-5 shadow-xl transition-transform hover:rotate-0"
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-sm font-semibold">Próximos pasos</div>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            De la última reunión
+          </span>
+        </div>
+        <ul className="space-y-2">
+          <li className="flex items-start gap-2 text-xs">
+            <Circle size={12} className="mt-0.5 shrink-0 text-primary/60" />
+            <span>Enviar propuesta nueva campaña de retargeting</span>
+          </li>
+          <li className="flex items-start gap-2 text-xs">
+            <Circle size={12} className="mt-0.5 shrink-0 text-primary/60" />
+            <span>Revisar CTR del último flight de Meta Ads</span>
+          </li>
+        </ul>
+      </GlassCard>
+    </div>
+  );
+}
 
 export default function LandingPage() {
   return (
     <main>
       {/* Hero */}
-      <section className="mx-auto max-w-5xl px-6 py-24 text-center">
-        <div className="inline-flex items-center rounded-full px-4 py-1.5 text-xs text-muted-foreground mb-6 backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
-          Inteligencia de cuentas para agencias de growth
+      <section className="mx-auto max-w-6xl px-6 py-20 lg:py-24">
+        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-10">
+          <div className="text-center lg:text-left">
+            <div className="inline-flex items-center rounded-full px-4 py-1.5 text-xs text-muted-foreground mb-6 backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+              Seguimiento de cuentas con reuniones recurrentes
+            </div>
+            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl text-foreground mb-6">
+              Sabé siempre cómo está{" "}
+              <span className="text-primary">cada cuenta</span>
+              <br />
+              sin depender de la memoria del equipo
+            </h1>
+            <p className="max-w-2xl text-lg text-muted-foreground mb-8 lg:max-w-none">
+              Analizá las reuniones con cada cuenta para reconocer el estado
+              actual, oportunidades de cross y up-selling, tablero de paid
+              media, CRM y mucho más.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+              <Link
+                href="/auth/signup"
+                className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+              >
+                Empezá gratis — procesá tu primera transcripción
+              </Link>
+              <Link
+                href="/auth/login"
+                className="inline-flex h-11 items-center justify-center rounded-md px-8 text-sm font-medium hover:bg-accent/50 transition-colors backdrop-blur-[16px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)]"
+              >
+                Ya tengo cuenta
+              </Link>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Sin tarjeta de crédito. Plan gratuito disponible.
+            </p>
+          </div>
+          <div className="relative">
+            <div
+              aria-hidden
+              className="absolute inset-0 -z-10 blur-3xl opacity-60"
+              style={{
+                background:
+                  "radial-gradient(circle at 60% 40%, hsl(243 85% 60% / 0.35), transparent 60%), radial-gradient(circle at 30% 70%, hsl(280 75% 60% / 0.25), transparent 55%)",
+              }}
+            />
+            <ShowcaseConstellation />
+          </div>
         </div>
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl text-foreground mb-6">
-          Siempre sabés cómo está{" "}
-          <span className="text-primary">cada cuenta</span>
-          <br />
-          sin depender de la memoria del equipo
-        </h1>
-        <p className="mx-auto max-w-2xl text-lg text-muted-foreground mb-8">
-          Subí la transcripción de una reunión y nao.fyi extrae las tareas,
-          detecta riesgos y oportunidades, y actualiza el estado de la cuenta
-          automáticamente — para que tu equipo siempre tenga el contexto
-          completo sin esfuerzo manual.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Link
-            href="/auth/signup"
-            className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
-          >
-            Empezá gratis — procesá tu primera transcripción
-          </Link>
-          <Link
-            href="/auth/login"
-            className="inline-flex h-11 items-center justify-center rounded-md px-8 text-sm font-medium hover:bg-accent/50 transition-colors backdrop-blur-[16px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)]"
-          >
-            Ya tengo cuenta
-          </Link>
-        </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          Sin tarjeta de crédito. Plan gratuito disponible.
-        </p>
       </section>
 
       {/* Problem */}
