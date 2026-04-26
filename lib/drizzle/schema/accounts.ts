@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { pgTable, text, timestamp, uuid, boolean, index, date, numeric, jsonb } from "drizzle-orm/pg-core";
 import { users } from "./users";
 import { workspaces } from "./workspaces";
@@ -36,6 +37,7 @@ export const accounts = pgTable(
     aiSummary: text("ai_summary"),
     aiSummaryUpdatedAt: timestamp("ai_summary_updated_at"),
     lastActivityAt: timestamp("last_activity_at"),
+    closedAt: timestamp("closed_at"),
     hasAdConnections: boolean("has_ad_connections").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -45,6 +47,9 @@ export const accounts = pgTable(
     index("accounts_owner_id_idx").on(table.ownerId),
     index("accounts_workspace_health_idx").on(table.workspaceId, table.healthSignal),
     index("accounts_workspace_activity_idx").on(table.workspaceId, table.lastActivityAt),
+    index("accounts_workspace_active_idx")
+      .on(table.workspaceId)
+      .where(sql`${table.closedAt} IS NULL`),
   ]
 );
 

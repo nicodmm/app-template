@@ -155,6 +155,13 @@
       "when": 1777153851758,
       "tag": "0021_redundant_kang",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1777166161823,
+      "tag": "0022_worried_nico_minoru",
+      "breakpoints": true
     }
   ]
 }

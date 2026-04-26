@@ -1,0 +1,2 @@
+ALTER TABLE "accounts" ADD COLUMN "closed_at" timestamp;--> statement-breakpoint
+CREATE INDEX "accounts_workspace_active_idx" ON "accounts" USING btree ("workspace_id") WHERE "accounts"."closed_at" IS NULL;
