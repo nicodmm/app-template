@@ -251,6 +251,60 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Features */}
+      <section className="mx-auto max-w-6xl px-6 py-20">
+        <h2 className="text-center text-2xl font-bold mb-3">
+          Todo lo que nao.fyi hace por vos
+        </h2>
+        <p className="text-center text-muted-foreground mb-12 max-w-xl mx-auto">
+          Una sola herramienta para ver, entender y accionar sobre cada cuenta.
+        </p>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            {
+              Icon: Mic,
+              title: "Reuniones recurrentes",
+              desc: "Procesa cada call y mantiene la línea de tiempo de la cuenta.",
+            },
+            {
+              Icon: Activity,
+              title: "Salud de cuenta",
+              desc: "Score evolutivo con deltas e historial visible en un strip chart.",
+            },
+            {
+              Icon: Sparkles,
+              title: "Señales automáticas",
+              desc: "Detecta riesgos, churn y oportunidades de cross y up-sell.",
+            },
+            {
+              Icon: BarChart3,
+              title: "Paid media unificado",
+              desc: "Tablero de Meta y Google Ads consolidado por cliente.",
+            },
+            {
+              Icon: Database,
+              title: "CRM integrado",
+              desc: "Sincronía con Pipedrive, HubSpot y otros para tener todo en un lugar.",
+            },
+            {
+              Icon: ListChecks,
+              title: "Próximos pasos",
+              desc: "Tareas extraídas de cada reunión, listas para asignar al equipo.",
+            },
+          ].map(({ Icon, title, desc }) => (
+            <GlassCard key={title} className="p-6">
+              <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Icon size={20} />
+              </div>
+              <h3 className="font-semibold mb-2">{title}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {desc}
+              </p>
+            </GlassCard>
+          ))}
+        </div>
+      </section>
+
       {/* How it works */}
       <section className="mx-auto max-w-5xl px-6 py-20">
         <h2 className="text-center text-2xl font-bold mb-3">Cómo funciona</h2>
