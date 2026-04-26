@@ -38,6 +38,7 @@ export interface AdminDashboardSnapshot {
 export async function getAdminDashboardMetrics(): Promise<AdminDashboardSnapshot> {
   const since = new Date(Date.now() - THIRTY_DAYS_MS);
 
+  // KPIs: simple aggregate queries in parallel.
   const [
     workspacesTotalRow,
     workspacesNewRow,
@@ -45,7 +46,6 @@ export async function getAdminDashboardMetrics(): Promise<AdminDashboardSnapshot
     usersNewRow,
     accountsActiveRow,
     transcriptsRow,
-    workspaceRows,
   ] = await Promise.all([
     db.select({ n: sql<number>`count(*)::int` }).from(workspaces),
     db
@@ -65,72 +65,120 @@ export async function getAdminDashboardMetrics(): Promise<AdminDashboardSnapshot
       .select({ n: sql<number>`count(*)::int` })
       .from(transcripts)
       .where(
-        and(eq(transcripts.status, "completed"), gte(transcripts.createdAt, since))
+        and(
+          eq(transcripts.status, "completed"),
+          gte(transcripts.createdAt, since)
+        )
       ),
-    // Per-workspace stats. Single composite query with subselects via SQL
-    // expressions; cheaper than N round-trips. Filter to top 10 by
-    // transcripts in window so the result set stays bounded.
-    db.execute<{
-      workspace_id: string;
-      workspace_name: string;
-      owner_display: string | null;
-      accounts_active: number;
-      transcripts_30d: number;
-      signals_active: number;
-      last_activity_at: Date | null;
-    }>(sql`
-      SELECT
-        w.id AS workspace_id,
-        w.name AS workspace_name,
-        COALESCE(u.full_name, u.email) AS owner_display,
-        COALESCE((
-          SELECT count(*)::int FROM accounts a
-          WHERE a.workspace_id = w.id AND a.closed_at IS NULL
-        ), 0) AS accounts_active,
-        COALESCE((
-          SELECT count(*)::int FROM transcripts t
-          WHERE t.workspace_id = w.id
-            AND t.status = 'completed'
-            AND t.created_at >= ${since}
-        ), 0) AS transcripts_30d,
-        COALESCE((
-          SELECT count(DISTINCT s.id)::int FROM signals s
-          INNER JOIN accounts a2 ON a2.id = s.account_id
-          WHERE a2.workspace_id = w.id AND s.status = 'active'
-        ), 0) AS signals_active,
-        (
-          SELECT max(t.created_at) FROM transcripts t
-          WHERE t.workspace_id = w.id
-        ) AS last_activity_at
-      FROM workspaces w
-      LEFT JOIN users u ON u.id = w.owner_id
-      ORDER BY transcripts_30d DESC, accounts_active DESC, w.created_at DESC
-      LIMIT 10
-    `),
   ]);
 
-  const topWorkspaces: AdminWorkspaceRow[] = (
-    workspaceRows as unknown as Array<{
-      workspace_id: string;
-      workspace_name: string;
-      owner_display: string | null;
-      accounts_active: number;
-      transcripts_30d: number;
-      signals_active: number;
-      last_activity_at: Date | null;
-    }>
-  ).map((r) => ({
-    workspaceId: r.workspace_id,
-    workspaceName: r.workspace_name,
-    ownerDisplay: r.owner_display,
-    accountsActive: r.accounts_active,
-    transcripts30d: r.transcripts_30d,
-    signalsActive: r.signals_active,
-    lastActivityAt: r.last_activity_at,
-  }));
+  // Top workspaces: derive in-memory from a small set of focused queries
+  // instead of correlated subselects. Cheaper to reason about and avoids
+  // edge-case planner issues with deeply nested SELECTs in subscribed
+  // pooler setups.
+  const wsRows = await db
+    .select({
+      id: workspaces.id,
+      name: workspaces.name,
+      ownerId: workspaces.ownerId,
+      createdAt: workspaces.createdAt,
+      ownerName: users.fullName,
+      ownerEmail: users.email,
+    })
+    .from(workspaces)
+    .leftJoin(users, eq(users.id, workspaces.ownerId));
 
-  // For workspaces without a stored owner_id (e.g. old data), fall back to
-  // the first member's display in JS.
+  const wsIds = wsRows.map((w) => w.id);
+
+  let accountsByWs = new Map<string, number>();
+  let transcriptsByWs = new Map<string, number>();
+  let signalsByWs = new Map<string, number>();
+  let lastActivityByWs = new Map<string, Date>();
+
+  if (wsIds.length > 0) {
+    const [accCounts, trCounts, sigCounts, lastAct] = await Promise.all([
+      db
+        .select({
+          workspaceId: accounts.workspaceId,
+          n: sql<number>`count(*)::int`,
+        })
+        .from(accounts)
+        .where(
+          and(
+            inArray(accounts.workspaceId, wsIds),
+            isNull(accounts.closedAt)
+          )
+        )
+        .groupBy(accounts.workspaceId),
+      db
+        .select({
+          workspaceId: transcripts.workspaceId,
+          n: sql<number>`count(*)::int`,
+        })
+        .from(transcripts)
+        .where(
+          and(
+            inArray(transcripts.workspaceId, wsIds),
+            eq(transcripts.status, "completed"),
+            gte(transcripts.createdAt, since)
+          )
+        )
+        .groupBy(transcripts.workspaceId),
+      db
+        .select({
+          workspaceId: accounts.workspaceId,
+          n: sql<number>`count(distinct ${signals.id})::int`,
+        })
+        .from(signals)
+        .innerJoin(accounts, eq(accounts.id, signals.accountId))
+        .where(
+          and(
+            inArray(accounts.workspaceId, wsIds),
+            eq(signals.status, "active")
+          )
+        )
+        .groupBy(accounts.workspaceId),
+      db
+        .select({
+          workspaceId: transcripts.workspaceId,
+          last: sql<Date | null>`max(${transcripts.createdAt})`,
+        })
+        .from(transcripts)
+        .where(inArray(transcripts.workspaceId, wsIds))
+        .groupBy(transcripts.workspaceId),
+    ]);
+
+    accountsByWs = new Map(accCounts.map((r) => [r.workspaceId, r.n]));
+    transcriptsByWs = new Map(trCounts.map((r) => [r.workspaceId, r.n]));
+    signalsByWs = new Map(sigCounts.map((r) => [r.workspaceId, r.n]));
+    lastActivityByWs = new Map(
+      lastAct
+        .filter((r) => r.last !== null)
+        .map((r) => [r.workspaceId, r.last as Date])
+    );
+  }
+
+  const topWorkspaces: AdminWorkspaceRow[] = wsRows
+    .map((w) => ({
+      workspaceId: w.id,
+      workspaceName: w.name,
+      ownerDisplay: w.ownerName ?? w.ownerEmail ?? null,
+      accountsActive: accountsByWs.get(w.id) ?? 0,
+      transcripts30d: transcriptsByWs.get(w.id) ?? 0,
+      signalsActive: signalsByWs.get(w.id) ?? 0,
+      lastActivityAt: lastActivityByWs.get(w.id) ?? null,
+    }))
+    .sort((a, b) => {
+      if (b.transcripts30d !== a.transcripts30d)
+        return b.transcripts30d - a.transcripts30d;
+      if (b.accountsActive !== a.accountsActive)
+        return b.accountsActive - a.accountsActive;
+      return 0;
+    })
+    .slice(0, 10);
+
+  // For workspaces without a stored owner_id, fall back to the first
+  // workspace member's display name.
   const fallbackTargets = topWorkspaces.filter((r) => !r.ownerDisplay);
   if (fallbackTargets.length > 0) {
     const ids = fallbackTargets.map((r) => r.workspaceId);

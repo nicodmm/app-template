@@ -1,6 +1,9 @@
-import { requireUserId, isCurrentUserAdmin } from "@/lib/auth";
+import { requireUserId } from "@/lib/auth";
 import { getWorkspaceWithUsage } from "@/lib/queries/workspace";
 import { createDefaultWorkspace } from "@/app/actions/auth";
+import { db } from "@/lib/drizzle/db";
+import { users } from "@/lib/drizzle/schema";
+import { eq } from "drizzle-orm";
 import { Sidebar } from "@/components/sidebar";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { AppHeader } from "@/components/app-header";
@@ -21,8 +24,19 @@ export default async function ProtectedLayout({
   const email = user?.email ?? "";
   const userInitial = email[0]?.toUpperCase() ?? "U";
 
-  let workspaceData = await getWorkspaceWithUsage(userId);
+  // Run workspace fetch and platform-admin check in parallel — both depend
+  // only on userId, no need to chain. Avoids piling up Supabase auth round
+  // trips on every protected page render.
+  const [workspaceFirstFetch, userRoleRows] = await Promise.all([
+    getWorkspaceWithUsage(userId),
+    db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1),
+  ]);
 
+  let workspaceData = workspaceFirstFetch;
   if (!workspaceData) {
     await createDefaultWorkspace(userId, email);
     workspaceData = await getWorkspaceWithUsage(userId);
@@ -32,7 +46,7 @@ export default async function ProtectedLayout({
   const transcriptsCount = workspaceData?.usage?.transcriptsCount ?? 0;
   const transcriptsLimit = 5;
   const plan = "Free";
-  const isPlatformAdmin = await isCurrentUserAdmin();
+  const isPlatformAdmin = userRoleRows[0]?.role === "admin";
 
   return (
     <div className="flex h-dvh flex-col">
