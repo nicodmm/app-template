@@ -162,6 +162,13 @@
       "when": 1777166161823,
       "tag": "0022_worried_nico_minoru",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1777244135224,
+      "tag": "0023_burly_silver_samurai",
+      "breakpoints": true
     }
   ]
 }
