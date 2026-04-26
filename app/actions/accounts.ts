@@ -270,3 +270,43 @@ export async function updateHealthSignal(
   revalidatePath(`/app/accounts/${accountId}`);
   revalidatePath("/app/portfolio");
 }
+
+export async function closeAccount(accountId: string): Promise<void> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceOrThrow(userId);
+  await assertCanWriteAccount(userId, workspace.id, accountId);
+
+  await db
+    .update(accounts)
+    .set({
+      closedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(eq(accounts.id, accountId), eq(accounts.workspaceId, workspace.id))
+    );
+
+  revalidatePath(`/app/accounts/${accountId}`);
+  revalidatePath("/app/portfolio");
+  revalidatePath("/app/dashboard");
+}
+
+export async function reopenAccount(accountId: string): Promise<void> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceOrThrow(userId);
+  await assertCanWriteAccount(userId, workspace.id, accountId);
+
+  await db
+    .update(accounts)
+    .set({
+      closedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(eq(accounts.id, accountId), eq(accounts.workspaceId, workspace.id))
+    );
+
+  revalidatePath(`/app/accounts/${accountId}`);
+  revalidatePath("/app/portfolio");
+  revalidatePath("/app/dashboard");
+}
