@@ -1,17 +1,16 @@
 import Link from "next/link";
 import { Plus, Briefcase } from "lucide-react";
 import { requireUserId } from "@/lib/auth";
-import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspace";
+import { getWorkspaceWithMember } from "@/lib/queries/workspace";
 import { getPortfolioAccounts } from "@/lib/queries/accounts";
 import { AccountCard } from "@/components/account-card";
 import { redirect } from "next/navigation";
 
 export default async function PortfolioPage() {
   const userId = await requireUserId();
-  const workspace = await getWorkspaceByUserId(userId);
-  if (!workspace) redirect("/auth/login");
-  const member = await getWorkspaceMember(workspace.id, userId);
-  if (!member) redirect("/auth/login");
+  const result = await getWorkspaceWithMember(userId);
+  if (!result) redirect("/auth/login");
+  const { workspace, member } = result;
 
   const accounts = await getPortfolioAccounts({
     workspaceId: workspace.id,

@@ -23,6 +23,25 @@ export async function getWorkspaceByUserId(
   return result[0]?.workspace ?? null;
 }
 
+/**
+ * Single-trip variant of `getWorkspaceByUserId` + `getWorkspaceMember`. Used
+ * by protected pages that always need both — saves one round-trip vs. the
+ * sequential pair, which is meaningful on Supabase free tier (~50-100ms).
+ */
+export async function getWorkspaceWithMember(
+  userId: string
+): Promise<{ workspace: Workspace; member: WorkspaceMember } | null> {
+  const result = await db
+    .select({ workspace: workspaces, member: workspaceMembers })
+    .from(workspaceMembers)
+    .innerJoin(workspaces, eq(workspaceMembers.workspaceId, workspaces.id))
+    .where(eq(workspaceMembers.userId, userId))
+    .limit(1);
+
+  if (!result[0]) return null;
+  return { workspace: result[0].workspace, member: result[0].member };
+}
+
 export async function getWorkspaceMember(
   workspaceId: string,
   userId: string

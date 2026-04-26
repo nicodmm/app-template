@@ -11,9 +11,8 @@ import {
 } from "lucide-react";
 import { requireUserId } from "@/lib/auth";
 import {
-  getWorkspaceByUserId,
+  getWorkspaceWithMember,
   getWorkspaceMembers,
-  getWorkspaceMember,
 } from "@/lib/queries/workspace";
 import { getAccountById } from "@/lib/queries/accounts";
 import { getTranscriptHistory, getLatestMeetingSummary } from "@/lib/queries/transcripts";
@@ -57,10 +56,9 @@ export default async function AccountDetailPage({
   const { accountId } = await params;
   const { edit, error } = await searchParams;
 
-  const workspace = await getWorkspaceByUserId(userId);
-  if (!workspace) redirect("/auth/login");
-  const viewerMember = await getWorkspaceMember(workspace.id, userId);
-  if (!viewerMember) redirect("/auth/login");
+  const result = await getWorkspaceWithMember(userId);
+  if (!result) redirect("/auth/login");
+  const { workspace, member: viewerMember } = result;
 
   const [
     account,

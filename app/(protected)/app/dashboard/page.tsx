@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireUserId } from "@/lib/auth";
 import {
-  getWorkspaceByUserId,
-  getWorkspaceMember,
+  getWorkspaceWithMember,
   getWorkspaceMembers,
 } from "@/lib/queries/workspace";
 import {
@@ -47,10 +46,9 @@ export default async function DashboardPage({
   searchParams,
 }: DashboardPageProps) {
   const userId = await requireUserId();
-  const workspace = await getWorkspaceByUserId(userId);
-  if (!workspace) redirect("/auth/login");
-  const member = await getWorkspaceMember(workspace.id, userId);
-  if (!member) redirect("/auth/login");
+  const result = await getWorkspaceWithMember(userId);
+  if (!result) redirect("/auth/login");
+  const { workspace, member } = result;
 
   const params = await searchParams;
   const period = resolvePeriod(params);

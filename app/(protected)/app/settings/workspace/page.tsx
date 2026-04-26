@@ -3,8 +3,7 @@ import { redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { requireUserId } from "@/lib/auth";
 import {
-  getWorkspaceByUserId,
-  getWorkspaceMember,
+  getWorkspaceWithMember,
   getWorkspaceMembers,
 } from "@/lib/queries/workspace";
 import { getPendingWorkspaceInvites } from "@/lib/queries/workspace-invites";
@@ -23,11 +22,9 @@ export default async function WorkspaceSettingsPage({
   searchParams,
 }: PageProps): Promise<React.ReactElement> {
   const userId = await requireUserId();
-  const workspace = await getWorkspaceByUserId(userId);
-  if (!workspace) redirect("/auth/login");
-
-  const member = await getWorkspaceMember(workspace.id, userId);
-  if (!member) redirect("/auth/login");
+  const result = await getWorkspaceWithMember(userId);
+  if (!result) redirect("/auth/login");
+  const { workspace, member } = result;
 
   const { drive, drive_error: driveError } = await searchParams;
 
