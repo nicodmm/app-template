@@ -1,6 +1,6 @@
 import { db } from "@/lib/drizzle/db";
 import { accounts, users } from "@/lib/drizzle/schema";
-import { eq, and, desc, isNull, sql } from "drizzle-orm";
+import { eq, and, desc, isNull, isNotNull, sql } from "drizzle-orm";
 import type { Account } from "@/lib/drizzle/schema";
 
 export type AccountWithOwner = Account & {
@@ -8,26 +8,37 @@ export type AccountWithOwner = Account & {
   ownerEmail: string | null;
 };
 
+export type PortfolioStatus = "active" | "archived" | "all";
+
 export interface PortfolioScope {
   workspaceId: string;
   userId: string;
   role: string;
-  includeClosed?: boolean;
+  /** Filter by archive status. Defaults to 'active' (only non-closed accounts). */
+  status?: PortfolioStatus;
 }
 
 function canSeeAllAccounts(role: string): boolean {
   return role === "owner" || role === "admin";
 }
 
-export async function getPortfolioAccounts(
-  scope: PortfolioScope
-): Promise<AccountWithOwner[]> {
+function scopeBaseConditions(scope: PortfolioScope) {
   const conditions = [eq(accounts.workspaceId, scope.workspaceId)];
   if (!canSeeAllAccounts(scope.role)) {
     conditions.push(eq(accounts.ownerId, scope.userId));
   }
-  if (!scope.includeClosed) {
+  return conditions;
+}
+
+export async function getPortfolioAccounts(
+  scope: PortfolioScope
+): Promise<AccountWithOwner[]> {
+  const status = scope.status ?? "active";
+  const conditions = scopeBaseConditions(scope);
+  if (status === "active") {
     conditions.push(isNull(accounts.closedAt));
+  } else if (status === "archived") {
+    conditions.push(isNotNull(accounts.closedAt));
   }
 
   const rows = await db
@@ -54,6 +65,26 @@ export async function getPortfolioAccounts(
     ownerName: r.ownerName,
     ownerEmail: r.ownerEmail,
   }));
+}
+
+export async function getPortfolioAccountCounts(
+  scope: Omit<PortfolioScope, "status">
+): Promise<{ active: number; archived: number }> {
+  const baseConds = scopeBaseConditions(scope);
+  const [activeRow, archivedRow] = await Promise.all([
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(accounts)
+      .where(and(...baseConds, isNull(accounts.closedAt))),
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(accounts)
+      .where(and(...baseConds, isNotNull(accounts.closedAt))),
+  ]);
+  return {
+    active: activeRow[0]?.n ?? 0,
+    archived: archivedRow[0]?.n ?? 0,
+  };
 }
 
 export async function getAccountById(
