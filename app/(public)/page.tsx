@@ -228,18 +228,19 @@ export default function LandingPage() {
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-3xl mx-auto">
             {[
-              "Transcripciones de reuniones",
-              "Google Ads y Meta Ads",
-              "CRM y spreadsheets",
-              "Notas y mails de seguimiento",
-              "Asana, Notion y similares",
-              "La memoria de cada AM",
-            ].map((item) => (
+              { label: "Transcripciones de reuniones", Icon: Mic },
+              { label: "Google Ads y Meta Ads", Icon: BarChart3 },
+              { label: "CRM y spreadsheets", Icon: Database },
+              { label: "Notas y mails de seguimiento", Icon: Mail },
+              { label: "Asana, Notion y similares", Icon: ListChecks },
+              { label: "La memoria de cada AM", Icon: Brain },
+            ].map(({ label, Icon }) => (
               <GlassCard
-                key={item}
-                className="px-4 py-3 text-sm text-center text-muted-foreground"
+                key={label}
+                className="flex flex-col items-center justify-center gap-2 px-4 py-6 text-sm text-center text-muted-foreground transition-transform hover:-translate-y-0.5"
               >
-                {item}
+                <Icon size={20} className="text-primary/70" />
+                {label}
               </GlassCard>
             ))}
           </div>
