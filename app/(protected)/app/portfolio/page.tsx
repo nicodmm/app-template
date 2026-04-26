@@ -6,8 +6,13 @@ import {
   getPortfolioAccounts,
   getPortfolioAccountCounts,
 } from "@/lib/queries/accounts";
+import {
+  getOnboardingState,
+  type OnboardingState,
+} from "@/lib/queries/onboarding";
 import { AccountCard } from "@/components/account-card";
 import { PortfolioStatusTabs } from "@/components/portfolio-status-tabs";
+import { OnboardingChecklist } from "@/components/onboarding-checklist";
 import { redirect } from "next/navigation";
 
 interface PageProps {
@@ -24,7 +29,9 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
   const status: "active" | "archived" =
     params.status === "archived" ? "archived" : "active";
 
-  const [accounts, counts] = await Promise.all([
+  const isElevated = member.role === "owner" || member.role === "admin";
+
+  const [accounts, counts, onboarding] = await Promise.all([
     getPortfolioAccounts({
       workspaceId: workspace.id,
       userId,
@@ -36,9 +43,14 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
       userId,
       role: member.role,
     }),
+    isElevated
+      ? getOnboardingState(workspace.id)
+      : Promise.resolve<OnboardingState | null>(null),
   ]);
 
   const totalForCurrentTab = status === "active" ? counts.active : counts.archived;
+  const showChecklist =
+    onboarding !== null && !onboarding.isComplete && status === "active";
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -81,6 +93,12 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
         />
       </div>
 
+      {showChecklist && onboarding && (
+        <div className="mb-6">
+          <OnboardingChecklist state={onboarding} />
+        </div>
+      )}
+
       {accounts.length === 0 ? (
         status === "archived" ? (
           <div className="flex flex-col items-center justify-center rounded-xl py-16 text-center backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_dashed_var(--glass-border)]">
@@ -93,7 +111,7 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
               quieras desde el detalle.
             </p>
           </div>
-        ) : (
+        ) : showChecklist ? null : (
           <div className="flex flex-col items-center justify-center rounded-xl py-20 text-center backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_dashed_var(--glass-border)]">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
               <Briefcase size={26} aria-hidden />

@@ -63,15 +63,19 @@ export default async function WorkspaceSettingsPage({
           appUrl={appUrl}
         />
 
-        <WorkspaceServicesSection
-          initialServices={workspace.services ?? []}
-          canManage={canManage}
-        />
+        <section id="services" className="scroll-mt-6">
+          <WorkspaceServicesSection
+            initialServices={workspace.services ?? []}
+            canManage={canManage}
+          />
+        </section>
 
-        <WorkspaceAgencyContextSection
-          initialValue={workspace.agencyContext}
-          canManage={canManage}
-        />
+        <section id="agency-context" className="scroll-mt-6">
+          <WorkspaceAgencyContextSection
+            initialValue={workspace.agencyContext}
+            canManage={canManage}
+          />
+        </section>
 
         <WorkspaceDriveSection
           connection={driveConnection}
