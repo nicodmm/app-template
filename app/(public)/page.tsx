@@ -485,31 +485,61 @@ export default function LandingPage() {
       </section>
 
       {/* CTA footer */}
-      <section className="mx-auto max-w-5xl px-6 py-16">
+      <section className="mx-auto max-w-6xl px-6 py-16">
         <GlassCard
           variant="strong"
-          className="px-8 py-14 text-center relative overflow-hidden"
+          className="relative overflow-hidden px-6 py-12 sm:px-10 lg:px-14 lg:py-16"
         >
           <div
             aria-hidden
-            className="absolute inset-0 -z-10 opacity-90"
+            className="absolute inset-0 -z-10"
             style={{
               background:
-                "radial-gradient(circle at 30% 50%, hsl(243 85% 60% / 0.35), transparent 60%), radial-gradient(circle at 75% 30%, hsl(280 75% 60% / 0.25), transparent 55%)",
+                "radial-gradient(circle at 25% 50%, hsl(243 85% 60% / 0.45), transparent 60%), radial-gradient(circle at 80% 30%, hsl(280 75% 60% / 0.35), transparent 55%), radial-gradient(circle at 50% 100%, hsl(200 85% 60% / 0.25), transparent 60%)",
             }}
           />
-          <h2 className="text-2xl font-bold text-foreground mb-3">
-            Empezá a gestionar tu cartera con claridad
-          </h2>
-          <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
-            Gratis. Sin tarjeta de crédito. Tu primer transcript en menos de un minuto.
-          </p>
-          <Link
-            href="/auth/signup"
-            className="inline-flex h-11 items-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/30"
-          >
-            Crear cuenta gratuita
-          </Link>
+          <div className="grid items-center gap-10 lg:grid-cols-2">
+            <div className="text-center lg:text-left">
+              <h2 className="text-3xl font-bold text-foreground mb-4 sm:text-4xl">
+                Empezá a gestionar tu cartera con claridad
+              </h2>
+              <ul className="mb-8 space-y-2 inline-block text-left">
+                {[
+                  "Sin tarjeta de crédito",
+                  "Primer transcript en menos de un minuto",
+                  "Cancelás cuando quieras",
+                ].map((b) => (
+                  <li
+                    key={b}
+                    className="flex items-start gap-2 text-sm text-muted-foreground"
+                  >
+                    <CheckIcon
+                      size={16}
+                      className="mt-0.5 shrink-0 text-success"
+                    />
+                    {b}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+                <Link
+                  href="/auth/signup"
+                  className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/30"
+                >
+                  Crear cuenta gratuita
+                </Link>
+                <Link
+                  href="/auth/login"
+                  className="inline-flex h-11 items-center justify-center rounded-md px-8 text-sm font-medium hover:bg-accent/50 transition-colors backdrop-blur-[16px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)]"
+                >
+                  Ya tengo cuenta
+                </Link>
+              </div>
+            </div>
+            <div className="relative">
+              <ShowcaseConstellation />
+            </div>
+          </div>
         </GlassCard>
       </section>
 
