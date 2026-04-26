@@ -4,11 +4,11 @@ import { requireUserId } from "@/lib/auth";
 import { createAccount } from "@/app/actions/accounts";
 import { getWorkspaceByUserId, getWorkspaceMembers } from "@/lib/queries/workspace";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ServiceScopeCheckboxes } from "@/components/service-scope-checkboxes";
 import { AccountModulesToggles } from "@/components/account-modules-toggles";
+import { NewAccountSubmit } from "@/components/new-account-submit";
 
 interface PageProps {
   searchParams: Promise<{ error?: string }>;
@@ -141,9 +141,7 @@ export default async function NewAccountPage({ searchParams }: PageProps) {
         </div>
 
         <div className="flex gap-3 pt-2">
-          <Button type="submit" className="flex-1 sm:flex-none sm:px-8">
-            Crear cuenta
-          </Button>
+          <NewAccountSubmit />
           <Link
             href="/app/portfolio"
             className="inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-accent transition-colors"

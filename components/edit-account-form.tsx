@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { updateAccount } from "@/app/actions/accounts";
 import type { AccountWithOwner } from "@/lib/queries/accounts";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
@@ -15,16 +16,31 @@ interface EditAccountFormProps {
   services: string[];
 }
 
-const initialState = { error: undefined as string | undefined };
+interface FormState {
+  error?: string;
+  /** Bumped on every successful save so the redirect effect re-fires. */
+  successAt?: number;
+}
+
+const initialState: FormState = {};
 
 export function EditAccountForm({ account, members, services }: EditAccountFormProps) {
+  const router = useRouter();
   const [state, formAction, isPending] = useActionState(
-    async (_prev: typeof initialState, formData: FormData) => {
+    async (_prev: FormState, formData: FormData): Promise<FormState> => {
       const result = await updateAccount(formData);
-      return { error: result.error };
+      if (result.error) return { error: result.error };
+      return { successAt: Date.now() };
     },
     initialState
   );
+
+  useEffect(() => {
+    if (state.successAt) {
+      router.replace(`/app/accounts/${account.id}`);
+      router.refresh();
+    }
+  }, [state.successAt, account.id, router]);
 
   return (
     <form action={formAction} className="space-y-4">

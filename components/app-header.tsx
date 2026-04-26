@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, User, Users } from "lucide-react";
+import { LogOut, User, Users, Plug } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -76,6 +76,15 @@ export function AppHeader({
               >
                 <Users size={14} />
                 Workspace
+              </Link>
+              <Link
+                href="/app/settings/integrations"
+                role="menuitem"
+                className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/40 dark:hover:bg-white/5"
+                onClick={() => setOpen(false)}
+              >
+                <Plug size={14} />
+                Integraciones
               </Link>
               <button
                 onClick={handleSignOut}
