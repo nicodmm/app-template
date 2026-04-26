@@ -9,6 +9,7 @@ import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getMonthlyUsage, getWorkspaceMember } from "@/lib/queries/workspace";
 import { getAccountsCount, getAccountById } from "@/lib/queries/accounts";
 import { buildEnabledModulesFromForm } from "@/lib/modules-client";
+import { normalizeAccountFields } from "@/lib/ai/normalize-account-fields";
 
 async function assertCanWriteAccount(
   userId: string,
@@ -161,10 +162,12 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
   const fee = parseFee(formData.get("fee") as string | null);
   const websiteUrl = parseUrl(formData.get("websiteUrl") as string | null);
   const linkedinUrl = parseUrl(formData.get("linkedinUrl") as string | null);
-  const industry = ((formData.get("industry") as string) || "").trim() || null;
-  const employeeCount =
+  const rawIndustry =
+    ((formData.get("industry") as string) || "").trim() || null;
+  const rawEmployeeCount =
     ((formData.get("employeeCount") as string) || "").trim() || null;
-  const location = ((formData.get("location") as string) || "").trim() || null;
+  const rawLocation =
+    ((formData.get("location") as string) || "").trim() || null;
   const companyDescription =
     ((formData.get("companyDescription") as string) || "").trim() || null;
   const enabledModules = buildEnabledModulesFromForm(
@@ -175,6 +178,31 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
 
   const existing = await getAccountById(accountId, workspace.id);
   const websiteChanged = (existing?.websiteUrl ?? null) !== websiteUrl;
+
+  // Normalize the three free-text fields with a tight LLM call only when
+  // the user actually changed any of them. Saves spend and avoids surprise
+  // rewrites when only e.g. the goals field was edited.
+  const fieldsChanged =
+    (existing?.industry ?? null) !== rawIndustry ||
+    (existing?.employeeCount ?? null) !== rawEmployeeCount ||
+    (existing?.location ?? null) !== rawLocation;
+
+  let industry = rawIndustry;
+  let employeeCount = rawEmployeeCount;
+  let location = rawLocation;
+  if (fieldsChanged) {
+    const normalized = await normalizeAccountFields(
+      {
+        industry: rawIndustry,
+        employeeCount: rawEmployeeCount,
+        location: rawLocation,
+      },
+      { workspaceId: workspace.id, accountId }
+    );
+    industry = normalized.industry;
+    employeeCount = normalized.employeeCount;
+    location = normalized.location;
+  }
 
   await db
     .update(accounts)

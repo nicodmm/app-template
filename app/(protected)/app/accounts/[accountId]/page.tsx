@@ -26,6 +26,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { PaidMediaMiniCard } from "@/components/paid-media-mini-card";
 import { CrmMiniCard } from "@/components/crm-mini-card";
 import { ReEnrichButton } from "@/components/re-enrich-button";
+import { EnrichmentStatusPoller } from "@/components/enrichment-status-poller";
 import { isModuleEnabled } from "@/lib/modules-client";
 import { LastMeetingSection } from "@/components/account-detail/last-meeting-section";
 import { FilesSection } from "@/components/account-detail/files-section";
@@ -171,13 +172,22 @@ export default async function AccountDetailPage({
                 </span>
               )}
             </div>
-            {account.websiteUrl && (
-              <ReEnrichButton
-                accountId={accountId}
-                disabled={account.enrichmentStatus === "pending"}
-              />
-            )}
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/app/accounts/${accountId}?edit=1`}
+                className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors"
+              >
+                Editar contexto
+              </Link>
+              {account.websiteUrl && (
+                <ReEnrichButton
+                  accountId={accountId}
+                  disabled={account.enrichmentStatus === "pending"}
+                />
+              )}
+            </div>
           </div>
+          <EnrichmentStatusPoller status={account.enrichmentStatus} />
 
           <div className="grid sm:grid-cols-2 gap-6">
             {account.goals && (
