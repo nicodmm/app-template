@@ -38,7 +38,10 @@ type AdApi = {
   creative?: {
     id: string;
     thumbnail_url?: string;
-    image_url?: string;
+    // Note: Meta deprecated `image_url` directly on AdCreative — requesting
+    // it returns "(#100) Tried accessing nonexisting field (image_url)".
+    // Image URLs now resolve via image_hash → AdImage endpoint, or via the
+    // nested image_url paths inside object_story_spec.
     image_hash?: string;
     object_story_spec?: {
       link_data?: AdCreativeLinkData;
@@ -70,7 +73,6 @@ function extractCreativeImage(
 ): ExtractedCreativeImage {
   if (!creative) return { imageUrl: null, imageHash: null };
 
-  if (creative.image_url) return { imageUrl: creative.image_url, imageHash: null };
   if (creative.image_hash) return { imageUrl: null, imageHash: creative.image_hash };
 
   const linkData = creative.object_story_spec?.link_data;
@@ -103,7 +105,12 @@ export async function fetchAndUpsertAds(
         "name",
         "status",
         "campaign_id",
-        "creative{id,thumbnail_url,image_url,image_hash,object_story_spec{link_data{image_url,image_hash,child_attachments{image_url,image_hash}},video_data{image_url,image_hash}}}",
+        // Removed top-level `image_url` from the AdCreative request — Meta
+        // deprecated it and returns error #100 when asked. We still get
+        // image URLs via image_hash (resolved through the AdImage endpoint
+        // a few lines below) and via the nested image_url paths inside
+        // object_story_spec which are still supported.
+        "creative{id,thumbnail_url,image_hash,object_story_spec{link_data{image_url,image_hash,child_attachments{image_url,image_hash}},video_data{image_url,image_hash}}}",
       ].join(","),
       limit: 500,
     },
