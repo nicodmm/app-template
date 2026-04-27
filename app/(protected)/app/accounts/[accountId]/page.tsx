@@ -28,6 +28,11 @@ import { CrmMiniCard } from "@/components/crm-mini-card";
 import { ReEnrichButton } from "@/components/re-enrich-button";
 import { EnrichmentStatusPoller } from "@/components/enrichment-status-poller";
 import { isModuleEnabled } from "@/lib/modules-client";
+import { AccountShareSection } from "@/components/account-share-section";
+import { db } from "@/lib/drizzle/db";
+import { accountShareLinks } from "@/lib/drizzle/schema";
+import { eq } from "drizzle-orm";
+import { coerceShareConfig } from "@/lib/share/share-config";
 import { LastMeetingSection } from "@/components/account-detail/last-meeting-section";
 import { FilesSection } from "@/components/account-detail/files-section";
 import { TasksSection } from "@/components/account-detail/tasks-section";
@@ -62,6 +67,23 @@ export default async function AccountDetailPage({
   ]);
 
   if (!account) notFound();
+
+  const [shareLinkRow] = await db
+    .select()
+    .from(accountShareLinks)
+    .where(eq(accountShareLinks.accountId, accountId))
+    .limit(1);
+  const existingShareLink = shareLinkRow
+    ? {
+        id: shareLinkRow.id,
+        token: shareLinkRow.token,
+        isActive: shareLinkRow.isActive,
+        hasPassword: !!shareLinkRow.passwordHash,
+        shareConfig: coerceShareConfig(shareLinkRow.shareConfig),
+        viewCount: shareLinkRow.viewCount,
+        lastAccessedAt: shareLinkRow.lastAccessedAt,
+      }
+    : null;
 
   const isEditing = edit === "1";
   const hasAgencyContext = Boolean(workspace.agencyContext?.trim());
@@ -118,6 +140,11 @@ export default async function AccountDetailPage({
           />
         </div>
       </div>
+
+      <AccountShareSection
+        accountId={accountId}
+        existing={existingShareLink}
+      />
 
       {/* Edit form */}
       {isEditing && (
