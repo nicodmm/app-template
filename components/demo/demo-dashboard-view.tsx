@@ -27,13 +27,13 @@ import type {
   AccountsListRow,
 } from "@/lib/queries/dashboard";
 
+type FilterKey = string; // shape: "health:green" | "industry:Ecommerce" | "size:51-200" | "opportunities:_"
+
 interface Props {
   snapshot: DashboardSnapshot;
   breakdown: DashboardBreakdown;
-  resolveAccountsList: (
-    filterType: "health" | "industry" | "size" | "opportunities",
-    filterValue: string
-  ) => AccountsListRow[];
+  /** Pre-computed map: keys like "health:green", "industry:Ecommerce", "opportunities:_". */
+  accountsByFilter: Record<FilterKey, AccountsListRow[]>;
 }
 
 interface OpenMetricDrawer {
@@ -93,8 +93,14 @@ function formatInteger(n: number): string {
 export function DemoDashboardView({
   snapshot,
   breakdown,
-  resolveAccountsList,
+  accountsByFilter,
 }: Props) {
+  function resolveRows(
+    filterType: "health" | "industry" | "size" | "opportunities",
+    filterValue: string
+  ): AccountsListRow[] {
+    return accountsByFilter[`${filterType}:${filterValue}`] ?? [];
+  }
   const [metricDrawer, setMetricDrawer] = useState<OpenMetricDrawer | null>(
     null
   );
@@ -228,7 +234,7 @@ export function DemoDashboardView({
         <DemoAccountsListDrawer
           title={accountsDrawer.title}
           filterType={accountsDrawer.filterType}
-          rows={resolveAccountsList(
+          rows={resolveRows(
             accountsDrawer.filterType,
             accountsDrawer.filterValue
           )}
