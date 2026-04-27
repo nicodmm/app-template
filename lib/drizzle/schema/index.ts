@@ -27,3 +27,4 @@ export * from "./context_documents";
 export * from "./workspace_invites";
 export * from "./drive_connections";
 export * from "./llm_usage";
+export * from "./admin_dashboard_snapshot";

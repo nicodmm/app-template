@@ -169,6 +169,13 @@
       "when": 1777244135224,
       "tag": "0023_burly_silver_samurai",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1777254056802,
+      "tag": "0024_secret_reaper",
+      "breakpoints": true
     }
   ]
 }
