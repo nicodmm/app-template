@@ -17,7 +17,10 @@ import {
   type DriveFolder,
   type DriveFileMeta,
 } from "@/lib/google/drive";
-import { parseDriveFileIdFromUrl } from "@/lib/google/drive-links";
+import {
+  parseDriveFileIdFromUrl,
+  parseDriveFolderIdFromUrl,
+} from "@/lib/google/drive-links";
 
 async function ensureManager(): Promise<{ workspaceId: string }> {
   const userId = await requireUserId();
@@ -102,18 +105,27 @@ export async function importDriveLinkForAccount(
   url: string,
   userNotes?: string
 ): Promise<{
-  outcome?: "queued" | "duplicate";
+  outcome?: "queued" | "duplicate" | "folder_bound";
   fileName?: string;
+  folderName?: string;
   error?: string;
 }> {
   const userId = await requireUserId();
   const workspace = await getWorkspaceByUserId(userId);
   if (!workspace) return { error: "Workspace no encontrado" };
 
+  // If the URL points at a folder, route to the folder-binding flow instead
+  // of trying to import a single file.
+  const folderId = parseDriveFolderIdFromUrl(url);
+  if (folderId) {
+    return bindFolderInternal(workspace.id, accountId, folderId, userId);
+  }
+
   const fileId = parseDriveFileIdFromUrl(url);
   if (!fileId) {
     return {
-      error: "Link inválido. Pegá una URL de un archivo de Drive (no una carpeta).",
+      error:
+        "Link inválido. Pegá una URL de un archivo o de una carpeta de Drive.",
     };
   }
 
@@ -229,6 +241,209 @@ export async function importDriveLinkForAccount(
 
   revalidatePath(`/app/accounts/${accountId}`);
   return { outcome: "queued", fileName: meta.name };
+}
+
+/**
+ * Bind a Drive folder to a specific account and kick off the initial sync.
+ * Used by the public action above (when the user pastes a folder URL) and by
+ * the explicit "Sincronizar ahora" button after binding.
+ */
+async function bindFolderInternal(
+  workspaceId: string,
+  accountId: string,
+  folderId: string,
+  userId: string
+): Promise<{
+  outcome: "folder_bound";
+  folderName: string;
+  error?: string;
+}> {
+  // Confirm the account belongs to this workspace.
+  const [account] = await db
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(and(eq(accounts.id, accountId), eq(accounts.workspaceId, workspaceId)))
+    .limit(1);
+  if (!account) {
+    return { outcome: "folder_bound", folderName: "", error: "Cuenta no encontrada" };
+  }
+
+  // Drive connection on the workspace.
+  const [conn] = await db
+    .select({ id: driveConnections.id })
+    .from(driveConnections)
+    .where(eq(driveConnections.workspaceId, workspaceId))
+    .limit(1);
+  if (!conn) {
+    return {
+      outcome: "folder_bound",
+      folderName: "",
+      error:
+        "Conectá Google Drive primero desde el Workspace para poder vincular carpetas.",
+    };
+  }
+
+  // Resolve folder metadata so we know its name and that we have access.
+  let accessToken: string;
+  try {
+    accessToken = await ensureFreshAccessToken(conn.id);
+  } catch (err) {
+    return {
+      outcome: "folder_bound",
+      folderName: "",
+      error:
+        err instanceof Error
+          ? err.message
+          : "No se pudo refrescar el token de Drive",
+    };
+  }
+
+  let folderName: string;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${folderId}?fields=id,name,mimeType`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: controller.signal,
+      }
+    );
+    clearTimeout(timeout);
+    if (res.status === 404) {
+      return {
+        outcome: "folder_bound",
+        folderName: "",
+        error:
+          "La carpeta no existe o tu cuenta de Google no tiene acceso. Compartila con la cuenta conectada en Drive.",
+      };
+    }
+    if (res.status === 403) {
+      return {
+        outcome: "folder_bound",
+        folderName: "",
+        error:
+          "Permiso insuficiente sobre la carpeta. Compartila con la cuenta conectada.",
+      };
+    }
+    if (!res.ok) {
+      return {
+        outcome: "folder_bound",
+        folderName: "",
+        error: `Drive devolvió ${res.status}. Probá de nuevo.`,
+      };
+    }
+    const meta = (await res.json()) as {
+      id: string;
+      name: string;
+      mimeType: string;
+    };
+    if (meta.mimeType !== "application/vnd.google-apps.folder") {
+      return {
+        outcome: "folder_bound",
+        folderName: "",
+        error: "El link no apunta a una carpeta de Drive.",
+      };
+    }
+    folderName = meta.name;
+  } catch (err) {
+    const msg =
+      err instanceof Error
+        ? err.name === "AbortError"
+          ? "Drive tardó demasiado en responder — probá de nuevo"
+          : err.message
+        : "No se pudo leer metadata de la carpeta";
+    return { outcome: "folder_bound", folderName: "", error: msg };
+  }
+
+  // Persist the binding.
+  await db
+    .update(accounts)
+    .set({
+      driveFolderId: folderId,
+      driveFolderName: folderName,
+      updatedAt: new Date(),
+    })
+    .where(eq(accounts.id, accountId));
+
+  // Trigger the initial sync — best effort. The UI will keep showing
+  // "vinculada" even if the trigger enqueue fails; user can hit "Sync ahora"
+  // manually.
+  try {
+    const { tasks } = await import("@trigger.dev/sdk/v3");
+    await tasks.trigger("sync-drive-folder-for-account", {
+      workspaceId,
+      accountId,
+      uploadedByUserId: userId,
+    });
+  } catch {
+    // best-effort
+  }
+
+  revalidatePath(`/app/accounts/${accountId}`);
+  return { outcome: "folder_bound", folderName };
+}
+
+export async function syncDriveFolderForAccountNow(
+  accountId: string
+): Promise<{ runId?: string; error?: string }> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) return { error: "Workspace no encontrado" };
+
+  const [acc] = await db
+    .select({
+      id: accounts.id,
+      driveFolderId: accounts.driveFolderId,
+    })
+    .from(accounts)
+    .where(
+      and(eq(accounts.id, accountId), eq(accounts.workspaceId, workspace.id))
+    )
+    .limit(1);
+  if (!acc) return { error: "Cuenta no encontrada" };
+  if (!acc.driveFolderId)
+    return { error: "Esta cuenta no tiene una carpeta de Drive vinculada" };
+
+  try {
+    const { tasks } = await import("@trigger.dev/sdk/v3");
+    const handle = await tasks.trigger("sync-drive-folder-for-account", {
+      workspaceId: workspace.id,
+      accountId,
+      uploadedByUserId: userId,
+    });
+    revalidatePath(`/app/accounts/${accountId}`);
+    return { runId: handle.id };
+  } catch (err) {
+    return {
+      error:
+        err instanceof Error
+          ? err.message
+          : "No se pudo encolar la sincronización",
+    };
+  }
+}
+
+export async function unlinkDriveFolderForAccount(
+  accountId: string
+): Promise<{ error?: string }> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) return { error: "Workspace no encontrado" };
+
+  await db
+    .update(accounts)
+    .set({
+      driveFolderId: null,
+      driveFolderName: null,
+      driveFolderSyncedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(eq(accounts.id, accountId), eq(accounts.workspaceId, workspace.id))
+    );
+  revalidatePath(`/app/accounts/${accountId}`);
+  return {};
 }
 
 export async function syncDriveNow(): Promise<{ runId?: string; error?: string }> {

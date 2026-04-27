@@ -204,6 +204,13 @@
       "when": 1777265635411,
       "tag": "0028_curious_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1777302620218,
+      "tag": "0029_unusual_layla_miller",
+      "breakpoints": true
     }
   ]
 }

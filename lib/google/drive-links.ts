@@ -45,3 +45,29 @@ export function parseDriveFileIdFromUrl(raw: string): string | null {
   }
   return null;
 }
+
+/**
+ * Parse the Drive folder ID from any of the common URL shapes:
+ *   https://drive.google.com/drive/folders/<ID>
+ *   https://drive.google.com/drive/u/0/folders/<ID>
+ *
+ * Returns null if the URL isn't a folder URL we recognize.
+ */
+export function parseDriveFolderIdFromUrl(raw: string): string | null {
+  const url = raw.trim();
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (
+      parsed.hostname !== "drive.google.com" &&
+      parsed.hostname !== "docs.google.com"
+    ) {
+      return null;
+    }
+    const match = parsed.pathname.match(/\/folders\/([^/?#]+)/);
+    if (match && match[1]) return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+  return null;
+}
