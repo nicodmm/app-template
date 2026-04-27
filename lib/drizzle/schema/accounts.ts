@@ -37,6 +37,8 @@ export const accounts = pgTable(
     healthJustification: text("health_justification"),
     aiSummary: text("ai_summary"),
     aiSummaryUpdatedAt: timestamp("ai_summary_updated_at"),
+    clientSummary: text("client_summary"),
+    clientSummaryUpdatedAt: timestamp("client_summary_updated_at"),
     lastActivityAt: timestamp("last_activity_at"),
     closedAt: timestamp("closed_at"),
     hasAdConnections: boolean("has_ad_connections").notNull().default(false),

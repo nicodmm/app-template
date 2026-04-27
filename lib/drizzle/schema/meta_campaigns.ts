@@ -10,6 +10,7 @@ export const metaCampaigns = pgTable(
       .references(() => metaAdAccounts.id, { onDelete: "cascade" }),
     metaCampaignId: text("meta_campaign_id").notNull(),
     name: text("name").notNull(),
+    publicName: text("public_name"),
     status: text("status").notNull().default("ACTIVE"),
     objective: text("objective"),
     dailyBudget: integer("daily_budget"),

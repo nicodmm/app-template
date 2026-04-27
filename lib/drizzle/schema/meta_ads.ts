@@ -14,6 +14,7 @@ export const metaAds = pgTable(
       .references(() => metaCampaigns.id, { onDelete: "cascade" }),
     metaAdId: text("meta_ad_id").notNull(),
     name: text("name").notNull(),
+    publicName: text("public_name"),
     status: text("status").notNull().default("ACTIVE"),
     creativeId: text("creative_id"),
     thumbnailUrl: text("thumbnail_url"),
