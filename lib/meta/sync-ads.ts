@@ -16,18 +16,15 @@ import {
 
 type AdCreativeChildAttachment = {
   image_hash?: string;
-  image_url?: string;
 };
 
 type AdCreativeLinkData = {
   image_hash?: string;
-  image_url?: string;
   child_attachments?: AdCreativeChildAttachment[];
 };
 
 type AdCreativeVideoData = {
   image_hash?: string;
-  image_url?: string;
 };
 
 type AdApi = {
@@ -38,10 +35,12 @@ type AdApi = {
   creative?: {
     id: string;
     thumbnail_url?: string;
-    // Note: Meta deprecated `image_url` directly on AdCreative — requesting
-    // it returns "(#100) Tried accessing nonexisting field (image_url)".
-    // Image URLs now resolve via image_hash → AdImage endpoint, or via the
-    // nested image_url paths inside object_story_spec.
+    // Meta deprecated `image_url` everywhere on AdCreative in v19+ —
+    // any field request that includes it returns "(#100) Tried
+    // accessing nonexisting field (image_url)" and aborts the whole
+    // /ads paginate. We now rely exclusively on image_hash (resolved
+    // via the AdImage endpoint a few lines below) plus thumbnail_url
+    // as the fallback display image.
     image_hash?: string;
     object_story_spec?: {
       link_data?: AdCreativeLinkData;
@@ -76,16 +75,18 @@ function extractCreativeImage(
   if (creative.image_hash) return { imageUrl: null, imageHash: creative.image_hash };
 
   const linkData = creative.object_story_spec?.link_data;
-  if (linkData?.image_url) return { imageUrl: linkData.image_url, imageHash: null };
   if (linkData?.image_hash) return { imageUrl: null, imageHash: linkData.image_hash };
 
   const firstChild = linkData?.child_attachments?.[0];
-  if (firstChild?.image_url) return { imageUrl: firstChild.image_url, imageHash: null };
   if (firstChild?.image_hash) return { imageUrl: null, imageHash: firstChild.image_hash };
 
   const videoData = creative.object_story_spec?.video_data;
-  if (videoData?.image_url) return { imageUrl: videoData.image_url, imageHash: null };
   if (videoData?.image_hash) return { imageUrl: null, imageHash: videoData.image_hash };
+
+  // Last resort: thumbnail from the creative itself (always allowed).
+  if (creative.thumbnail_url) {
+    return { imageUrl: creative.thumbnail_url, imageHash: null };
+  }
 
   return { imageUrl: null, imageHash: null };
 }
@@ -105,12 +106,11 @@ export async function fetchAndUpsertAds(
         "name",
         "status",
         "campaign_id",
-        // Removed top-level `image_url` from the AdCreative request — Meta
-        // deprecated it and returns error #100 when asked. We still get
-        // image URLs via image_hash (resolved through the AdImage endpoint
-        // a few lines below) and via the nested image_url paths inside
-        // object_story_spec which are still supported.
-        "creative{id,thumbnail_url,image_hash,object_story_spec{link_data{image_url,image_hash,child_attachments{image_url,image_hash}},video_data{image_url,image_hash}}}",
+        // image_url was deprecated everywhere on AdCreative in Graph API
+        // v19+ — including the previously-safe nested paths inside
+        // object_story_spec. We request ONLY image_hash + thumbnail_url
+        // and resolve hashes to URLs via the AdImage endpoint below.
+        "creative{id,thumbnail_url,image_hash,object_story_spec{link_data{image_hash,child_attachments{image_hash}},video_data{image_hash}}}",
       ].join(","),
       limit: 500,
     },
