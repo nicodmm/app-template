@@ -45,7 +45,10 @@ function formatRelative(d: Date | null): string {
 }
 
 export function AccountShareSection({ accountId, existing }: Props) {
-  const [isOpen, setIsOpen] = useState(!!existing);
+  // Collapsed by default — even when a link already exists. Makes the
+  // account detail page calmer and matches the user's mental model of
+  // "this is generated, set & forget unless I want to tweak something".
+  const [isOpen, setIsOpen] = useState(false);
   const [link, setLink] = useState<ExistingLink | null>(existing);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -84,7 +87,9 @@ export function AccountShareSection({ accountId, existing }: Props) {
         viewCount: 0,
         lastAccessedAt: null,
       });
-      setIsOpen(true);
+      // Stay collapsed after creation — the user can expand later to
+      // customize modules/password.
+      setIsOpen(false);
     });
   }
 
@@ -184,17 +189,49 @@ export function AccountShareSection({ accountId, existing }: Props) {
 
   return (
     <GlassCard className="p-6 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold flex items-center gap-2">
-          <Eye size={16} aria-hidden /> Vista pública
-        </h2>
-        <button
-          type="button"
-          onClick={() => setIsOpen((v) => !v)}
-          className="text-xs text-muted-foreground hover:text-foreground"
-        >
-          {isOpen ? "Contraer" : "Expandir"}
-        </button>
+      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h2 className="font-semibold flex items-center gap-2">
+            <Eye size={16} aria-hidden /> Vista pública
+          </h2>
+          <span
+            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+              link.isActive
+                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                : "bg-slate-500/15 text-slate-700 dark:text-slate-300"
+            }`}
+          >
+            {link.isActive ? "Activo" : "Pausado"}
+          </span>
+          {link.hasPassword && (
+            <span className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+              Con contraseña
+            </span>
+          )}
+          <span className="text-xs text-muted-foreground">
+            {link.viewCount} visita{link.viewCount !== 1 ? "s" : ""}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {!isOpen && (
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs hover:bg-accent transition-colors"
+              aria-label="Copiar link"
+            >
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {copied ? "Copiado" : "Copiar link"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsOpen((v) => !v)}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            {isOpen ? "Contraer" : "Configurar"}
+          </button>
+        </div>
       </div>
 
       {isOpen && (
