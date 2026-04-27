@@ -189,7 +189,7 @@ export async function computeAdminDashboardSnapshot(): Promise<ComputedSnapshot>
       db
         .select({
           workspaceId: transcripts.workspaceId,
-          last: sql<Date | null>`max(${transcripts.createdAt})`,
+          last: sql<unknown>`max(${transcripts.createdAt})`,
         })
         .from(transcripts)
         .where(inArray(transcripts.workspaceId, wsIds))
@@ -199,10 +199,17 @@ export async function computeAdminDashboardSnapshot(): Promise<ComputedSnapshot>
     accountsByWs = new Map(accCounts.map((r) => [r.workspaceId, r.n]));
     transcriptsByWs = new Map(trCounts.map((r) => [r.workspaceId, r.n]));
     signalsByWs = new Map(sigCounts.map((r) => [r.workspaceId, r.n]));
+    // postgres-js returns timestamps as Date in some configs and as raw
+    // strings in others; normalize to Date so the downstream toISOString
+    // call works regardless.
     lastActivityByWs = new Map(
       lastAct
-        .filter((r) => r.last !== null)
-        .map((r) => [r.workspaceId, r.last as Date])
+        .filter((r) => r.last !== null && r.last !== undefined)
+        .map((r) => {
+          const v = r.last;
+          const d = v instanceof Date ? v : new Date(v as string);
+          return [r.workspaceId, d] as [string, Date];
+        })
     );
   }
 
