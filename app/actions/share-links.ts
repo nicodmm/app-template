@@ -62,7 +62,10 @@ export async function createShareLink(
   await db.insert(accountShareLinks).values({
     accountId,
     token,
-    shareConfig: { ...DEFAULT_SHARE_CONFIG },
+    shareConfig: { ...DEFAULT_SHARE_CONFIG } as unknown as Record<
+      string,
+      boolean
+    >,
   });
   revalidatePath(`/app/accounts/${accountId}`);
   return { token };
@@ -86,7 +89,10 @@ export async function updateShareConfig(
   const merged = coerceShareConfig({ ...link.shareConfig, ...partial });
   await db
     .update(accountShareLinks)
-    .set({ shareConfig: merged, updatedAt: new Date() })
+    .set({
+      shareConfig: merged as unknown as Record<string, boolean>,
+      updatedAt: new Date(),
+    })
     .where(eq(accountShareLinks.id, shareLinkId));
   revalidatePath(`/app/accounts/${link.accountId}`);
 }
