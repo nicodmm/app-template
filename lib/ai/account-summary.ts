@@ -16,6 +16,7 @@ const SUMMARY_MODEL = "claude-haiku-4-5-20251001";
 const SummarySchema = z.object({
   meetingSummary: z.string(),
   accountSituation: z.string(),
+  clientSummary: z.string(),
 });
 
 export type AccountSummaryOutput = z.infer<typeof SummarySchema>;
@@ -247,8 +248,10 @@ REGLAS DURAS:
 
 Prosa, NO bullets, NO fechas específicas. Máximo 180 palabras la sección "accountSituation" completa.
 
+3. "clientSummary" — VERSIÓN PARA EL CLIENTE FINAL (no para el equipo interno). Tono presente, hechos avanzados sin ansiedades internas, sin críticas. Estilo: "Esta semana avanzamos en X", "Tenemos pendiente Y", "Coordinamos Z para la próxima semana". Sin emojis. NUNCA menciones señales de riesgo, salud de cuenta, métricas internas ni nombres del equipo de la agencia. 2-4 oraciones, prosa simple. Si la información disponible no alcanza para un resumen genuino, devolvé "Tu cuenta sigue activa. Te traemos una actualización completa pronto."
+
 Respondé SOLO con JSON válido (strings con \\n para saltos de línea):
-{"meetingSummary": "...", "accountSituation": "..."}`,
+{"meetingSummary": "...", "accountSituation": "...", "clientSummary": "..."}`,
       },
     ],
   });
@@ -269,6 +272,11 @@ Respondé SOLO con JSON válido (strings con \\n para saltos de línea):
     if (!jsonMatch) throw new Error("No JSON found");
     return SummarySchema.parse(JSON.parse(jsonMatch[0]));
   } catch {
-    return { meetingSummary: text, accountSituation: text };
+    return {
+      meetingSummary: text,
+      accountSituation: text,
+      clientSummary:
+        "Tu cuenta sigue activa. Te traemos una actualización completa pronto.",
+    };
   }
 }

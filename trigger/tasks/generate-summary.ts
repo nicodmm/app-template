@@ -14,6 +14,7 @@ interface GenerateSummaryInput {
 interface GenerateSummaryOutput {
   meetingSummary: string;
   accountSituation: string;
+  clientSummary: string;
 }
 
 export const generateSummary = task({

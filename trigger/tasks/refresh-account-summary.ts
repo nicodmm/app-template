@@ -57,6 +57,8 @@ export const refreshAccountSummary = task({
       .set({
         aiSummary: parsed.accountSituation,
         aiSummaryUpdatedAt: new Date(),
+        clientSummary: parsed.clientSummary,
+        clientSummaryUpdatedAt: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(accounts.id, payload.accountId));
