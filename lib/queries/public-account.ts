@@ -105,11 +105,13 @@ export interface PublicAccountSnapshot {
       id: string;
       description: string;
       priority: number;
+      status: string;
       transcriptId: string | null;
       meetingDate: Date | null;
       meetingTitle: string | null;
       sourceExcerpt: string | null;
       sourceContext: string | null;
+      completedAt: Date | null;
       createdAt: Date;
     }> | null;
     participants: Array<{
@@ -231,21 +233,44 @@ export async function getPublicAccountSnapshot(
         .limit(1)
     : [undefined];
 
-  // Workspace member emails — used to relabel participants who match a
-  // workspace user as "Equipo de {workspace}".
-  const memberEmails = config.participants
-    ? new Set(
-        (
-          await db
-            .select({ email: users.email })
-            .from(workspaceMembers)
-            .innerJoin(users, eq(users.id, workspaceMembers.userId))
-            .where(eq(workspaceMembers.workspaceId, accountRow.workspaceId))
-        )
-          .map((r) => r.email?.toLowerCase().trim())
-          .filter((e): e is string => !!e)
-      )
-    : new Set<string>();
+  // Workspace member identities — used to relabel participants who match
+  // an agency-side user as "Equipo de {workspace}". We index by both email
+  // AND normalized full name so we still flag people whose participant
+  // entries didn't capture an email (very common when extraction relies
+  // on transcript voice tags).
+  const ACCENT_MAP: Record<string, string> = {
+    á: "a", à: "a", ä: "a", â: "a", ã: "a",
+    é: "e", è: "e", ë: "e", ê: "e",
+    í: "i", ì: "i", ï: "i", î: "i",
+    ó: "o", ò: "o", ö: "o", ô: "o", õ: "o",
+    ú: "u", ù: "u", ü: "u", û: "u",
+    ñ: "n",
+  };
+  const normalizeName = (s: string): string =>
+    s
+      .toLowerCase()
+      .split("")
+      .map((ch) => ACCENT_MAP[ch] ?? ch)
+      .join("")
+      .replace(/[^a-z0-9 ]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const memberEmails = new Set<string>();
+  const memberNames = new Set<string>();
+  if (config.participants) {
+    const memberRows = await db
+      .select({ email: users.email, fullName: users.fullName })
+      .from(workspaceMembers)
+      .innerJoin(users, eq(users.id, workspaceMembers.userId))
+      .where(eq(workspaceMembers.workspaceId, accountRow.workspaceId));
+    for (const m of memberRows) {
+      const email = m.email?.toLowerCase().trim();
+      if (email) memberEmails.add(email);
+      const name = m.fullName ? normalizeName(m.fullName) : "";
+      if (name.length >= 3) memberNames.add(name);
+    }
+  }
 
   const [
     lastMeetingData,
@@ -295,7 +320,11 @@ export async function getPublicAccountSnapshot(
           .then((rows) =>
             rows.map((p) => {
               const email = p.email?.toLowerCase().trim() ?? null;
-              const isAgencyTeam = !!email && memberEmails.has(email);
+              const normalizedName = normalizeName(p.name);
+              const isAgencyTeam =
+                (!!email && memberEmails.has(email)) ||
+                (normalizedName.length >= 3 &&
+                  memberNames.has(normalizedName));
               return {
                 name: p.name,
                 role: isAgencyTeam
@@ -480,38 +509,40 @@ async function loadFilesTimeline(
  * UI (read-only).
  */
 async function loadTasksWithContext(accountId: string) {
+  // No status filter — public view shows pending AND completed (the
+  // completed ones are visual progress proof). UI marks them with
+  // strikethrough + check icon.
   const rows = await db
     .select({
       id: tasks.id,
       description: tasks.description,
       priority: tasks.priority,
+      status: tasks.status,
       transcriptId: tasks.transcriptId,
       sourceExcerpt: tasks.sourceExcerpt,
       sourceContext: tasks.sourceContext,
+      completedAt: tasks.completedAt,
       createdAt: tasks.createdAt,
       meetingDate: transcripts.meetingDate,
       meetingTitle: transcripts.fileName,
     })
     .from(tasks)
     .leftJoin(transcripts, eq(transcripts.id, tasks.transcriptId))
-    .where(
-      and(
-        eq(tasks.accountId, accountId),
-        inArray(tasks.status, ["pending", "in_progress"])
-      )
-    )
+    .where(eq(tasks.accountId, accountId))
     .orderBy(desc(tasks.createdAt))
-    .limit(40);
+    .limit(80);
 
   return rows.map((r) => ({
     id: r.id,
     description: r.description,
     priority: r.priority,
+    status: r.status,
     transcriptId: r.transcriptId,
     meetingDate: r.meetingDate ? new Date(r.meetingDate) : null,
     meetingTitle: r.meetingTitle,
     sourceExcerpt: r.sourceExcerpt,
     sourceContext: r.sourceContext,
+    completedAt: r.completedAt,
     createdAt: r.createdAt,
   }));
 }

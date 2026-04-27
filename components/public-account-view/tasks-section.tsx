@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   CalendarDays,
   ChevronDown,
   ChevronRight,
   Quote,
   Info,
+  Check,
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { cn } from "@/lib/utils";
@@ -15,11 +16,13 @@ interface PublicTask {
   id: string;
   description: string;
   priority: number;
+  status: string;
   transcriptId: string | null;
   meetingDate: Date | null;
   meetingTitle: string | null;
   sourceExcerpt: string | null;
   sourceContext: string | null;
+  completedAt: Date | null;
   createdAt: Date;
 }
 
@@ -59,21 +62,11 @@ interface Group {
   tasks: PublicTask[];
 }
 
-export function TasksSection({ rows }: Props) {
-  if (rows.length === 0) {
-    return (
-      <GlassCard className="p-6">
-        <h2 className="font-semibold mb-3">Tareas en curso</h2>
-        <p className="text-sm text-muted-foreground">
-          Tu equipo está al día — no hay tareas pendientes ahora mismo.
-        </p>
-      </GlassCard>
-    );
-  }
+type Tab = "pending" | "completed";
 
-  // Group by transcript so the layout matches the agency-side view.
+function buildGroups(tasks: PublicTask[]): Group[] {
   const map = new Map<string, Group>();
-  for (const t of rows) {
+  for (const t of tasks) {
     const key = t.transcriptId ?? "__manual__";
     if (!map.has(key)) {
       const label =
@@ -85,25 +78,94 @@ export function TasksSection({ rows }: Props) {
     }
     map.get(key)!.tasks.push(t);
   }
-  const groups = [...map.values()].sort((a, b) => {
+  return [...map.values()].sort((a, b) => {
     if (a.key === "__manual__") return 1;
     if (b.key === "__manual__") return -1;
     return b.dateKey.localeCompare(a.dateKey);
   });
+}
+
+export function TasksSection({ rows }: Props) {
+  const [tab, setTab] = useState<Tab>("pending");
+
+  const pending = useMemo(
+    () =>
+      rows.filter(
+        (t) => t.status === "pending" || t.status === "in_progress"
+      ),
+    [rows]
+  );
+  const completed = useMemo(
+    () =>
+      [...rows.filter((t) => t.status === "completed")].sort(
+        (a, b) =>
+          (b.completedAt?.getTime() ?? 0) - (a.completedAt?.getTime() ?? 0)
+      ),
+    [rows]
+  );
+
+  if (rows.length === 0) {
+    return (
+      <GlassCard className="p-6">
+        <h2 className="font-semibold mb-3">Tareas</h2>
+        <p className="text-sm text-muted-foreground">
+          Tu equipo está al día — no hay tareas registradas todavía.
+        </p>
+      </GlassCard>
+    );
+  }
+
+  const visible = tab === "pending" ? pending : completed;
+  const groups = buildGroups(visible);
 
   return (
     <GlassCard className="p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold">Tareas en curso</h2>
-        <span className="text-xs text-muted-foreground">
-          {rows.length} pendiente{rows.length !== 1 ? "s" : ""}
-        </span>
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <h2 className="font-semibold">Tareas</h2>
+        <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit">
+          {(
+            [
+              { k: "pending", label: "En curso", count: pending.length },
+              { k: "completed", label: "Completadas", count: completed.length },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.k}
+              type="button"
+              onClick={() => setTab(t.k)}
+              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                tab === t.k
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}
+              <span
+                className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                  tab === t.k
+                    ? "bg-primary/10 text-primary"
+                    : "bg-muted-foreground/10"
+                }`}
+              >
+                {t.count}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="space-y-3">
-        {groups.map((g) => (
-          <TaskGroup key={g.key} group={g} defaultOpen={true} />
-        ))}
-      </div>
+      {visible.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-2">
+          {tab === "pending"
+            ? "No hay tareas en curso ahora mismo."
+            : "Todavía no hay tareas completadas."}
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {groups.map((g) => (
+            <TaskGroup key={g.key} group={g} defaultOpen={true} />
+          ))}
+        </div>
+      )}
     </GlassCard>
   );
 }
@@ -146,16 +208,24 @@ function TaskRow({ task }: { task: PublicTask }) {
   const priority = PRIORITY_LABEL[task.priority] ?? "Media";
   const priorityCls = PRIORITY_CLS[task.priority] ?? PRIORITY_CLS[3];
   const hasContext = task.sourceExcerpt || task.sourceContext;
+  const isCompleted = task.status === "completed";
   return (
     <div className="py-2.5">
       <div className="flex items-start gap-3">
-        <div className="mt-1 shrink-0 w-3.5 h-3.5 rounded-full border border-muted-foreground/40" />
+        {isCompleted ? (
+          <div className="mt-0.5 shrink-0 w-4 h-4 rounded-full bg-emerald-500 border border-emerald-500 text-white flex items-center justify-center">
+            <Check size={11} strokeWidth={3} />
+          </div>
+        ) : (
+          <div className="mt-1 shrink-0 w-3.5 h-3.5 rounded-full border border-muted-foreground/40" />
+        )}
         <div className="flex-1 min-w-0">
           <button
             type="button"
             onClick={() => hasContext && setExpanded((v) => !v)}
             className={cn(
               "text-sm leading-snug text-left w-full",
+              isCompleted && "line-through text-muted-foreground",
               hasContext && "hover:text-primary transition-colors cursor-pointer"
             )}
           >
@@ -165,7 +235,8 @@ function TaskRow({ task }: { task: PublicTask }) {
             <span
               className={cn(
                 "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
-                priorityCls
+                priorityCls,
+                isCompleted && "opacity-60"
               )}
             >
               {priority}
@@ -174,6 +245,16 @@ function TaskRow({ task }: { task: PublicTask }) {
               <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
                 <CalendarDays size={9} />
                 {task.meetingTitle}
+              </span>
+            )}
+            {isCompleted && task.completedAt && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400">
+                <Check size={9} />
+                Completada el{" "}
+                {new Date(task.completedAt).toLocaleDateString("es-AR", {
+                  day: "numeric",
+                  month: "short",
+                })}
               </span>
             )}
           </div>
