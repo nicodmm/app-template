@@ -103,7 +103,8 @@ export async function disconnectDrive(): Promise<void> {
 export async function importDriveLinkForAccount(
   accountId: string,
   url: string,
-  userNotes?: string
+  userNotes?: string,
+  opts?: { skipTaskExtraction?: boolean }
 ): Promise<{
   outcome?: "queued" | "duplicate" | "folder_bound";
   fileName?: string;
@@ -118,7 +119,13 @@ export async function importDriveLinkForAccount(
   // of trying to import a single file.
   const folderId = parseDriveFolderIdFromUrl(url);
   if (folderId) {
-    return bindFolderInternal(workspace.id, accountId, folderId, userId);
+    return bindFolderInternal(
+      workspace.id,
+      accountId,
+      folderId,
+      userId,
+      opts?.skipTaskExtraction ?? false
+    );
   }
 
   const fileId = parseDriveFileIdFromUrl(url);
@@ -252,7 +259,8 @@ async function bindFolderInternal(
   workspaceId: string,
   accountId: string,
   folderId: string,
-  userId: string
+  userId: string,
+  skipTaskExtraction: boolean
 ): Promise<{
   outcome: "folder_bound";
   folderName: string;
@@ -375,6 +383,7 @@ async function bindFolderInternal(
       workspaceId,
       accountId,
       uploadedByUserId: userId,
+      skipTaskExtraction,
     });
   } catch {
     // best-effort

@@ -12,6 +12,7 @@ import {
   syncDriveFolderForAccountNow,
   unlinkDriveFolderForAccount,
 } from "@/app/actions/drive";
+import { parseDriveFolderIdFromUrl } from "@/lib/google/drive-links";
 import { TranscriptProgress } from "@/components/transcript-progress";
 
 interface ContextUploadFormProps {
@@ -130,6 +131,10 @@ export function ContextUploadForm({
     | { phase: "error"; message: string }
     | { phase: "info"; message: string }
   >({ phase: "idle" });
+  // Only relevant when binding a NEW folder. After bind, future syncs
+  // (cron + manual) always extract tasks. Default true — historical files
+  // generate stale tasks, almost everyone wants to skip them.
+  const [skipTaskExtraction, setSkipTaskExtraction] = useState(true);
 
   useEffect(() => {
     return () => {
@@ -323,7 +328,8 @@ export function ContextUploadForm({
     const result = await importDriveLinkForAccount(
       accountId,
       driveLinkUrl.trim(),
-      driveLinkNotes.trim() || undefined
+      driveLinkNotes.trim() || undefined,
+      { skipTaskExtraction }
     );
     if (result.error) {
       setDriveLinkState({ phase: "error", message: result.error });
@@ -840,11 +846,12 @@ export function ContextUploadForm({
 
           <p className="text-xs text-muted-foreground">
             Pegá un link a un archivo o una carpeta de Drive. Si es archivo, lo
-            importamos como una transcripción o doc de contexto según el formato.
-            Si es <strong>carpeta</strong>, vinculamos la carpeta a la cuenta e
-            importamos todo lo de adentro automáticamente. Hace falta tener Drive
-            conectado en el Workspace y que la cuenta de Google tenga acceso al
-            archivo o carpeta.
+            importamos como transcripción o doc de contexto según el formato.
+            Si es <strong>carpeta</strong>, la vinculamos a la cuenta e
+            importamos los <strong>24 archivos más recientes</strong> al
+            instante. Después cada 30 minutos chequeamos si hay nuevos y los
+            importamos solos. Hace falta Drive conectado en el Workspace y que
+            la cuenta de Google tenga acceso a la carpeta.
           </p>
 
           {driveLinkState.phase === "error" && (
@@ -873,6 +880,24 @@ export function ContextUploadForm({
             onChange={(e) => setDriveLinkUrl(e.target.value)}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
+          {parseDriveFolderIdFromUrl(driveLinkUrl) && !folder && (
+            <label className="flex items-start gap-2 text-xs text-muted-foreground rounded-md p-2.5 [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)]">
+              <input
+                type="checkbox"
+                checked={skipTaskExtraction}
+                onChange={(e) => setSkipTaskExtraction(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                <strong className="text-foreground">
+                  No extraer tareas de los archivos viejos
+                </strong>{" "}
+                — recomendado para evitar que tu lista de tareas se llene con
+                cosas obsoletas. Los archivos nuevos que ingresen a la carpeta
+                a partir de ahora sí van a generar tareas automáticamente.
+              </span>
+            </label>
+          )}
           <textarea
             placeholder="Notas o descripción (opcional — solo aplica a archivos individuales)"
             value={driveLinkNotes}

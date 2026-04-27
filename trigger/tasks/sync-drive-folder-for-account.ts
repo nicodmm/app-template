@@ -1,5 +1,5 @@
-import { task, logger } from "@trigger.dev/sdk/v3";
-import { eq, and } from "drizzle-orm";
+import { task, logger, schedules } from "@trigger.dev/sdk/v3";
+import { eq, and, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/lib/drizzle/db";
 import { driveConnections, accounts } from "@/lib/drizzle/schema";
 import {
@@ -12,9 +12,16 @@ interface SyncFolderInput {
   workspaceId: string;
   accountId: string;
   uploadedByUserId?: string | null;
+  /**
+   * When true, files imported during this run skip task extraction. The
+   * UI sets this only on the initial bulk import (so historical docs
+   * don't flood the task list). Cron + manual "Sync now" leave it
+   * unset so future files extract tasks normally.
+   */
+  skipTaskExtraction?: boolean;
 }
 
-const MAX_FILES_PER_RUN = 200;
+const MAX_FILES_PER_RUN = 24;
 
 export const syncDriveFolderForAccount = task({
   id: "sync-drive-folder-for-account",
@@ -78,6 +85,7 @@ export const syncDriveFolderForAccount = task({
           accountId: acc.id,
           uploadedByUserId: payload.uploadedByUserId ?? null,
           source: "drive_link",
+          skipTaskExtraction: payload.skipTaskExtraction ?? false,
         });
         if (outcome === "imported") imported += 1;
         else if (outcome === "duplicate") duplicates += 1;
@@ -108,5 +116,46 @@ export const syncDriveFolderForAccount = task({
       duplicates,
       skipped,
     });
+  },
+});
+
+/**
+ * Cron — every 30 min iterate every account that has a Drive folder bound
+ * and trigger an incremental sync. Cron-driven syncs always extract tasks
+ * (the skipTaskExtraction flag is only set on the initial bulk import via
+ * the UI checkbox).
+ */
+export const syncAllAccountDriveFolders = schedules.task({
+  id: "sync-all-account-drive-folders",
+  cron: "*/30 * * * *",
+  run: async (): Promise<void> => {
+    const rows = await db
+      .select({
+        accountId: accounts.id,
+        workspaceId: accounts.workspaceId,
+      })
+      .from(accounts)
+      .where(
+        and(
+          isNotNull(accounts.driveFolderId),
+          isNull(accounts.closedAt)
+        )
+      );
+
+    for (const r of rows) {
+      try {
+        await syncDriveFolderForAccount.trigger({
+          workspaceId: r.workspaceId,
+          accountId: r.accountId,
+        });
+      } catch (err) {
+        logger.warn("Failed to enqueue account folder sync", {
+          accountId: r.accountId,
+          error: err instanceof Error ? err.message : "unknown",
+        });
+      }
+    }
+
+    logger.info("Account folder cron tick done", { accountsScanned: rows.length });
   },
 });

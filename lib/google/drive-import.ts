@@ -30,6 +30,13 @@ interface ImportOptions {
    * "link-only sync" mode to keep storage minimal.
    */
   linkOnly?: boolean;
+  /**
+   * When true, the transcript path skips extract-tasks and the context-doc
+   * path skips enqueueing analyze-context-document. Used by the initial
+   * bulk import after Drive-folder bind so historical files don't produce
+   * stale tasks.
+   */
+  skipTaskExtraction?: boolean;
 }
 
 function hashContent(content: string): string {
@@ -203,6 +210,7 @@ export async function importDriveFileForAccount(
         accountId,
         workspaceId,
         content: text,
+        skipTaskExtraction: opts.skipTaskExtraction ?? false,
       });
       await db
         .update(transcripts)
@@ -245,17 +253,21 @@ export async function importDriveFileForAccount(
 
   // Kick off an account-summary refresh and a per-doc task analysis. The
   // analyzer skips automatically if the doc has too little narrative text.
+  // skipTaskExtraction skips analyze-context-document entirely — it's a
+  // dedicated task-extraction step.
   try {
     const { tasks } = await import("@trigger.dev/sdk/v3");
     await tasks.trigger("refresh-account-summary", {
       accountId,
       workspaceId,
     });
-    await tasks.trigger("analyze-context-document", {
-      contextDocumentId: contextInsert[0].id,
-      accountId,
-      workspaceId,
-    });
+    if (!opts.skipTaskExtraction) {
+      await tasks.trigger("analyze-context-document", {
+        contextDocumentId: contextInsert[0].id,
+        accountId,
+        workspaceId,
+      });
+    }
   } catch {
     // best-effort; manual re-trigger available from the UI
   }

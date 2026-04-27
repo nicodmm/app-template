@@ -14,6 +14,12 @@ interface ProcessTranscriptInput {
   accountId: string;
   workspaceId: string;
   content: string;
+  /**
+   * Skip the extract-tasks step. Set by bulk historical imports (Drive
+   * folder bind) to avoid flooding the task list with stale items from
+   * old meetings. Live transcripts and post-bind syncs leave it unset.
+   */
+  skipTaskExtraction?: boolean;
 }
 
 export const processTranscript = task({
@@ -21,6 +27,7 @@ export const processTranscript = task({
   maxDuration: 300,
   run: async (payload: ProcessTranscriptInput): Promise<void> => {
     const { transcriptId, accountId, workspaceId, content } = payload;
+    const skipTaskExtraction = payload.skipTaskExtraction ?? false;
 
     try {
       // 1. Prepare — normalize text, update status to processing
@@ -41,12 +48,14 @@ export const processTranscript = task({
       });
 
       // 3. Extract tasks (sequential — Promise.all not supported with triggerAndWait)
-      await extractTasks.triggerAndWait({
-        transcriptId,
-        accountId,
-        workspaceId,
-        cleanedContent,
-      });
+      if (!skipTaskExtraction) {
+        await extractTasks.triggerAndWait({
+          transcriptId,
+          accountId,
+          workspaceId,
+          cleanedContent,
+        });
+      }
 
       // 4. Generate summary
       const summaryResult = await generateSummary.triggerAndWait({
