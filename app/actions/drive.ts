@@ -106,7 +106,11 @@ export async function importDriveLinkForAccount(
   userNotes?: string,
   opts?: { skipTaskExtraction?: boolean; matchAccountName?: boolean }
 ): Promise<{
-  outcome?: "queued" | "duplicate" | "folder_bound";
+  outcome?:
+    | "queued"
+    | "duplicate"
+    | "folder_bound"
+    | "drive_not_connected";
   fileName?: string;
   folderName?: string;
   error?: string;
@@ -114,6 +118,16 @@ export async function importDriveLinkForAccount(
   const userId = await requireUserId();
   const workspace = await getWorkspaceByUserId(userId);
   if (!workspace) return { error: "Workspace no encontrado" };
+
+  // Single up-front Drive-connection check — both folder and file paths
+  // need it. Returning a structured outcome lets the UI offer an inline
+  // "Connect Drive" CTA instead of a dead-end error message.
+  const [hasConn] = await db
+    .select({ id: driveConnections.id })
+    .from(driveConnections)
+    .where(eq(driveConnections.workspaceId, workspace.id))
+    .limit(1);
+  if (!hasConn) return { outcome: "drive_not_connected" };
 
   // If the URL points at a folder, route to the folder-binding flow instead
   // of trying to import a single file.
@@ -152,10 +166,7 @@ export async function importDriveLinkForAccount(
     .where(eq(driveConnections.workspaceId, workspace.id))
     .limit(1);
   if (!conn) {
-    return {
-      error:
-        "Conectá Google Drive primero desde el Workspace para poder importar links.",
-    };
+    return { outcome: "drive_not_connected" };
   }
 
   // Refresh token and fetch metadata quickly to fail fast on permission issues

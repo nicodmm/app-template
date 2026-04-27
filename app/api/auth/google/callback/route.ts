@@ -12,11 +12,19 @@ import {
 } from "@/lib/google/oauth";
 
 const STATE_COOKIE = "google_oauth_state";
-const REDIRECT_BASE = `/app/settings/workspace`;
+const RETURN_TO_COOKIE = "google_oauth_return_to";
+const DEFAULT_REDIRECT_BASE = `/app/settings/workspace`;
 
-function redirect(reason: string, ok = false): NextResponse {
+function redirect(
+  reason: string,
+  ok: boolean,
+  returnTo: string | null
+): NextResponse {
+  const base = returnTo ?? DEFAULT_REDIRECT_BASE;
+  const separator = base.includes("?") ? "&" : "?";
+  const param = ok ? "drive=" : "drive_error=";
   const url = new URL(
-    `${REDIRECT_BASE}?${ok ? "drive=" : "drive_error="}${encodeURIComponent(reason)}`,
+    `${base}${separator}${param}${encodeURIComponent(reason)}`,
     process.env.NEXT_PUBLIC_APP_URL
   );
   return NextResponse.redirect(url);
@@ -24,30 +32,41 @@ function redirect(reason: string, ok = false): NextResponse {
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const userId = await requireUserId();
+
+  // Pull the optional returnTo cookie up front so error redirects respect
+  // it too. Only accept relative paths under /app/ — defense in depth.
+  const cookieStore = await cookies();
+  const rawReturn = cookieStore.get(RETURN_TO_COOKIE)?.value ?? null;
+  const returnTo =
+    rawReturn && rawReturn.startsWith("/app/") && !rawReturn.includes("//")
+      ? rawReturn
+      : null;
+  if (rawReturn) cookieStore.delete(RETURN_TO_COOKIE);
+
   const workspace = await getWorkspaceByUserId(userId);
-  if (!workspace) return redirect("no_workspace");
+  if (!workspace) return redirect("no_workspace", false, returnTo);
   const member = await getWorkspaceMember(workspace.id, userId);
   if (!member || (member.role !== "owner" && member.role !== "admin")) {
-    return redirect("forbidden");
+    return redirect("forbidden", false, returnTo);
   }
 
   const code = req.nextUrl.searchParams.get("code");
   const state = req.nextUrl.searchParams.get("state");
   const oauthError = req.nextUrl.searchParams.get("error");
 
-  if (oauthError) return redirect(oauthError);
-  if (!code || !state) return redirect("missing_code");
+  if (oauthError) return redirect(oauthError, false, returnTo);
+  if (!code || !state) return redirect("missing_code", false, returnTo);
 
-  const cookieStore = await cookies();
   const storedState = cookieStore.get(STATE_COOKIE)?.value;
   cookieStore.delete(STATE_COOKIE);
-  if (!storedState || storedState !== state) return redirect("invalid_state");
+  if (!storedState || storedState !== state)
+    return redirect("invalid_state", false, returnTo);
 
   try {
     const tokens = await exchangeGoogleCode(code);
     if (!tokens.refresh_token) {
       // Without offline access we cannot refresh later.
-      return redirect("no_refresh_token");
+      return redirect("no_refresh_token", false, returnTo);
     }
     const userInfo = await fetchGoogleUserInfo(tokens.access_token);
 
@@ -84,9 +103,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       });
     }
 
-    return redirect("connected", true);
+    return redirect("connected", true, returnTo);
   } catch (err) {
     const message = err instanceof Error ? err.message : "oauth_failed";
-    return redirect(message.substring(0, 80));
+    return redirect(message.substring(0, 80), false, returnTo);
   }
 }

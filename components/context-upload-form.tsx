@@ -120,6 +120,7 @@ export function ContextUploadForm({
     | { phase: "polling"; message: string }
     | { phase: "done"; message: string }
     | { phase: "error"; message: string }
+    | { phase: "needs_connect" }
   >({ phase: "idle" });
   const driveLinkPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -337,6 +338,12 @@ export function ContextUploadForm({
       driveLinkNotes.trim() || undefined,
       { skipTaskExtraction, matchAccountName }
     );
+
+    if (result.outcome === "drive_not_connected") {
+      setDriveLinkState({ phase: "needs_connect" });
+      return;
+    }
+
     if (result.error) {
       setDriveLinkState({ phase: "error", message: result.error });
       return;
@@ -856,8 +863,7 @@ export function ContextUploadForm({
             Si es <strong>carpeta</strong>, la vinculamos a la cuenta e
             importamos los <strong>24 archivos más recientes</strong> al
             instante. Después cada 10 minutos chequeamos si hay nuevos y los
-            importamos solos. Hace falta Drive conectado en el Workspace y que
-            la cuenta de Google tenga acceso a la carpeta.
+            importamos solos.
           </p>
 
           {driveLinkState.phase === "error" && (
@@ -876,6 +882,24 @@ export function ContextUploadForm({
             <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-start gap-2">
               <Loader2 size={14} className="animate-spin text-primary mt-0.5 shrink-0" />
               <p className="text-sm text-primary">{driveLinkState.message}</p>
+            </div>
+          )}
+          {driveLinkState.phase === "needs_connect" && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700 p-4 space-y-2">
+              <p className="text-sm text-amber-900 dark:text-amber-200">
+                <strong>Drive no está conectado</strong> en este workspace.
+                Conectá tu cuenta de Google ahora — te traemos de vuelta acá
+                cuando termines y podés volver a hacer click en{" "}
+                <em>Importar desde Drive</em>.
+              </p>
+              <a
+                href={`/api/auth/google/login?returnTo=${encodeURIComponent(
+                  `/app/accounts/${accountId}`
+                )}`}
+                className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 text-white px-3 py-1.5 text-xs font-medium hover:bg-amber-700 transition-colors"
+              >
+                <LinkIcon size={12} /> Conectar Google Drive
+              </a>
             </div>
           )}
 
