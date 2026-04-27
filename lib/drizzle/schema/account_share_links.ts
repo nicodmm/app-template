@@ -32,7 +32,6 @@ export const accountShareLinks = pgTable(
   },
   (table) => [
     index("account_share_links_account_idx").on(table.accountId),
-    index("account_share_links_token_idx").on(table.token),
   ]
 );
 
