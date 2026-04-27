@@ -188,6 +188,7 @@ export type CampaignRow = {
   id: string;
   metaCampaignId: string;
   name: string;
+  publicName: string | null;
   status: string;
   objective: string | null;
   dailyBudget: number | null;
@@ -212,6 +213,7 @@ export async function getCampaignsWithKpis(
       id: metaCampaigns.id,
       metaCampaignId: metaCampaigns.metaCampaignId,
       name: metaCampaigns.name,
+      publicName: metaCampaigns.publicName,
       status: metaCampaigns.status,
       objective: metaCampaigns.objective,
       dailyBudget: metaCampaigns.dailyBudget,
@@ -241,6 +243,7 @@ export async function getCampaignsWithKpis(
     id: r.id,
     metaCampaignId: r.metaCampaignId,
     name: r.name,
+    publicName: r.publicName,
     status: r.status,
     objective: r.objective,
     dailyBudget: r.dailyBudget,
@@ -293,6 +296,7 @@ export type AdRow = {
   id: string;
   metaAdId: string;
   name: string;
+  publicName: string | null;
   status: string;
   campaignId: string;
   campaignName: string;
@@ -317,6 +321,7 @@ export async function getActiveAdsWithKpis(
       id: metaAds.id,
       metaAdId: metaAds.metaAdId,
       name: metaAds.name,
+      publicName: metaAds.publicName,
       status: metaAds.status,
       campaignId: metaAds.campaignId,
       campaignName: metaCampaigns.name,
@@ -348,6 +353,7 @@ export async function getActiveAdsWithKpis(
     id: r.id,
     metaAdId: r.metaAdId,
     name: r.name,
+    publicName: r.publicName,
     status: r.status,
     campaignId: r.campaignId,
     campaignName: r.campaignName,

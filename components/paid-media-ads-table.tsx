@@ -5,6 +5,8 @@ import { PaidMediaAdDrawer } from "./paid-media-ad-drawer";
 import { getPaidMediaLabels } from "@/lib/meta/labels";
 import { formatMoney } from "@/lib/meta/format";
 import type { AdRow } from "@/lib/queries/paid-media";
+import { PublicNameEditor } from "@/components/paid-media/public-name-editor";
+import { setPublicAdName } from "@/app/actions/share-links";
 
 interface Props {
   ads: AdRow[];
@@ -60,8 +62,15 @@ export function PaidMediaAdsTable({ ads, currency, isEcommerce, adAccountId, sin
                       alt={ad.name}
                       size={56}
                     />
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{ad.name}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium">
+                        <PublicNameEditor
+                          entityId={ad.id}
+                          internalName={ad.name}
+                          initialPublicName={ad.publicName}
+                          onSave={setPublicAdName}
+                        />
+                      </div>
                       <div className="text-xs text-muted-foreground truncate">
                         {ad.campaignName}
                       </div>

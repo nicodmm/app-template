@@ -5,6 +5,8 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import type { CampaignRow } from "@/lib/queries/paid-media";
 import { getPaidMediaLabels } from "@/lib/meta/labels";
 import { PaidMediaCampaignDrawer } from "./paid-media-campaign-drawer";
+import { PublicNameEditor } from "@/components/paid-media/public-name-editor";
+import { setPublicCampaignName } from "@/app/actions/share-links";
 
 type SortKey = keyof Pick<
   CampaignRow,
@@ -123,7 +125,14 @@ export function PaidMediaCampaignsTable({
                 onClick={() => setSelectedId(c.id)}
                 className="cursor-pointer hover:bg-muted/40 transition-colors"
               >
-                <td className="px-2 py-2 max-w-[240px] truncate">{c.name}</td>
+                <td className="px-2 py-2 max-w-[240px]">
+                  <PublicNameEditor
+                    entityId={c.id}
+                    internalName={c.name}
+                    initialPublicName={c.publicName}
+                    onSave={setPublicCampaignName}
+                  />
+                </td>
                 <td className="px-2 py-2">
                   <span
                     className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
