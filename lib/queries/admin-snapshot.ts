@@ -34,38 +34,53 @@ export interface ComputedSnapshot {
  * Runs the heavy aggregate work to populate the dashboard snapshot.
  * Designed to run in a Trigger.dev task far from any user request, so
  * a long execution doesn't pin pooler connections used by `/app/*`
- * pages. The set of queries here mirrors what the old in-render
- * `getAdminDashboardMetrics` did.
+ * pages. Queries run sequentially with per-step timing logs so a slow
+ * query is visible in the Trigger trace instead of disappearing into
+ * a Promise.all that times out as a whole.
  */
 export async function computeAdminDashboardSnapshot(): Promise<ComputedSnapshot> {
   const since = new Date(Date.now() - THIRTY_DAYS_MS);
 
-  const [
-    workspacesTotalRow,
-    workspacesNewRow,
-    usersTotalRow,
-    usersNewRow,
-    accountsActiveRow,
-    transcriptsRow,
-    llmAgg30dRow,
-    llmAggLifetimeRow,
-    llmByTaskRows,
-    wsRows,
-  ] = await Promise.all([
-    db.select({ n: sql<number>`count(*)::int` }).from(workspaces),
+  async function step<T>(label: string, fn: () => Promise<T>): Promise<T> {
+    const t0 = Date.now();
+    try {
+      const out = await fn();
+      console.log(`[admin-snapshot] ${label} ok in ${Date.now() - t0}ms`);
+      return out;
+    } catch (err) {
+      console.error(
+        `[admin-snapshot] ${label} FAILED after ${Date.now() - t0}ms`,
+        err
+      );
+      throw err;
+    }
+  }
+
+  const workspacesTotalRow = await step("workspaces.total", () =>
+    db.select({ n: sql<number>`count(*)::int` }).from(workspaces)
+  );
+  const workspacesNewRow = await step("workspaces.new30d", () =>
     db
       .select({ n: sql<number>`count(*)::int` })
       .from(workspaces)
-      .where(gte(workspaces.createdAt, since)),
-    db.select({ n: sql<number>`count(*)::int` }).from(users),
+      .where(gte(workspaces.createdAt, since))
+  );
+  const usersTotalRow = await step("users.total", () =>
+    db.select({ n: sql<number>`count(*)::int` }).from(users)
+  );
+  const usersNewRow = await step("users.new30d", () =>
     db
       .select({ n: sql<number>`count(*)::int` })
       .from(users)
-      .where(gte(users.createdAt, since)),
+      .where(gte(users.createdAt, since))
+  );
+  const accountsActiveRow = await step("accounts.active", () =>
     db
       .select({ n: sql<number>`count(*)::int` })
       .from(accounts)
-      .where(isNull(accounts.closedAt)),
+      .where(isNull(accounts.closedAt))
+  );
+  const transcriptsRow = await step("transcripts.completed30d", () =>
     db
       .select({ n: sql<number>`count(*)::int` })
       .from(transcripts)
@@ -74,20 +89,26 @@ export async function computeAdminDashboardSnapshot(): Promise<ComputedSnapshot>
           eq(transcripts.status, "completed"),
           gte(transcripts.createdAt, since)
         )
-      ),
+      )
+  );
+  const llmAgg30dRow = await step("llm.agg30d", () =>
     db
       .select({
         cost: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)::text`,
         tokens: sql<number>`coalesce(sum(${llmUsage.inputTokens} + ${llmUsage.outputTokens} + ${llmUsage.cacheReadTokens} + ${llmUsage.cacheWriteTokens}), 0)::bigint`,
       })
       .from(llmUsage)
-      .where(gte(llmUsage.createdAt, since)),
+      .where(gte(llmUsage.createdAt, since))
+  );
+  const llmAggLifetimeRow = await step("llm.aggLifetime", () =>
     db
       .select({
         cost: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)::text`,
         tokens: sql<number>`coalesce(sum(${llmUsage.inputTokens} + ${llmUsage.outputTokens} + ${llmUsage.cacheReadTokens} + ${llmUsage.cacheWriteTokens}), 0)::bigint`,
       })
-      .from(llmUsage),
+      .from(llmUsage)
+  );
+  const llmByTaskRows = await step("llm.byTask30d", () =>
     db
       .select({
         taskName: llmUsage.taskName,
@@ -98,7 +119,9 @@ export async function computeAdminDashboardSnapshot(): Promise<ComputedSnapshot>
       })
       .from(llmUsage)
       .where(gte(llmUsage.createdAt, since))
-      .groupBy(llmUsage.taskName),
+      .groupBy(llmUsage.taskName)
+  );
+  const wsRows = await step("workspaces.withOwners", () =>
     db
       .select({
         id: workspaces.id,
@@ -107,11 +130,9 @@ export async function computeAdminDashboardSnapshot(): Promise<ComputedSnapshot>
         ownerEmail: users.email,
       })
       .from(workspaces)
-      .leftJoin(users, eq(users.id, workspaces.ownerId)),
-  ]);
+      .leftJoin(users, eq(users.id, workspaces.ownerId))
+  );
 
-  // Per-workspace fanout. wsRows is small (admin platform — usually <100
-  // workspaces), so this stays cheap.
   const wsIds = wsRows.map((w) => w.id);
 
   let accountsByWs = new Map<string, number>();
@@ -120,7 +141,7 @@ export async function computeAdminDashboardSnapshot(): Promise<ComputedSnapshot>
   let lastActivityByWs = new Map<string, Date>();
 
   if (wsIds.length > 0) {
-    const [accCounts, trCounts, sigCounts, lastAct] = await Promise.all([
+    const accCounts = await step("accounts.byWs", () =>
       db
         .select({
           workspaceId: accounts.workspaceId,
@@ -130,7 +151,9 @@ export async function computeAdminDashboardSnapshot(): Promise<ComputedSnapshot>
         .where(
           and(inArray(accounts.workspaceId, wsIds), isNull(accounts.closedAt))
         )
-        .groupBy(accounts.workspaceId),
+        .groupBy(accounts.workspaceId)
+    );
+    const trCounts = await step("transcripts.byWs30d", () =>
       db
         .select({
           workspaceId: transcripts.workspaceId,
@@ -144,7 +167,9 @@ export async function computeAdminDashboardSnapshot(): Promise<ComputedSnapshot>
             gte(transcripts.createdAt, since)
           )
         )
-        .groupBy(transcripts.workspaceId),
+        .groupBy(transcripts.workspaceId)
+    );
+    const sigCounts = await step("signals.activeByWs", () =>
       db
         .select({
           workspaceId: accounts.workspaceId,
@@ -158,7 +183,9 @@ export async function computeAdminDashboardSnapshot(): Promise<ComputedSnapshot>
             eq(signals.status, "active")
           )
         )
-        .groupBy(accounts.workspaceId),
+        .groupBy(accounts.workspaceId)
+    );
+    const lastAct = await step("transcripts.lastActivityByWs", () =>
       db
         .select({
           workspaceId: transcripts.workspaceId,
@@ -166,8 +193,8 @@ export async function computeAdminDashboardSnapshot(): Promise<ComputedSnapshot>
         })
         .from(transcripts)
         .where(inArray(transcripts.workspaceId, wsIds))
-        .groupBy(transcripts.workspaceId),
-    ]);
+        .groupBy(transcripts.workspaceId)
+    );
 
     accountsByWs = new Map(accCounts.map((r) => [r.workspaceId, r.n]));
     transcriptsByWs = new Map(trCounts.map((r) => [r.workspaceId, r.n]));

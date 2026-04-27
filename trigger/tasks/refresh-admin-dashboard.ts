@@ -11,13 +11,19 @@ import {
  */
 export const refreshAdminDashboardOnce = task({
   id: "refresh-admin-dashboard",
-  retry: { maxAttempts: 2 },
-  maxDuration: 120,
+  retry: { maxAttempts: 1 },
+  maxDuration: 600,
   run: async () => {
     logger.info("computing admin dashboard snapshot");
+    const t0 = Date.now();
     const data = await computeAdminDashboardSnapshot();
+    logger.info("snapshot computed, persisting", {
+      computeMs: Date.now() - t0,
+      workspacesTotal: data.workspacesTotal,
+    });
     await persistAdminDashboardSnapshot(data);
     logger.info("admin dashboard snapshot persisted", {
+      totalMs: Date.now() - t0,
       workspacesTotal: data.workspacesTotal,
       llmCostUsd30d: data.llmCostUsd30d,
     });
@@ -26,16 +32,20 @@ export const refreshAdminDashboardOnce = task({
 });
 
 /**
- * Hourly schedule. Runs at minute 0 of every hour. Bumps to less-
- * frequent if the queries get heavy enough to justify, but currently
- * each refresh takes a few seconds even on a small workspace.
+ * Hourly schedule. Runs at minute 0 of every hour.
  */
 export const refreshAdminDashboardCron = schedules.task({
   id: "refresh-admin-dashboard-cron",
   cron: "0 * * * *",
+  maxDuration: 600,
   run: async () => {
+    const t0 = Date.now();
     const data = await computeAdminDashboardSnapshot();
     await persistAdminDashboardSnapshot(data);
+    logger.info("admin dashboard snapshot persisted (cron)", {
+      totalMs: Date.now() - t0,
+      workspacesTotal: data.workspacesTotal,
+    });
     return { ok: true };
   },
 });
