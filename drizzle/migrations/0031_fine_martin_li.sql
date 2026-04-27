@@ -1,0 +1,1 @@
+ALTER TABLE "admin_dashboard_snapshot" ADD COLUMN "top_users" jsonb DEFAULT '[]'::jsonb NOT NULL;

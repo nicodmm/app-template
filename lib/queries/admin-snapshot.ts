@@ -1,6 +1,7 @@
 import { db } from "@/lib/drizzle/db";
 import {
   workspaces,
+  workspaceMembers,
   users,
   accounts,
   transcripts,
@@ -9,6 +10,7 @@ import {
   adminDashboardSnapshot,
   type SnapshotWorkspaceRow,
   type SnapshotLlmTaskRow,
+  type SnapshotUserRow,
   type AdminDashboardSnapshotRow,
 } from "@/lib/drizzle/schema";
 import { and, eq, gte, isNull, sql, inArray } from "drizzle-orm";
@@ -28,6 +30,7 @@ export interface ComputedSnapshot {
   llmTokensLifetime: number;
   topWorkspaces: SnapshotWorkspaceRow[];
   llmByTask: SnapshotLlmTaskRow[];
+  topUsers: SnapshotUserRow[];
 }
 
 /**
@@ -242,6 +245,106 @@ export async function computeAdminDashboardSnapshot(): Promise<ComputedSnapshot>
     }))
     .sort((a, b) => b.costUsd - a.costUsd);
 
+  // Users — full list with per-user aggregates. Same pattern as workspaces:
+  // small admin platform, so a fanout of 3 extra queries is cheap.
+  const userRows = await step("users.list", () =>
+    db
+      .select({
+        id: users.id,
+        email: users.email,
+        fullName: users.fullName,
+        role: users.role,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+  );
+
+  let workspacesByUser = new Map<string, number>();
+  let transcriptsByUser = new Map<string, number>();
+  let lastActivityByUser = new Map<string, Date>();
+
+  if (userRows.length > 0) {
+    const userIds = userRows.map((u) => u.id);
+    const wmCounts = await step("workspaceMembers.byUser", () =>
+      db
+        .select({
+          userId: workspaceMembers.userId,
+          n: sql<number>`count(distinct ${workspaceMembers.workspaceId})::int`,
+        })
+        .from(workspaceMembers)
+        .where(inArray(workspaceMembers.userId, userIds))
+        .groupBy(workspaceMembers.userId)
+    );
+    const trByUser = await step("transcripts.byUser30d", () =>
+      db
+        .select({
+          uploadedBy: transcripts.uploadedBy,
+          n: sql<number>`count(*)::int`,
+        })
+        .from(transcripts)
+        .where(
+          and(
+            inArray(transcripts.uploadedBy, userIds),
+            gte(transcripts.createdAt, since)
+          )
+        )
+        .groupBy(transcripts.uploadedBy)
+    );
+    const lastByUser = await step("transcripts.lastActivityByUser", () =>
+      db
+        .select({
+          uploadedBy: transcripts.uploadedBy,
+          last: sql<unknown>`max(${transcripts.createdAt})`,
+        })
+        .from(transcripts)
+        .where(inArray(transcripts.uploadedBy, userIds))
+        .groupBy(transcripts.uploadedBy)
+    );
+
+    workspacesByUser = new Map(wmCounts.map((r) => [r.userId, r.n]));
+    transcriptsByUser = new Map(
+      trByUser
+        .filter((r) => r.uploadedBy !== null)
+        .map((r) => [r.uploadedBy as string, r.n])
+    );
+    lastActivityByUser = new Map(
+      lastByUser
+        .filter(
+          (r) =>
+            r.uploadedBy !== null && r.last !== null && r.last !== undefined
+        )
+        .map((r) => {
+          const v = r.last;
+          const d = v instanceof Date ? v : new Date(v as string);
+          return [r.uploadedBy as string, d] as [string, Date];
+        })
+    );
+  }
+
+  const topUsers: SnapshotUserRow[] = userRows
+    .map((u) => ({
+      userId: u.id,
+      email: u.email,
+      fullName: u.fullName,
+      role: u.role,
+      workspacesCount: workspacesByUser.get(u.id) ?? 0,
+      transcripts30d: transcriptsByUser.get(u.id) ?? 0,
+      lastActivityAt:
+        (lastActivityByUser.get(u.id) ?? null)?.toISOString() ?? null,
+      createdAt:
+        u.createdAt instanceof Date
+          ? u.createdAt.toISOString()
+          : new Date(u.createdAt as unknown as string).toISOString(),
+    }))
+    .sort((a, b) => {
+      if (b.transcripts30d !== a.transcripts30d)
+        return b.transcripts30d - a.transcripts30d;
+      const aLast = a.lastActivityAt ? Date.parse(a.lastActivityAt) : 0;
+      const bLast = b.lastActivityAt ? Date.parse(b.lastActivityAt) : 0;
+      if (bLast !== aLast) return bLast - aLast;
+      return Date.parse(b.createdAt) - Date.parse(a.createdAt);
+    });
+
   return {
     workspacesTotal: workspacesTotalRow[0]?.n ?? 0,
     workspacesNew30d: workspacesNewRow[0]?.n ?? 0,
@@ -255,6 +358,7 @@ export async function computeAdminDashboardSnapshot(): Promise<ComputedSnapshot>
     llmTokensLifetime: Number(llmAggLifetimeRow[0]?.tokens ?? 0),
     topWorkspaces,
     llmByTask,
+    topUsers,
   };
 }
 
@@ -281,6 +385,7 @@ export async function persistAdminDashboardSnapshot(
       llmTokensLifetime: data.llmTokensLifetime,
       topWorkspaces: data.topWorkspaces,
       llmByTask: data.llmByTask,
+      topUsers: data.topUsers,
       refreshedAt: new Date(),
     })
     .onConflictDoUpdate({
@@ -298,6 +403,7 @@ export async function persistAdminDashboardSnapshot(
         llmTokensLifetime: data.llmTokensLifetime,
         topWorkspaces: data.topWorkspaces,
         llmByTask: data.llmByTask,
+        topUsers: data.topUsers,
         refreshedAt: new Date(),
       },
     });

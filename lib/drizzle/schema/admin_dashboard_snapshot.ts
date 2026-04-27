@@ -29,6 +29,19 @@ export interface SnapshotLlmTaskRow {
   costUsd: number;
 }
 
+export interface SnapshotUserRow {
+  userId: string;
+  email: string;
+  fullName: string | null;
+  role: string;
+  workspacesCount: number;
+  transcripts30d: number;
+  /** ISO timestamp serialized to JSON. */
+  lastActivityAt: string | null;
+  /** ISO timestamp serialized to JSON. */
+  createdAt: string;
+}
+
 /**
  * Singleton-row table that holds the precomputed platform-admin
  * dashboard rollup. Refreshed in background by the
@@ -81,6 +94,10 @@ export const adminDashboardSnapshot = pgTable("admin_dashboard_snapshot", {
     .default(sql`'[]'::jsonb`),
   llmByTask: jsonb("llm_by_task")
     .$type<SnapshotLlmTaskRow[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+  topUsers: jsonb("top_users")
+    .$type<SnapshotUserRow[]>()
     .notNull()
     .default(sql`'[]'::jsonb`),
 

@@ -231,7 +231,7 @@ export default async function AdminDashboardPage() {
 
           <div className="mt-6 rounded-xl backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
             <div className="flex items-center justify-between px-4 pt-4 pb-2">
-              <h2 className="text-sm font-semibold">Workspaces más activos</h2>
+              <h2 className="text-sm font-semibold">Workspaces</h2>
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 últimos 30 días
               </span>
@@ -288,6 +288,76 @@ export default async function AdminDashboardPage() {
                         </td>
                         <td className="px-4 py-2 text-right text-muted-foreground">
                           {formatDate(w.lastActivityAt)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6 rounded-xl backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+            <div className="flex items-center justify-between px-4 pt-4 pb-2">
+              <h2 className="text-sm font-semibold">Usuarios</h2>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {snap.topUsers.length} en total
+              </span>
+            </div>
+            {snap.topUsers.length === 0 ? (
+              <p className="px-4 pb-4 text-xs text-muted-foreground">
+                Aún no hay usuarios registrados.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-2 text-left font-medium">
+                        Usuario
+                      </th>
+                      <th className="px-4 py-2 text-left font-medium">Email</th>
+                      <th className="px-4 py-2 text-left font-medium">Rol</th>
+                      <th className="px-4 py-2 text-right font-medium">
+                        Workspaces
+                      </th>
+                      <th className="px-4 py-2 text-right font-medium">
+                        Transcripciones (30d)
+                      </th>
+                      <th className="px-4 py-2 text-right font-medium">
+                        Última actividad
+                      </th>
+                      <th className="px-4 py-2 text-right font-medium">
+                        Alta
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {snap.topUsers.map((u) => (
+                      <tr
+                        key={u.userId}
+                        className="[border-top:1px_solid_var(--glass-tile-border)]"
+                      >
+                        <td className="px-4 py-2 font-medium">
+                          {u.fullName ?? "—"}
+                        </td>
+                        <td className="px-4 py-2 text-muted-foreground">
+                          {u.email}
+                        </td>
+                        <td className="px-4 py-2 text-muted-foreground">
+                          {u.role}
+                        </td>
+                        <td className="px-4 py-2 text-right tabular-nums">
+                          {formatInteger(u.workspacesCount)}
+                        </td>
+                        <td className="px-4 py-2 text-right tabular-nums">
+                          {formatInteger(u.transcripts30d)}
+                        </td>
+                        <td className="px-4 py-2 text-right text-muted-foreground">
+                          {formatDate(u.lastActivityAt)}
+                        </td>
+                        <td className="px-4 py-2 text-right text-muted-foreground">
+                          {formatDate(u.createdAt)}
                         </td>
                       </tr>
                     ))}
