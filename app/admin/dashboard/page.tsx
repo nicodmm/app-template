@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { Wrench, ChevronRight } from "lucide-react";
 
-export const dynamic = "force-static";
+// Don't switch this to "force-static" — the parent admin layout's
+// requireAdminAccess() reads cookies, and force-static disables cookie
+// access at the route segment level, which makes the auth check return
+// "no user" and redirects every visitor to /unauthorized.
+export const dynamic = "force-dynamic";
 
 /**
  * Temporarily disabled.
