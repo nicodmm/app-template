@@ -54,10 +54,36 @@ export interface AdminDashboardSnapshot {
   llmByTask30d: AdminLlmTaskRow[];
 }
 
+/**
+ * Wraps a query in a hard timeout. Returns null when the timeout fires or
+ * the query throws — letting the dashboard render partial data instead of
+ * hanging forever when one stat is misbehaving (e.g. a Supabase pooler
+ * hiccup or the llm_usage table not yet existing on a fresh deploy).
+ */
+async function safeQuery<T>(
+  label: string,
+  q: Promise<T>,
+  timeoutMs = 5000
+): Promise<T | null> {
+  return Promise.race([
+    q,
+    new Promise<null>((resolve) =>
+      setTimeout(() => {
+        console.error(`[admin] ${label} timed out after ${timeoutMs}ms`);
+        resolve(null);
+      }, timeoutMs)
+    ),
+  ]).catch((err) => {
+    console.error(`[admin] ${label} failed`, err);
+    return null;
+  });
+}
+
 export async function getAdminDashboardMetrics(): Promise<AdminDashboardSnapshot> {
   const since = new Date(Date.now() - THIRTY_DAYS_MS);
 
-  // KPIs: simple aggregate queries in parallel.
+  // KPIs and LLM aggregates in parallel, each guarded by safeQuery so a
+  // single misbehaving query doesn't take the whole page down.
   const [
     workspacesTotalRow,
     workspacesNewRow,
@@ -69,70 +95,99 @@ export async function getAdminDashboardMetrics(): Promise<AdminDashboardSnapshot
     llmAggLifetimeRow,
     llmByTaskRows,
   ] = await Promise.all([
-    db.select({ n: sql<number>`count(*)::int` }).from(workspaces),
-    db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(workspaces)
-      .where(gte(workspaces.createdAt, since)),
-    db.select({ n: sql<number>`count(*)::int` }).from(users),
-    db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(users)
-      .where(gte(users.createdAt, since)),
-    db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(accounts)
-      .where(isNull(accounts.closedAt)),
-    db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(transcripts)
-      .where(
-        and(
-          eq(transcripts.status, "completed"),
-          gte(transcripts.createdAt, since)
+    safeQuery(
+      "workspacesTotal",
+      db.select({ n: sql<number>`count(*)::int` }).from(workspaces)
+    ),
+    safeQuery(
+      "workspacesNew",
+      db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(workspaces)
+        .where(gte(workspaces.createdAt, since))
+    ),
+    safeQuery(
+      "usersTotal",
+      db.select({ n: sql<number>`count(*)::int` }).from(users)
+    ),
+    safeQuery(
+      "usersNew",
+      db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(users)
+        .where(gte(users.createdAt, since))
+    ),
+    safeQuery(
+      "accountsActive",
+      db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(accounts)
+        .where(isNull(accounts.closedAt))
+    ),
+    safeQuery(
+      "transcripts30d",
+      db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(transcripts)
+        .where(
+          and(
+            eq(transcripts.status, "completed"),
+            gte(transcripts.createdAt, since)
+          )
         )
-      ),
-    db
-      .select({
-        cost: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)::text`,
-        tokens: sql<number>`coalesce(sum(${llmUsage.inputTokens} + ${llmUsage.outputTokens} + ${llmUsage.cacheReadTokens} + ${llmUsage.cacheWriteTokens}), 0)::bigint`,
-      })
-      .from(llmUsage)
-      .where(gte(llmUsage.createdAt, since)),
-    db
-      .select({
-        cost: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)::text`,
-        tokens: sql<number>`coalesce(sum(${llmUsage.inputTokens} + ${llmUsage.outputTokens} + ${llmUsage.cacheReadTokens} + ${llmUsage.cacheWriteTokens}), 0)::bigint`,
-      })
-      .from(llmUsage),
-    db
-      .select({
-        taskName: llmUsage.taskName,
-        calls: sql<number>`count(*)::int`,
-        inputTokens: sql<number>`coalesce(sum(${llmUsage.inputTokens}), 0)::bigint`,
-        outputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)::bigint`,
-        costUsd: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)::text`,
-      })
-      .from(llmUsage)
-      .where(gte(llmUsage.createdAt, since))
-      .groupBy(llmUsage.taskName),
+    ),
+    safeQuery(
+      "llmAgg30d",
+      db
+        .select({
+          cost: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)::text`,
+          tokens: sql<number>`coalesce(sum(${llmUsage.inputTokens} + ${llmUsage.outputTokens} + ${llmUsage.cacheReadTokens} + ${llmUsage.cacheWriteTokens}), 0)::bigint`,
+        })
+        .from(llmUsage)
+        .where(gte(llmUsage.createdAt, since))
+    ),
+    safeQuery(
+      "llmAggLifetime",
+      db
+        .select({
+          cost: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)::text`,
+          tokens: sql<number>`coalesce(sum(${llmUsage.inputTokens} + ${llmUsage.outputTokens} + ${llmUsage.cacheReadTokens} + ${llmUsage.cacheWriteTokens}), 0)::bigint`,
+        })
+        .from(llmUsage)
+    ),
+    safeQuery(
+      "llmByTask",
+      db
+        .select({
+          taskName: llmUsage.taskName,
+          calls: sql<number>`count(*)::int`,
+          inputTokens: sql<number>`coalesce(sum(${llmUsage.inputTokens}), 0)::bigint`,
+          outputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)::bigint`,
+          costUsd: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)::text`,
+        })
+        .from(llmUsage)
+        .where(gte(llmUsage.createdAt, since))
+        .groupBy(llmUsage.taskName)
+    ),
   ]);
 
-  // Top workspaces: derive in-memory from a small set of focused queries
-  // instead of correlated subselects. Cheaper to reason about and avoids
-  // edge-case planner issues with deeply nested SELECTs in subscribed
-  // pooler setups.
-  const wsRows = await db
-    .select({
-      id: workspaces.id,
-      name: workspaces.name,
-      ownerId: workspaces.ownerId,
-      createdAt: workspaces.createdAt,
-      ownerName: users.fullName,
-      ownerEmail: users.email,
-    })
-    .from(workspaces)
-    .leftJoin(users, eq(users.id, workspaces.ownerId));
+  // Top workspaces: derive in-memory from a small set of focused queries.
+  // safeQuery wrapping so this doesn't hang the page on a slow query.
+  const wsRowsResult = await safeQuery(
+    "workspacesList",
+    db
+      .select({
+        id: workspaces.id,
+        name: workspaces.name,
+        ownerId: workspaces.ownerId,
+        createdAt: workspaces.createdAt,
+        ownerName: users.fullName,
+        ownerEmail: users.email,
+      })
+      .from(workspaces)
+      .leftJoin(users, eq(users.id, workspaces.ownerId))
+  );
+  const wsRows = wsRowsResult ?? [];
 
   const wsIds = wsRows.map((w) => w.id);
 
@@ -143,62 +198,80 @@ export async function getAdminDashboardMetrics(): Promise<AdminDashboardSnapshot
 
   if (wsIds.length > 0) {
     const [accCounts, trCounts, sigCounts, lastAct] = await Promise.all([
-      db
-        .select({
-          workspaceId: accounts.workspaceId,
-          n: sql<number>`count(*)::int`,
-        })
-        .from(accounts)
-        .where(
-          and(
-            inArray(accounts.workspaceId, wsIds),
-            isNull(accounts.closedAt)
+      safeQuery(
+        "accountsByWs",
+        db
+          .select({
+            workspaceId: accounts.workspaceId,
+            n: sql<number>`count(*)::int`,
+          })
+          .from(accounts)
+          .where(
+            and(
+              inArray(accounts.workspaceId, wsIds),
+              isNull(accounts.closedAt)
+            )
           )
-        )
-        .groupBy(accounts.workspaceId),
-      db
-        .select({
-          workspaceId: transcripts.workspaceId,
-          n: sql<number>`count(*)::int`,
-        })
-        .from(transcripts)
-        .where(
-          and(
-            inArray(transcripts.workspaceId, wsIds),
-            eq(transcripts.status, "completed"),
-            gte(transcripts.createdAt, since)
+          .groupBy(accounts.workspaceId)
+      ),
+      safeQuery(
+        "transcriptsByWs",
+        db
+          .select({
+            workspaceId: transcripts.workspaceId,
+            n: sql<number>`count(*)::int`,
+          })
+          .from(transcripts)
+          .where(
+            and(
+              inArray(transcripts.workspaceId, wsIds),
+              eq(transcripts.status, "completed"),
+              gte(transcripts.createdAt, since)
+            )
           )
-        )
-        .groupBy(transcripts.workspaceId),
-      db
-        .select({
-          workspaceId: accounts.workspaceId,
-          n: sql<number>`count(distinct ${signals.id})::int`,
-        })
-        .from(signals)
-        .innerJoin(accounts, eq(accounts.id, signals.accountId))
-        .where(
-          and(
-            inArray(accounts.workspaceId, wsIds),
-            eq(signals.status, "active")
+          .groupBy(transcripts.workspaceId)
+      ),
+      safeQuery(
+        "signalsByWs",
+        db
+          .select({
+            workspaceId: accounts.workspaceId,
+            n: sql<number>`count(distinct ${signals.id})::int`,
+          })
+          .from(signals)
+          .innerJoin(accounts, eq(accounts.id, signals.accountId))
+          .where(
+            and(
+              inArray(accounts.workspaceId, wsIds),
+              eq(signals.status, "active")
+            )
           )
-        )
-        .groupBy(accounts.workspaceId),
-      db
-        .select({
-          workspaceId: transcripts.workspaceId,
-          last: sql<Date | null>`max(${transcripts.createdAt})`,
-        })
-        .from(transcripts)
-        .where(inArray(transcripts.workspaceId, wsIds))
-        .groupBy(transcripts.workspaceId),
+          .groupBy(accounts.workspaceId)
+      ),
+      safeQuery(
+        "lastActivityByWs",
+        db
+          .select({
+            workspaceId: transcripts.workspaceId,
+            last: sql<Date | null>`max(${transcripts.createdAt})`,
+          })
+          .from(transcripts)
+          .where(inArray(transcripts.workspaceId, wsIds))
+          .groupBy(transcripts.workspaceId)
+      ),
     ]);
 
-    accountsByWs = new Map(accCounts.map((r) => [r.workspaceId, r.n]));
-    transcriptsByWs = new Map(trCounts.map((r) => [r.workspaceId, r.n]));
-    signalsByWs = new Map(sigCounts.map((r) => [r.workspaceId, r.n]));
+    accountsByWs = new Map(
+      (accCounts ?? []).map((r) => [r.workspaceId, r.n])
+    );
+    transcriptsByWs = new Map(
+      (trCounts ?? []).map((r) => [r.workspaceId, r.n])
+    );
+    signalsByWs = new Map(
+      (sigCounts ?? []).map((r) => [r.workspaceId, r.n])
+    );
     lastActivityByWs = new Map(
-      lastAct
+      (lastAct ?? [])
         .filter((r) => r.last !== null)
         .map((r) => [r.workspaceId, r.last as Date])
     );
@@ -228,19 +301,22 @@ export async function getAdminDashboardMetrics(): Promise<AdminDashboardSnapshot
   const fallbackTargets = topWorkspaces.filter((r) => !r.ownerDisplay);
   if (fallbackTargets.length > 0) {
     const ids = fallbackTargets.map((r) => r.workspaceId);
-    const memberRows = await db
-      .select({
-        workspaceId: workspaceMembers.workspaceId,
-        fullName: users.fullName,
-        email: users.email,
-        createdAt: workspaceMembers.createdAt,
-      })
-      .from(workspaceMembers)
-      .innerJoin(users, eq(users.id, workspaceMembers.userId))
-      .where(inArray(workspaceMembers.workspaceId, ids))
-      .orderBy(workspaceMembers.workspaceId, desc(workspaceMembers.createdAt));
+    const memberRows = await safeQuery(
+      "ownerFallback",
+      db
+        .select({
+          workspaceId: workspaceMembers.workspaceId,
+          fullName: users.fullName,
+          email: users.email,
+          createdAt: workspaceMembers.createdAt,
+        })
+        .from(workspaceMembers)
+        .innerJoin(users, eq(users.id, workspaceMembers.userId))
+        .where(inArray(workspaceMembers.workspaceId, ids))
+        .orderBy(workspaceMembers.workspaceId, desc(workspaceMembers.createdAt))
+    );
     const fallback = new Map<string, string>();
-    for (const r of memberRows) {
+    for (const r of memberRows ?? []) {
       if (!fallback.has(r.workspaceId)) {
         fallback.set(r.workspaceId, r.fullName ?? r.email);
       }
@@ -252,7 +328,7 @@ export async function getAdminDashboardMetrics(): Promise<AdminDashboardSnapshot
     }
   }
 
-  const llmByTask30d: AdminLlmTaskRow[] = llmByTaskRows
+  const llmByTask30d: AdminLlmTaskRow[] = (llmByTaskRows ?? [])
     .map((r) => ({
       taskName: r.taskName,
       calls: r.calls,
@@ -264,16 +340,16 @@ export async function getAdminDashboardMetrics(): Promise<AdminDashboardSnapshot
 
   return {
     kpis: {
-      workspacesTotal: workspacesTotalRow[0]?.n ?? 0,
-      workspacesNew30d: workspacesNewRow[0]?.n ?? 0,
-      usersTotal: usersTotalRow[0]?.n ?? 0,
-      usersNew30d: usersNewRow[0]?.n ?? 0,
-      accountsActive: accountsActiveRow[0]?.n ?? 0,
-      transcriptsCompleted30d: transcriptsRow[0]?.n ?? 0,
-      llmCostUsd30d: Number(llmAgg30dRow[0]?.cost ?? 0),
-      llmTokensTotal30d: Number(llmAgg30dRow[0]?.tokens ?? 0),
-      llmCostUsdLifetime: Number(llmAggLifetimeRow[0]?.cost ?? 0),
-      llmTokensLifetime: Number(llmAggLifetimeRow[0]?.tokens ?? 0),
+      workspacesTotal: workspacesTotalRow?.[0]?.n ?? 0,
+      workspacesNew30d: workspacesNewRow?.[0]?.n ?? 0,
+      usersTotal: usersTotalRow?.[0]?.n ?? 0,
+      usersNew30d: usersNewRow?.[0]?.n ?? 0,
+      accountsActive: accountsActiveRow?.[0]?.n ?? 0,
+      transcriptsCompleted30d: transcriptsRow?.[0]?.n ?? 0,
+      llmCostUsd30d: Number(llmAgg30dRow?.[0]?.cost ?? 0),
+      llmTokensTotal30d: Number(llmAgg30dRow?.[0]?.tokens ?? 0),
+      llmCostUsdLifetime: Number(llmAggLifetimeRow?.[0]?.cost ?? 0),
+      llmTokensLifetime: Number(llmAggLifetimeRow?.[0]?.tokens ?? 0),
     },
     topWorkspaces,
     llmByTask30d,
