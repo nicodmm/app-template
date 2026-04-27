@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import {
   Briefcase,
   FileText,
@@ -9,7 +10,13 @@ import {
   Zap,
   Coins,
 } from "lucide-react";
-import { getAdminDashboardMetrics } from "@/lib/queries/admin";
+import {
+  getAdminKpis,
+  getAdminLlmByTask,
+  getAdminTopWorkspaces,
+} from "@/lib/queries/admin";
+
+export const dynamic = "force-dynamic";
 
 function formatInteger(n: number): string {
   return new Intl.NumberFormat("es-AR").format(n);
@@ -40,19 +47,62 @@ function formatDate(d: Date | null): string {
   });
 }
 
-export default async function AdminDashboardPage() {
-  const snapshot = await getAdminDashboardMetrics();
-  const { kpis, topWorkspaces, llmByTask30d } = snapshot;
-
+function KpiTile({
+  label,
+  value,
+  hint,
+  icon,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  icon?: React.ReactNode;
+}) {
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Plataforma</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Métricas globales y workspaces más activos.
-        </p>
-      </div>
+    <div className="flex flex-col items-start gap-1 rounded-xl p-4 backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {icon}
+        {label}
+      </span>
+      <span className="text-2xl font-semibold tabular-nums">{value}</span>
+      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+    </div>
+  );
+}
 
+function KpiSkeleton() {
+  return (
+    <div className="rounded-xl p-4 backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)] animate-pulse">
+      <div className="h-3 w-20 rounded bg-muted/30 mb-2" />
+      <div className="h-7 w-16 rounded bg-muted/40" />
+    </div>
+  );
+}
+
+function KpisSkeleton({ count }: { count: number }) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: count }).map((_, i) => (
+        <KpiSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
+function TableSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className="rounded-xl p-4 space-y-2 backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)] animate-pulse">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="h-4 w-full rounded bg-muted/30" />
+      ))}
+    </div>
+  );
+}
+
+async function KpisSection() {
+  const kpis = await getAdminKpis();
+  return (
+    <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <KpiTile
           label="Workspaces totales"
@@ -123,149 +173,164 @@ export default async function AdminDashboardPage() {
             icon={<Zap size={13} />}
           />
         </div>
-
-        <div className="mt-4 rounded-xl backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
-          <div className="flex items-center justify-between px-4 pt-4 pb-2">
-            <h3 className="text-sm font-semibold">Costo por tarea</h3>
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              últimos 30 días
-            </span>
-          </div>
-          {llmByTask30d.length === 0 ? (
-            <p className="px-4 pb-4 text-xs text-muted-foreground">
-              Aún no hay registros de uso. Una vez que se ejecute un job de
-              IA, aparece acá.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-xs text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-medium">Tarea</th>
-                    <th className="px-4 py-2 text-right font-medium">Calls</th>
-                    <th className="px-4 py-2 text-right font-medium">
-                      Input tokens
-                    </th>
-                    <th className="px-4 py-2 text-right font-medium">
-                      Output tokens
-                    </th>
-                    <th className="px-4 py-2 text-right font-medium">
-                      Costo USD
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {llmByTask30d.map((row) => (
-                    <tr
-                      key={row.taskName}
-                      className="[border-top:1px_solid_var(--glass-tile-border)]"
-                    >
-                      <td className="px-4 py-2 font-medium">
-                        <code className="text-xs">{row.taskName}</code>
-                      </td>
-                      <td className="px-4 py-2 text-right tabular-nums">
-                        {formatInteger(row.calls)}
-                      </td>
-                      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
-                        {formatTokens(row.inputTokens)}
-                      </td>
-                      <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
-                        {formatTokens(row.outputTokens)}
-                      </td>
-                      <td className="px-4 py-2 text-right tabular-nums font-medium">
-                        {formatUsd(row.costUsd)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
       </div>
+    </>
+  );
+}
 
-      <div className="mt-6 rounded-xl backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
-        <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <h2 className="text-sm font-semibold">Workspaces más activos</h2>
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            últimos 30 días
-          </span>
-        </div>
-        {topWorkspaces.length === 0 ? (
-          <p className="px-4 pb-4 text-xs text-muted-foreground">
-            Sin actividad en el período.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium">Workspace</th>
-                  <th className="px-4 py-2 text-left font-medium">Owner</th>
-                  <th className="px-4 py-2 text-right font-medium">Cuentas</th>
-                  <th className="px-4 py-2 text-right font-medium">
-                    Transcripciones
-                  </th>
-                  <th className="px-4 py-2 text-right font-medium">
-                    Señales activas
-                  </th>
-                  <th className="px-4 py-2 text-right font-medium">
-                    Última actividad
-                  </th>
+async function LlmByTaskSection() {
+  const rows = await getAdminLlmByTask();
+  return (
+    <div className="rounded-xl backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <h3 className="text-sm font-semibold">Costo por tarea</h3>
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          últimos 30 días
+        </span>
+      </div>
+      {rows.length === 0 ? (
+        <p className="px-4 pb-4 text-xs text-muted-foreground">
+          Aún no hay registros de uso. Una vez que se ejecute un job de IA,
+          aparece acá.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2 text-left font-medium">Tarea</th>
+                <th className="px-4 py-2 text-right font-medium">Calls</th>
+                <th className="px-4 py-2 text-right font-medium">
+                  Input tokens
+                </th>
+                <th className="px-4 py-2 text-right font-medium">
+                  Output tokens
+                </th>
+                <th className="px-4 py-2 text-right font-medium">Costo USD</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.taskName}
+                  className="[border-top:1px_solid_var(--glass-tile-border)]"
+                >
+                  <td className="px-4 py-2 font-medium">
+                    <code className="text-xs">{row.taskName}</code>
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums">
+                    {formatInteger(row.calls)}
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+                    {formatTokens(row.inputTokens)}
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+                    {formatTokens(row.outputTokens)}
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums font-medium">
+                    {formatUsd(row.costUsd)}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {topWorkspaces.map((w) => (
-                  <tr
-                    key={w.workspaceId}
-                    className="[border-top:1px_solid_var(--glass-tile-border)]"
-                  >
-                    <td className="px-4 py-2 font-medium">{w.workspaceName}</td>
-                    <td className="px-4 py-2 text-muted-foreground">
-                      {w.ownerDisplay ?? "—"}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums">
-                      {formatInteger(w.accountsActive)}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums">
-                      {formatInteger(w.transcripts30d)}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums">
-                      {formatInteger(w.signalsActive)}
-                    </td>
-                    <td className="px-4 py-2 text-right text-muted-foreground">
-                      {formatDate(w.lastActivityAt)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
 
-function KpiTile({
-  label,
-  value,
-  hint,
-  icon,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  icon?: React.ReactNode;
-}) {
+async function TopWorkspacesSection() {
+  const rows = await getAdminTopWorkspaces();
   return (
-    <div className="flex flex-col items-start gap-1 rounded-xl p-4 backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
-      <span className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {icon}
-        {label}
-      </span>
-      <span className="text-2xl font-semibold tabular-nums">{value}</span>
-      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+    <div className="rounded-xl backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]">
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <h2 className="text-sm font-semibold">Workspaces más activos</h2>
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          últimos 30 días
+        </span>
+      </div>
+      {rows.length === 0 ? (
+        <p className="px-4 pb-4 text-xs text-muted-foreground">
+          Sin actividad en el período.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2 text-left font-medium">Workspace</th>
+                <th className="px-4 py-2 text-left font-medium">Owner</th>
+                <th className="px-4 py-2 text-right font-medium">Cuentas</th>
+                <th className="px-4 py-2 text-right font-medium">
+                  Transcripciones
+                </th>
+                <th className="px-4 py-2 text-right font-medium">
+                  Señales activas
+                </th>
+                <th className="px-4 py-2 text-right font-medium">
+                  Última actividad
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((w) => (
+                <tr
+                  key={w.workspaceId}
+                  className="[border-top:1px_solid_var(--glass-tile-border)]"
+                >
+                  <td className="px-4 py-2 font-medium">{w.workspaceName}</td>
+                  <td className="px-4 py-2 text-muted-foreground">
+                    {w.ownerDisplay ?? "—"}
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums">
+                    {formatInteger(w.accountsActive)}
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums">
+                    {formatInteger(w.transcripts30d)}
+                  </td>
+                  <td className="px-4 py-2 text-right tabular-nums">
+                    {formatInteger(w.signalsActive)}
+                  </td>
+                  <td className="px-4 py-2 text-right text-muted-foreground">
+                    {formatDate(w.lastActivityAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function AdminDashboardPage() {
+  return (
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold">Plataforma</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Métricas globales y workspaces más activos.
+        </p>
+      </div>
+
+      <Suspense fallback={<KpisSkeleton count={6} />}>
+        <KpisSection />
+      </Suspense>
+
+      <div className="mt-6">
+        <h2 className="text-sm font-semibold mb-3">Costo por tarea</h2>
+        <Suspense fallback={<TableSkeleton rows={4} />}>
+          <LlmByTaskSection />
+        </Suspense>
+      </div>
+
+      <div className="mt-6">
+        <Suspense fallback={<TableSkeleton rows={5} />}>
+          <TopWorkspacesSection />
+        </Suspense>
+      </div>
     </div>
   );
 }

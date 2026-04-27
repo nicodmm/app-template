@@ -55,6 +55,255 @@ export interface AdminDashboardSnapshot {
 }
 
 /**
+ * Light-weight query: just the 6 KPIs + LLM aggregates. Used by the
+ * top KPI tiles. Keeps everything in 8 parallel small aggregates.
+ */
+export async function getAdminKpis(): Promise<AdminKpis> {
+  const since = new Date(Date.now() - THIRTY_DAYS_MS);
+  const [
+    workspacesTotalRow,
+    workspacesNewRow,
+    usersTotalRow,
+    usersNewRow,
+    accountsActiveRow,
+    transcriptsRow,
+    llmAgg30dRow,
+    llmAggLifetimeRow,
+  ] = await Promise.all([
+    safeQuery(
+      "workspacesTotal",
+      db.select({ n: sql<number>`count(*)::int` }).from(workspaces)
+    ),
+    safeQuery(
+      "workspacesNew",
+      db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(workspaces)
+        .where(gte(workspaces.createdAt, since))
+    ),
+    safeQuery(
+      "usersTotal",
+      db.select({ n: sql<number>`count(*)::int` }).from(users)
+    ),
+    safeQuery(
+      "usersNew",
+      db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(users)
+        .where(gte(users.createdAt, since))
+    ),
+    safeQuery(
+      "accountsActive",
+      db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(accounts)
+        .where(isNull(accounts.closedAt))
+    ),
+    safeQuery(
+      "transcripts30d",
+      db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(transcripts)
+        .where(
+          and(
+            eq(transcripts.status, "completed"),
+            gte(transcripts.createdAt, since)
+          )
+        )
+    ),
+    safeQuery(
+      "llmAgg30d",
+      db
+        .select({
+          cost: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)::text`,
+          tokens: sql<number>`coalesce(sum(${llmUsage.inputTokens} + ${llmUsage.outputTokens} + ${llmUsage.cacheReadTokens} + ${llmUsage.cacheWriteTokens}), 0)::bigint`,
+        })
+        .from(llmUsage)
+        .where(gte(llmUsage.createdAt, since))
+    ),
+    safeQuery(
+      "llmAggLifetime",
+      db
+        .select({
+          cost: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)::text`,
+          tokens: sql<number>`coalesce(sum(${llmUsage.inputTokens} + ${llmUsage.outputTokens} + ${llmUsage.cacheReadTokens} + ${llmUsage.cacheWriteTokens}), 0)::bigint`,
+        })
+        .from(llmUsage)
+    ),
+  ]);
+
+  return {
+    workspacesTotal: workspacesTotalRow?.[0]?.n ?? 0,
+    workspacesNew30d: workspacesNewRow?.[0]?.n ?? 0,
+    usersTotal: usersTotalRow?.[0]?.n ?? 0,
+    usersNew30d: usersNewRow?.[0]?.n ?? 0,
+    accountsActive: accountsActiveRow?.[0]?.n ?? 0,
+    transcriptsCompleted30d: transcriptsRow?.[0]?.n ?? 0,
+    llmCostUsd30d: Number(llmAgg30dRow?.[0]?.cost ?? 0),
+    llmTokensTotal30d: Number(llmAgg30dRow?.[0]?.tokens ?? 0),
+    llmCostUsdLifetime: Number(llmAggLifetimeRow?.[0]?.cost ?? 0),
+    llmTokensLifetime: Number(llmAggLifetimeRow?.[0]?.tokens ?? 0),
+  };
+}
+
+/**
+ * Per-task LLM cost rollup. Independent from the KPIs so it can stream
+ * in its own Suspense boundary.
+ */
+export async function getAdminLlmByTask(): Promise<AdminLlmTaskRow[]> {
+  const since = new Date(Date.now() - THIRTY_DAYS_MS);
+  const rows = await safeQuery(
+    "llmByTask",
+    db
+      .select({
+        taskName: llmUsage.taskName,
+        calls: sql<number>`count(*)::int`,
+        inputTokens: sql<number>`coalesce(sum(${llmUsage.inputTokens}), 0)::bigint`,
+        outputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)::bigint`,
+        costUsd: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)::text`,
+      })
+      .from(llmUsage)
+      .where(gte(llmUsage.createdAt, since))
+      .groupBy(llmUsage.taskName)
+  );
+  return (rows ?? [])
+    .map((r) => ({
+      taskName: r.taskName,
+      calls: r.calls,
+      inputTokens: Number(r.inputTokens),
+      outputTokens: Number(r.outputTokens),
+      costUsd: Number(r.costUsd ?? 0),
+    }))
+    .sort((a, b) => b.costUsd - a.costUsd);
+}
+
+/**
+ * Top workspaces by activity. The heaviest section — does its own
+ * fanned-out queries and is meant to live behind its own Suspense
+ * boundary so it can never block the KPI tiles above.
+ */
+export async function getAdminTopWorkspaces(): Promise<AdminWorkspaceRow[]> {
+  const since = new Date(Date.now() - THIRTY_DAYS_MS);
+
+  const wsRows = await safeQuery(
+    "workspacesList",
+    db
+      .select({
+        id: workspaces.id,
+        name: workspaces.name,
+        ownerId: workspaces.ownerId,
+        createdAt: workspaces.createdAt,
+        ownerName: users.fullName,
+        ownerEmail: users.email,
+      })
+      .from(workspaces)
+      .leftJoin(users, eq(users.id, workspaces.ownerId))
+  );
+  const ws = wsRows ?? [];
+  if (ws.length === 0) return [];
+
+  const wsIds = ws.map((w) => w.id);
+
+  const [accCounts, trCounts, sigCounts, lastAct] = await Promise.all([
+    safeQuery(
+      "accountsByWs",
+      db
+        .select({
+          workspaceId: accounts.workspaceId,
+          n: sql<number>`count(*)::int`,
+        })
+        .from(accounts)
+        .where(
+          and(
+            inArray(accounts.workspaceId, wsIds),
+            isNull(accounts.closedAt)
+          )
+        )
+        .groupBy(accounts.workspaceId)
+    ),
+    safeQuery(
+      "transcriptsByWs",
+      db
+        .select({
+          workspaceId: transcripts.workspaceId,
+          n: sql<number>`count(*)::int`,
+        })
+        .from(transcripts)
+        .where(
+          and(
+            inArray(transcripts.workspaceId, wsIds),
+            eq(transcripts.status, "completed"),
+            gte(transcripts.createdAt, since)
+          )
+        )
+        .groupBy(transcripts.workspaceId)
+    ),
+    safeQuery(
+      "signalsByWs",
+      db
+        .select({
+          workspaceId: accounts.workspaceId,
+          n: sql<number>`count(distinct ${signals.id})::int`,
+        })
+        .from(signals)
+        .innerJoin(accounts, eq(accounts.id, signals.accountId))
+        .where(
+          and(
+            inArray(accounts.workspaceId, wsIds),
+            eq(signals.status, "active")
+          )
+        )
+        .groupBy(accounts.workspaceId)
+    ),
+    safeQuery(
+      "lastActivityByWs",
+      db
+        .select({
+          workspaceId: transcripts.workspaceId,
+          last: sql<Date | null>`max(${transcripts.createdAt})`,
+        })
+        .from(transcripts)
+        .where(inArray(transcripts.workspaceId, wsIds))
+        .groupBy(transcripts.workspaceId)
+    ),
+  ]);
+
+  const accountsByWs = new Map(
+    (accCounts ?? []).map((r) => [r.workspaceId, r.n])
+  );
+  const transcriptsByWs = new Map(
+    (trCounts ?? []).map((r) => [r.workspaceId, r.n])
+  );
+  const signalsByWs = new Map(
+    (sigCounts ?? []).map((r) => [r.workspaceId, r.n])
+  );
+  const lastActivityByWs = new Map(
+    (lastAct ?? [])
+      .filter((r) => r.last !== null)
+      .map((r) => [r.workspaceId, r.last as Date])
+  );
+
+  return ws
+    .map((w) => ({
+      workspaceId: w.id,
+      workspaceName: w.name,
+      ownerDisplay: w.ownerName ?? w.ownerEmail ?? null,
+      accountsActive: accountsByWs.get(w.id) ?? 0,
+      transcripts30d: transcriptsByWs.get(w.id) ?? 0,
+      signalsActive: signalsByWs.get(w.id) ?? 0,
+      lastActivityAt: lastActivityByWs.get(w.id) ?? null,
+    }))
+    .sort((a, b) => {
+      if (b.transcripts30d !== a.transcripts30d)
+        return b.transcripts30d - a.transcripts30d;
+      if (b.accountsActive !== a.accountsActive)
+        return b.accountsActive - a.accountsActive;
+      return 0;
+    })
+    .slice(0, 10);
+}
+
+/**
  * Wraps a query in a hard timeout. Returns null when the timeout fires or
  * the query throws — letting the dashboard render partial data instead of
  * hanging forever when one stat is misbehaving (e.g. a Supabase pooler
