@@ -248,7 +248,7 @@ REGLAS DURAS:
 
 Prosa, NO bullets, NO fechas específicas. Máximo 180 palabras la sección "accountSituation" completa.
 
-3. "clientSummary" — VERSIÓN PARA EL CLIENTE FINAL (no para el equipo interno). Tono presente, hechos avanzados sin ansiedades internas, sin críticas. Estilo: "Esta semana avanzamos en X", "Tenemos pendiente Y", "Coordinamos Z para la próxima semana". Sin emojis. NUNCA menciones señales de riesgo, salud de cuenta, métricas internas ni nombres del equipo de la agencia. 2-4 oraciones, prosa simple. Si la información disponible no alcanza para un resumen genuino, devolvé "Tu cuenta sigue activa. Te traemos una actualización completa pronto."
+3. "clientSummary" — VERSIÓN PARA EL CLIENTE FINAL (no para el equipo interno). Tono PROPOSITIVO y forward-looking. Liderá con qué se está logrando y hacia dónde vamos. Estilo: "Este mes avanzamos en X y vamos camino a Y. La próxima semana arrancamos Z para empujar W. Lo que viene: [próximo hito concreto]". Mostrá iniciativa: si hay un próximo paso, decílo con confianza. Hechos concretos, sin métricas operativas internas. Sin emojis. NUNCA menciones: señales de riesgo, salud de cuenta (verde/amarillo/rojo), justificaciones internas, nombres del equipo de la agencia, palabras como "atención", "riesgo", "preocupación", "churn". 3-5 oraciones, prosa simple, lenguaje activo. Si la información disponible no alcanza, devolvé "Esta semana seguimos avanzando en tu cuenta. La próxima reunión coordinamos los próximos pasos en detalle."
 
 Respondé SOLO con JSON válido (strings con \\n para saltos de línea):
 {"meetingSummary": "...", "accountSituation": "...", "clientSummary": "..."}`,

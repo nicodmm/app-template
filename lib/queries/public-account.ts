@@ -16,10 +16,47 @@ import {
   crmStages,
   crmPipelines,
   workspaces,
+  workspaceMembers,
   users,
 } from "@/lib/drizzle/schema";
-import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, ne } from "drizzle-orm";
 import { coerceShareConfig, type ShareConfig } from "@/lib/share/share-config";
+
+/**
+ * Strip markdown sections that are explicitly internal-facing. The summary
+ * pipeline emits sections like "**Riesgos:**" or "**Atención:**" that the
+ * client should never see — we cut them out before rendering. We also drop
+ * any "Atención: ..." inline sentences in the accountSituation prose.
+ */
+function redactInternalSections(text: string | null): string | null {
+  if (!text) return text;
+  // Drop sections that start with one of the internal headers and run until
+  // the next bold header or end of string.
+  const sectionHeaders = [
+    "Riesgos",
+    "Riesgo",
+    "Atención",
+    "Atencion",
+    "Health",
+    "Salud",
+    "Justificación",
+    "Justificacion",
+  ];
+  let out = text;
+  for (const h of sectionHeaders) {
+    const re = new RegExp(
+      `\\*\\*\\s*${h}\\s*:?\\s*\\*\\*[\\s\\S]*?(?=(\\n\\n\\*\\*|$))`,
+      "gi"
+    );
+    out = out.replace(re, "");
+  }
+  // Inline "Atención: ..." sentence form
+  out = out.replace(/Atención:[^.\n]*\.?/gi, "");
+  out = out.replace(/Atencion:[^.\n]*\.?/gi, "");
+  // Collapse triple-blank-line gaps left by the deletion.
+  out = out.replace(/\n{3,}/g, "\n\n").trim();
+  return out;
+}
 
 export interface PublicAccountSnapshot {
   share: {
@@ -59,16 +96,26 @@ export interface PublicAccountSnapshot {
     } | null;
     files: Array<{
       title: string;
-      docType: string;
+      kind: "document" | "meeting";
+      docType: string | null;
+      meetingDate: Date | null;
       createdAt: Date;
     }> | null;
     tasks: Array<{
+      id: string;
       description: string;
-      status: string;
+      priority: number;
+      transcriptId: string | null;
+      meetingDate: Date | null;
+      meetingTitle: string | null;
+      sourceExcerpt: string | null;
+      sourceContext: string | null;
+      createdAt: Date;
     }> | null;
     participants: Array<{
       name: string;
       role: string | null;
+      isAgencyTeam: boolean;
     }> | null;
     signals: Array<{
       type: string;
@@ -143,6 +190,7 @@ export async function getPublicAccountSnapshot(
       websiteUrl: accounts.websiteUrl,
       linkedinUrl: accounts.linkedinUrl,
       clientSummary: accounts.clientSummary,
+      aiSummary: accounts.aiSummary,
       lastActivityAt: accounts.lastActivityAt,
       ownerId: accounts.ownerId,
       workspaceId: accounts.workspaceId,
@@ -170,6 +218,34 @@ export async function getPublicAccountSnapshot(
   }
 
   const config = coerceShareConfig(link.shareConfig);
+
+  // Pre-compute the most recent transcript id so we can exclude it from the
+  // "Archivos" timeline (it's already shown as the standalone last-meeting
+  // section).
+  const [latestTranscript] = config.lastMeeting || config.files
+    ? await db
+        .select({ id: transcripts.id })
+        .from(transcripts)
+        .where(eq(transcripts.accountId, accountRow.id))
+        .orderBy(desc(transcripts.meetingDate), desc(transcripts.createdAt))
+        .limit(1)
+    : [undefined];
+
+  // Workspace member emails — used to relabel participants who match a
+  // workspace user as "Equipo de {workspace}".
+  const memberEmails = config.participants
+    ? new Set(
+        (
+          await db
+            .select({ email: users.email })
+            .from(workspaceMembers)
+            .innerJoin(users, eq(users.id, workspaceMembers.userId))
+            .where(eq(workspaceMembers.workspaceId, accountRow.workspaceId))
+        )
+          .map((r) => r.email?.toLowerCase().trim())
+          .filter((e): e is string => !!e)
+      )
+    : new Set<string>();
 
   const [
     lastMeetingData,
@@ -199,45 +275,36 @@ export async function getPublicAccountSnapshot(
             return {
               title: r.fileName ?? "Reunión",
               meetingDate: r.meetingDate ? new Date(r.meetingDate) : null,
-              meetingSummary: r.meetingSummary,
+              meetingSummary: redactInternalSections(r.meetingSummary),
             };
           })
       : Promise.resolve(null),
-    config.files
-      ? db
-          .select({
-            title: contextDocuments.title,
-            docType: contextDocuments.docType,
-            createdAt: contextDocuments.createdAt,
-          })
-          .from(contextDocuments)
-          .where(eq(contextDocuments.accountId, accountRow.id))
-          .orderBy(desc(contextDocuments.createdAt))
-          .limit(20)
-      : Promise.resolve(null),
-    config.tasks
-      ? db
-          .select({
-            description: tasks.description,
-            status: tasks.status,
-          })
-          .from(tasks)
-          .where(
-            and(
-              eq(tasks.accountId, accountRow.id),
-              inArray(tasks.status, ["pending", "in_progress"])
-            )
-          )
-          .orderBy(desc(tasks.createdAt))
-          .limit(20)
-      : Promise.resolve(null),
+    config.files ? loadFilesTimeline(accountRow.id, latestTranscript?.id ?? null) : Promise.resolve(null),
+    config.tasks ? loadTasksWithContext(accountRow.id) : Promise.resolve(null),
     config.participants
       ? db
-          .select({ name: participants.name, role: participants.role })
+          .select({
+            name: participants.name,
+            role: participants.role,
+            email: participants.email,
+          })
           .from(participants)
           .where(eq(participants.accountId, accountRow.id))
           .orderBy(desc(participants.appearanceCount))
-          .limit(20)
+          .limit(40)
+          .then((rows) =>
+            rows.map((p) => {
+              const email = p.email?.toLowerCase().trim() ?? null;
+              const isAgencyTeam = !!email && memberEmails.has(email);
+              return {
+                name: p.name,
+                role: isAgencyTeam
+                  ? `Equipo de ${workspaceRow?.name ?? "tu agencia"}`
+                  : p.role,
+                isAgencyTeam,
+              };
+            })
+          )
       : Promise.resolve(null),
     config.signals
       ? db
@@ -288,6 +355,12 @@ export async function getPublicAccountSnapshot(
     .where(eq(accountShareLinks.id, link.id))
     .catch(() => {});
 
+  // Summary fallback: when client_summary hasn't been generated yet (older
+  // accounts pre-deploy), fall back to a redacted version of aiSummary so
+  // the panel isn't empty. Internal-only sections are stripped first.
+  const summaryText =
+    accountRow.clientSummary ?? redactInternalSections(accountRow.aiSummary);
+
   const snapshot: PublicAccountSnapshot = {
     share: {
       token: link.token,
@@ -308,9 +381,7 @@ export async function getPublicAccountSnapshot(
     },
     config,
     data: {
-      summary: config.summary
-        ? { clientSummary: accountRow.clientSummary }
-        : null,
+      summary: config.summary ? { clientSummary: summaryText } : null,
       context: config.context
         ? {
             goals: accountRow.goals,
@@ -341,6 +412,108 @@ export async function getPublicAccountSnapshot(
     passwordHash: link.passwordHash ?? undefined,
     passwordVersion: link.passwordVersion,
   };
+}
+
+/**
+ * Files timeline: merges context_documents + transcripts (excluding the
+ * most recent one which is shown standalone in the "Última reunión"
+ * section). Sorted newest-first by createdAt.
+ */
+async function loadFilesTimeline(
+  accountId: string,
+  excludeTranscriptId: string | null
+) {
+  const [docs, trans] = await Promise.all([
+    db
+      .select({
+        title: contextDocuments.title,
+        docType: contextDocuments.docType,
+        createdAt: contextDocuments.createdAt,
+      })
+      .from(contextDocuments)
+      .where(eq(contextDocuments.accountId, accountId))
+      .orderBy(desc(contextDocuments.createdAt))
+      .limit(40),
+    db
+      .select({
+        fileName: transcripts.fileName,
+        meetingDate: transcripts.meetingDate,
+        createdAt: transcripts.createdAt,
+        id: transcripts.id,
+      })
+      .from(transcripts)
+      .where(
+        excludeTranscriptId
+          ? and(
+              eq(transcripts.accountId, accountId),
+              ne(transcripts.id, excludeTranscriptId)
+            )
+          : eq(transcripts.accountId, accountId)
+      )
+      .orderBy(desc(transcripts.meetingDate), desc(transcripts.createdAt))
+      .limit(40),
+  ]);
+
+  const merged: PublicAccountSnapshot["data"]["files"] = [
+    ...docs.map((d) => ({
+      title: d.title,
+      kind: "document" as const,
+      docType: d.docType,
+      meetingDate: null,
+      createdAt: d.createdAt,
+    })),
+    ...trans.map((t) => ({
+      title: t.fileName ?? "Reunión",
+      kind: "meeting" as const,
+      docType: null,
+      meetingDate: t.meetingDate ? new Date(t.meetingDate) : null,
+      createdAt: t.createdAt,
+    })),
+  ];
+  merged.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  return merged.slice(0, 40);
+}
+
+/**
+ * Tasks for the public view — pulls the priority + meeting context so the
+ * client view can group by reunión and show the same cards as the agency
+ * UI (read-only).
+ */
+async function loadTasksWithContext(accountId: string) {
+  const rows = await db
+    .select({
+      id: tasks.id,
+      description: tasks.description,
+      priority: tasks.priority,
+      transcriptId: tasks.transcriptId,
+      sourceExcerpt: tasks.sourceExcerpt,
+      sourceContext: tasks.sourceContext,
+      createdAt: tasks.createdAt,
+      meetingDate: transcripts.meetingDate,
+      meetingTitle: transcripts.fileName,
+    })
+    .from(tasks)
+    .leftJoin(transcripts, eq(transcripts.id, tasks.transcriptId))
+    .where(
+      and(
+        eq(tasks.accountId, accountId),
+        inArray(tasks.status, ["pending", "in_progress"])
+      )
+    )
+    .orderBy(desc(tasks.createdAt))
+    .limit(40);
+
+  return rows.map((r) => ({
+    id: r.id,
+    description: r.description,
+    priority: r.priority,
+    transcriptId: r.transcriptId,
+    meetingDate: r.meetingDate ? new Date(r.meetingDate) : null,
+    meetingTitle: r.meetingTitle,
+    sourceExcerpt: r.sourceExcerpt,
+    sourceContext: r.sourceContext,
+    createdAt: r.createdAt,
+  }));
 }
 
 async function loadCrmForAccount(accountId: string) {
