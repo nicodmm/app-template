@@ -26,6 +26,7 @@ export const accounts = pgTable(
     websiteUrl: text("website_url"),
     linkedinUrl: text("linkedin_url"),
     industry: text("industry"),
+    industryCategory: text("industry_category"),
     employeeCount: text("employee_count"),
     location: text("location"),
     companyDescription: text("company_description"),

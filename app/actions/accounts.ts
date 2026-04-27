@@ -63,7 +63,8 @@ function parseUrl(raw: string | null): string | null {
 async function triggerEnrichment(
   accountId: string,
   workspaceId: string,
-  websiteUrl: string
+  websiteUrl: string,
+  linkedinUrl: string | null
 ): Promise<void> {
   try {
     const { tasks } = await import("@trigger.dev/sdk/v3");
@@ -71,6 +72,7 @@ async function triggerEnrichment(
       accountId,
       workspaceId,
       websiteUrl,
+      linkedinUrl,
     });
   } catch (err) {
     // Best-effort: never block the create/update flow on Trigger.dev issues.
@@ -121,7 +123,7 @@ export async function createAccount(formData: FormData): Promise<void> {
     .returning();
 
   if (websiteUrl) {
-    await triggerEnrichment(account.id, workspace.id, websiteUrl);
+    await triggerEnrichment(account.id, workspace.id, websiteUrl, linkedinUrl);
   }
 
   // Sync usage_tracking.accounts_count
@@ -190,6 +192,7 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
   let industry = rawIndustry;
   let employeeCount = rawEmployeeCount;
   let location = rawLocation;
+  let industryCategory: string | undefined;
   if (fieldsChanged) {
     const normalized = await normalizeAccountFields(
       {
@@ -202,6 +205,7 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
     industry = normalized.industry;
     employeeCount = normalized.employeeCount;
     location = normalized.location;
+    industryCategory = normalized.industryCategory;
   }
 
   await db
@@ -220,6 +224,7 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
       employeeCount,
       location,
       companyDescription,
+      ...(industryCategory !== undefined ? { industryCategory } : {}),
       ...(websiteChanged && websiteUrl
         ? { enrichmentStatus: "pending", enrichmentError: null }
         : {}),
@@ -230,7 +235,7 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
     );
 
   if (websiteChanged && websiteUrl) {
-    await triggerEnrichment(accountId, workspace.id, websiteUrl);
+    await triggerEnrichment(accountId, workspace.id, websiteUrl, linkedinUrl);
   }
 
   revalidatePath(`/app/accounts/${accountId}`);
@@ -256,7 +261,7 @@ export async function reEnrichAccount(accountId: string): Promise<void> {
       and(eq(accounts.id, accountId), eq(accounts.workspaceId, workspace.id))
     );
 
-  await triggerEnrichment(accountId, workspace.id, account.websiteUrl);
+  await triggerEnrichment(accountId, workspace.id, account.websiteUrl, account.linkedinUrl);
   revalidatePath(`/app/accounts/${accountId}`);
 }
 

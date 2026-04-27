@@ -102,6 +102,7 @@ export async function getWorkspaceDashboardSnapshot(
       closedAt: accounts.closedAt,
       healthSignal: accounts.healthSignal,
       industry: accounts.industry,
+      industryCategory: accounts.industryCategory,
       employeeCount: accounts.employeeCount,
     })
     .from(accounts)
@@ -257,7 +258,7 @@ export async function getWorkspaceDashboardSnapshot(
   const industryCounts = new Map<string, number>();
   const sizeCounts = new Map<string, number>();
   for (const a of inScopeAccounts) {
-    const ind = (a.industry ?? "").trim() || "Sin clasificar";
+    const ind = (a.industryCategory ?? "").trim() || "Sin clasificar";
     industryCounts.set(ind, (industryCounts.get(ind) ?? 0) + 1);
     const sz = (a.employeeCount ?? "").trim() || "Sin clasificar";
     sizeCounts.set(sz, (sizeCounts.get(sz) ?? 0) + 1);
@@ -315,6 +316,7 @@ interface BreakdownAccount {
   closedAt: Date | null;
   serviceScope: string | null;
   industry: string | null;
+  industryCategory: string | null;
   employeeCount: string | null;
   ownerName: string | null;
 }
@@ -382,6 +384,7 @@ export async function getDashboardMetricBreakdown(
       closedAt: accounts.closedAt,
       serviceScope: accounts.serviceScope,
       industry: accounts.industry,
+      industryCategory: accounts.industryCategory,
       employeeCount: accounts.employeeCount,
       ownerId: accounts.ownerId,
     })
@@ -410,6 +413,7 @@ export async function getDashboardMetricBreakdown(
     closedAt: r.closedAt,
     serviceScope: r.serviceScope,
     industry: r.industry,
+    industryCategory: r.industryCategory,
     employeeCount: r.employeeCount,
     ownerName: r.ownerId ? (ownerNames.get(r.ownerId) ?? "Sin nombre") : null,
   }));
@@ -433,7 +437,7 @@ export async function getDashboardMetricBreakdown(
     .sort((a, b) => b.value - a.value);
 
   // Industry / size groupings.
-  const groupBy = (key: "industry" | "employeeCount") => {
+  const groupBy = (key: "industryCategory" | "employeeCount") => {
     const m = new Map<string, BreakdownAccount[]>();
     for (const a of accountsTyped) {
       const label = (a[key] ?? "").trim() || "Sin clasificar";
@@ -448,7 +452,7 @@ export async function getDashboardMetricBreakdown(
       }))
       .sort((a, b) => b.value - a.value);
   };
-  const byIndustry = groupBy("industry");
+  const byIndustry = groupBy("industryCategory");
   const bySize = groupBy("employeeCount");
 
   // Owner: only shown for owner/admin viewers.
@@ -505,10 +509,10 @@ export async function getDashboardAccountsList(
   } else if (filter.type === "industry") {
     if (filter.value === "Sin clasificar") {
       conds.push(
-        sql`(${accounts.industry} IS NULL OR btrim(${accounts.industry}) = '')`
+        sql`(${accounts.industryCategory} IS NULL OR btrim(${accounts.industryCategory}) = '')`
       );
     } else {
-      conds.push(eq(accounts.industry, filter.value));
+      conds.push(eq(accounts.industryCategory, filter.value));
     }
   } else if (filter.type === "size") {
     if (filter.value === "Sin clasificar") {

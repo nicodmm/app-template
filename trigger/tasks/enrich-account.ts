@@ -5,12 +5,17 @@ import { db } from "@/lib/drizzle/db";
 import { accounts } from "@/lib/drizzle/schema";
 import { eq } from "drizzle-orm";
 import { logLlmUsage } from "@/lib/ai/log-usage";
+import {
+  INDUSTRY_CATEGORIES,
+  coerceIndustryCategory,
+} from "@/lib/industry-categories";
 
 const MODEL = "claude-haiku-4-5-20251001";
 const client = new Anthropic();
 
 const EnrichmentSchema = z.object({
   industry: z.string().nullable(),
+  industryCategory: z.string().nullable(),
   employeeCount: z.string().nullable(),
   location: z.string().nullable(),
   description: z.string().nullable(),
@@ -21,6 +26,7 @@ interface EnrichAccountInput {
   accountId: string;
   workspaceId: string;
   websiteUrl: string;
+  linkedinUrl?: string | null;
 }
 
 function htmlToText(html: string): string {
@@ -69,6 +75,8 @@ export const enrichAccount = task({
       return;
     }
 
+    const linkedinUrl = payload.linkedinUrl?.trim() || null;
+
     await db
       .update(accounts)
       .set({
@@ -106,27 +114,49 @@ export const enrichAccount = task({
         throw new Error("El sitio no devolvió contenido legible");
       }
 
+      const categoriesList = INDUSTRY_CATEGORIES.join('", "');
+
+      // Single Claude call with web_search tool. The model uses the website
+      // text as primary source and falls back to web_search ONLY when
+      // employeeCount is not derivable from the website itself — typical for
+      // company sites that don't advertise headcount. LinkedIn employee
+      // ranges are public via Google snippets even when the page itself is
+      // gated, so the search hits the snippet.
       const response = await client.messages.create({
         model: MODEL,
-        max_tokens: 512,
+        max_tokens: 1024,
+        tools: [
+          {
+            type: "web_search_20250305",
+            name: "web_search",
+            max_uses: 2,
+          } as never,
+        ],
         messages: [
           {
             role: "user",
-            content: `Analizá el siguiente contenido del sitio web de una empresa y extraé datos clave para que una agencia de marketing entienda al cliente.
+            content: `Analizá el siguiente contenido del sitio web de una empresa y extraé datos clave para una agencia de marketing.
 
 SITIO: ${normalized}
+LINKEDIN: ${linkedinUrl ?? "(no provisto)"}
 
-CONTENIDO:
+CONTENIDO DEL SITIO:
 ${cleanText}
 
-Devolvé SOLO JSON válido con estas claves. Si no podés inferir un dato con confianza, poné null — nunca inventes.
+INSTRUCCIONES:
+1. Inferí lo que puedas DEL SITIO. Si "employeeCount" no aparece en el sitio Y hay un linkedinUrl, usá la herramienta web_search con la query "${linkedinUrl ?? ""}" o "[nombre empresa] linkedin employees" para encontrar el rango de empleados — los snippets de LinkedIn lo muestran (ej: "11-50 employees").
+2. NO inventes. Si no podés inferir un dato con confianza incluso después de buscar, devolvé null.
+3. Limitate a 2 búsquedas como máximo. Si no encontrás el dato, devolvé null.
+
+Devolvé SOLO JSON válido al final, sin texto extra antes ni después:
 
 {
-  "industry": "string — una frase corta en español (ej: 'Ecommerce de ropa', 'SaaS B2B de RRHH'). null si no está claro.",
-  "employeeCount": "string — uno de: '1-10', '11-50', '51-200', '201-500', '501-1000', '1001+'. null si no podés estimar.",
-  "location": "string — ciudad, país (ej: 'Buenos Aires, Argentina'). null si no figura.",
-  "description": "string — una o dos oraciones en español describiendo qué hace la empresa y a quién apunta. null si no tenés información.",
-  "confidence": "'low' | 'medium' | 'high' — tu confianza global en la extracción."
+  "industry": "frase corta en español describiendo la industria detallada (ej: 'Ecommerce de ropa', 'SaaS B2B de RRHH'). null si no está claro.",
+  "industryCategory": "EXACTAMENTE uno de: \\"${categoriesList}\\". Mapeá la industria detallada a su bucket amplio. Si dudás, 'Otros'.",
+  "employeeCount": "uno de: '1-10', '11-50', '51-200', '201-500', '501-1000', '1001+'. null si no podés estimar.",
+  "location": "ciudad, país (ej: 'Buenos Aires, Argentina'). null si no figura.",
+  "description": "una o dos oraciones describiendo qué hace la empresa y a quién apunta. null si no tenés información.",
+  "confidence": "'low' | 'medium' | 'high' — tu confianza global."
 }`,
           },
         ],
@@ -140,8 +170,13 @@ Devolvé SOLO JSON válido con estas claves. Si no podés inferir un dato con co
         usage: response.usage,
       });
 
-      const text = response.content[0]?.type === "text" ? response.content[0].text : "";
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      // The response may include tool_use + tool_result blocks before the
+      // final text block. Take the LAST text block, which is the answer.
+      const textBlocks = response.content.flatMap((b) =>
+        b.type === "text" ? [b.text] : []
+      );
+      const finalText = textBlocks[textBlocks.length - 1] ?? "";
+      const jsonMatch = finalText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error("El modelo no devolvió JSON");
       const parsed = EnrichmentSchema.parse(JSON.parse(jsonMatch[0]));
 
@@ -149,6 +184,7 @@ Devolvé SOLO JSON válido con estas claves. Si no podés inferir un dato con co
         .update(accounts)
         .set({
           industry: parsed.industry,
+          industryCategory: coerceIndustryCategory(parsed.industryCategory),
           employeeCount: parsed.employeeCount,
           location: parsed.location,
           companyDescription: parsed.description,
@@ -162,6 +198,7 @@ Devolvé SOLO JSON válido con estas claves. Si no podés inferir un dato con co
       logger.info("Account enriched", {
         accountId: payload.accountId,
         confidence: parsed.confidence,
+        usedLinkedin: !!linkedinUrl,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error desconocido";
