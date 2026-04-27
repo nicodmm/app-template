@@ -2,16 +2,25 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, FileText, AlertCircle, X, Loader2, StickyNote, Paperclip, Link as LinkIcon } from "lucide-react";
+import { Upload, FileText, AlertCircle, X, Loader2, StickyNote, Paperclip, Link as LinkIcon, FolderOpen, RefreshCw, Unlink } from "lucide-react";
 import mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
 import { uploadTranscript } from "@/app/actions/transcripts";
 import { uploadContextDocument } from "@/app/actions/context-documents";
-import { importDriveLinkForAccount } from "@/app/actions/drive";
+import {
+  importDriveLinkForAccount,
+  syncDriveFolderForAccountNow,
+  unlinkDriveFolderForAccount,
+} from "@/app/actions/drive";
 import { TranscriptProgress } from "@/components/transcript-progress";
 
 interface ContextUploadFormProps {
   accountId: string;
+  boundDriveFolder: {
+    id: string;
+    name: string;
+    syncedAt: Date | null;
+  } | null;
 }
 
 type TranscriptPasteState =
@@ -74,7 +83,10 @@ const DOC_TYPE_LABEL: Record<string, string> = {
   other: "Otro",
 };
 
-export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
+export function ContextUploadForm({
+  accountId,
+  boundDriveFolder,
+}: ContextUploadFormProps) {
   const [tab, setTab] = useState<"transcript" | "note" | "file" | "drive_link">("transcript");
   const router = useRouter();
 
@@ -107,6 +119,17 @@ export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
     | { phase: "error"; message: string }
   >({ phase: "idle" });
   const driveLinkPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Folder binding state (mirrored from props so we can update it after
+  // unlink/sync without waiting for a router refresh).
+  const [folder, setFolder] = useState(boundDriveFolder);
+  const [folderAction, setFolderAction] = useState<
+    | { phase: "idle" }
+    | { phase: "syncing" }
+    | { phase: "unlinking" }
+    | { phase: "error"; message: string }
+    | { phase: "info"; message: string }
+  >({ phase: "idle" });
 
   useEffect(() => {
     return () => {
@@ -306,6 +329,36 @@ export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
       setDriveLinkState({ phase: "error", message: result.error });
       return;
     }
+
+    // Folder binding flow — different UX from single-file import.
+    if (result.outcome === "folder_bound") {
+      const folderName = result.folderName ?? "la carpeta";
+      setFolder({ id: "", name: folderName, syncedAt: null });
+      setDriveLinkUrl("");
+      setDriveLinkNotes("");
+      setDriveLinkState({
+        phase: "polling",
+        message: `Carpeta "${folderName}" vinculada. Sincronizando archivos en segundo plano — van a aparecer en Archivos de contexto.`,
+      });
+      // Poll for refresh so the bound-folder banner picks up syncedAt.
+      if (driveLinkPollRef.current) clearInterval(driveLinkPollRef.current);
+      let attempts = 0;
+      const maxAttempts = 24; // 24 × 5s = 2 min window for folder syncs
+      driveLinkPollRef.current = setInterval(() => {
+        router.refresh();
+        attempts += 1;
+        if (attempts >= maxAttempts && driveLinkPollRef.current) {
+          clearInterval(driveLinkPollRef.current);
+          driveLinkPollRef.current = null;
+          setDriveLinkState({
+            phase: "done",
+            message: `Listo. Si no ves todos los archivos todavía, refrescá la página.`,
+          });
+        }
+      }, 5000);
+      return;
+    }
+
     const name = result.fileName ?? "el archivo";
 
     if (result.outcome === "duplicate") {
@@ -746,11 +799,52 @@ export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
       {/* DRIVE LINK TAB */}
       {tab === "drive_link" && (
         <div className="space-y-3">
+          {folder && <BoundFolderPanel
+            folder={folder}
+            actionState={folderAction}
+            onSync={async () => {
+              setFolderAction({ phase: "syncing" });
+              const r = await syncDriveFolderForAccountNow(accountId);
+              if (r.error) {
+                setFolderAction({ phase: "error", message: r.error });
+                return;
+              }
+              setFolderAction({
+                phase: "info",
+                message:
+                  "Sincronización en marcha — los archivos nuevos van a aparecer en unos segundos.",
+              });
+              router.refresh();
+              setTimeout(() => router.refresh(), 5000);
+              setTimeout(() => router.refresh(), 15000);
+              setTimeout(() => router.refresh(), 30000);
+            }}
+            onUnlink={async () => {
+              if (
+                !confirm(
+                  "¿Desvincular la carpeta? Los archivos ya importados se quedan en la cuenta. Para volver a sincronizar tenés que pegar el link de la carpeta de nuevo."
+                )
+              )
+                return;
+              setFolderAction({ phase: "unlinking" });
+              const r = await unlinkDriveFolderForAccount(accountId);
+              if (r.error) {
+                setFolderAction({ phase: "error", message: r.error });
+                return;
+              }
+              setFolder(null);
+              setFolderAction({ phase: "idle" });
+              router.refresh();
+            }}
+          />}
+
           <p className="text-xs text-muted-foreground">
-            Pegá un link a un archivo de Drive (documento, planilla, presentación, PDF). Lo
-            importamos usando tu conexión de Drive del Workspace — no guardamos el archivo
-            físico. Si es un documento de texto entra como transcripción; cualquier otro
-            formato queda como archivo de contexto con el link original.
+            Pegá un link a un archivo o una carpeta de Drive. Si es archivo, lo
+            importamos como una transcripción o doc de contexto según el formato.
+            Si es <strong>carpeta</strong>, vinculamos la carpeta a la cuenta e
+            importamos todo lo de adentro automáticamente. Hace falta tener Drive
+            conectado en el Workspace y que la cuenta de Google tenga acceso al
+            archivo o carpeta.
           </p>
 
           {driveLinkState.phase === "error" && (
@@ -774,13 +868,13 @@ export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
 
           <input
             type="url"
-            placeholder="https://drive.google.com/file/d/..."
+            placeholder="https://drive.google.com/file/d/... o https://drive.google.com/drive/folders/..."
             value={driveLinkUrl}
             onChange={(e) => setDriveLinkUrl(e.target.value)}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
           <textarea
-            placeholder="Notas o descripción (opcional — qué aporta este archivo al contexto)"
+            placeholder="Notas o descripción (opcional — solo aplica a archivos individuales)"
             value={driveLinkNotes}
             onChange={(e) => setDriveLinkNotes(e.target.value)}
             rows={3}
@@ -800,10 +894,102 @@ export function ContextUploadForm({ accountId }: ContextUploadFormProps) {
             ) : driveLinkState.phase === "polling" ? (
               <><Loader2 size={14} className="animate-spin" /> Esperando import...</>
             ) : (
-              <><LinkIcon size={14} /> Importar desde link</>
+              <><LinkIcon size={14} /> Importar desde Drive</>
             )}
           </button>
         </div>
+      )}
+    </div>
+  );
+}
+
+interface BoundFolderPanelProps {
+  folder: { id: string; name: string; syncedAt: Date | null };
+  actionState:
+    | { phase: "idle" }
+    | { phase: "syncing" }
+    | { phase: "unlinking" }
+    | { phase: "error"; message: string }
+    | { phase: "info"; message: string };
+  onSync: () => void;
+  onUnlink: () => void;
+}
+
+function formatRelative(d: Date | null): string {
+  if (!d) return "todavía no se sincronizó";
+  const diff = Date.now() - new Date(d).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "hace segundos";
+  if (mins < 60) return `hace ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `hace ${hrs} h`;
+  const days = Math.floor(hrs / 24);
+  return `hace ${days} día${days !== 1 ? "s" : ""}`;
+}
+
+function BoundFolderPanel({
+  folder,
+  actionState,
+  onSync,
+  onUnlink,
+}: BoundFolderPanelProps) {
+  return (
+    <div className="rounded-lg p-4 [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)]">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex items-start gap-2 min-w-0">
+          <FolderOpen
+            size={18}
+            className="text-primary shrink-0 mt-0.5"
+            aria-hidden
+          />
+          <div className="min-w-0">
+            <p className="text-sm font-medium truncate">
+              Carpeta vinculada: {folder.name}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Última sincronización: {formatRelative(folder.syncedAt)} · Importa
+              hasta 200 archivos del nivel raíz (sin subcarpetas).
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={onSync}
+            disabled={
+              actionState.phase === "syncing" ||
+              actionState.phase === "unlinking"
+            }
+            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-accent transition-colors disabled:opacity-50"
+          >
+            {actionState.phase === "syncing" ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <RefreshCw size={12} />
+            )}
+            {actionState.phase === "syncing"
+              ? "Sincronizando..."
+              : "Sincronizar ahora"}
+          </button>
+          <button
+            type="button"
+            onClick={onUnlink}
+            disabled={
+              actionState.phase === "syncing" ||
+              actionState.phase === "unlinking"
+            }
+            className="inline-flex items-center gap-1 rounded-md border border-destructive/40 text-destructive px-2.5 py-1.5 text-xs hover:bg-destructive/10 transition-colors disabled:opacity-50"
+          >
+            <Unlink size={12} />
+            Desvincular
+          </button>
+        </div>
+      </div>
+      {actionState.phase === "error" && (
+        <p className="text-xs text-destructive mt-3">{actionState.message}</p>
+      )}
+      {actionState.phase === "info" && (
+        <p className="text-xs text-primary mt-3">{actionState.message}</p>
       )}
     </div>
   );

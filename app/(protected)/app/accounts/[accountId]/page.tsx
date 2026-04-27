@@ -374,7 +374,18 @@ export default async function AccountDetailPage({
       {isModuleEnabled(account.enabledModules, "context_upload") && (
         <GlassCard className="p-6 mb-6">
           <h2 className="font-semibold mb-4">Subir contexto</h2>
-          <ContextUploadForm accountId={accountId} />
+          <ContextUploadForm
+            accountId={accountId}
+            boundDriveFolder={
+              account.driveFolderId && account.driveFolderName
+                ? {
+                    id: account.driveFolderId,
+                    name: account.driveFolderName,
+                    syncedAt: account.driveFolderSyncedAt,
+                  }
+                : null
+            }
+          />
         </GlassCard>
       )}
 
