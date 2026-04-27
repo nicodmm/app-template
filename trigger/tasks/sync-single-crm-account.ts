@@ -20,25 +20,54 @@ export const syncSingleCrmAccount = task({
     if (conn.status !== "active") return { skipped: conn.status };
     if (conn.catalogsConfiguredAt === null) return { skipped: "not_configured" };
 
-    // Refresh catalogs if stale
-    const staleHours = 24;
-    const staleCutoff = new Date(Date.now() - staleHours * 3600_000);
-    if (!conn.catalogsLastRefresh || conn.catalogsLastRefresh < staleCutoff) {
-      await fetchAndUpsertCatalogs(conn.id);
+    try {
+      // Refresh catalogs if stale
+      const staleHours = 24;
+      const staleCutoff = new Date(Date.now() - staleHours * 3600_000);
+      if (!conn.catalogsLastRefresh || conn.catalogsLastRefresh < staleCutoff) {
+        await fetchAndUpsertCatalogs(conn.id);
+      }
+
+      const updatedSince = conn.lastSyncedAt
+        ? new Date(conn.lastSyncedAt.getTime() - 5 * 60_000) // 5-minute overlap
+        : new Date(0); // first incremental run pulls everything (mirrors backfill safety)
+
+      const { upserted, deleted } = await fetchAndUpsertDeals(
+        conn.id,
+        updatedSince
+      );
+
+      await db
+        .update(crmConnections)
+        .set({ lastSyncedAt: new Date(), updatedAt: new Date() })
+        .where(eq(crmConnections.id, conn.id));
+
+      logger.info("incremental sync complete", {
+        connectionId: conn.id,
+        upserted,
+        deleted,
+      });
+      return { upserted, deleted };
+    } catch (err) {
+      // Network failures (TypeError: fetch failed) and provider auth
+      // failures shouldn't keep crashing the cron forever. Mark the
+      // connection as expired so:
+      //   1. The hourly cron stops scheduling it
+      //   2. The /settings/integrations page can surface "reconnect"
+      //   3. The user notices and re-auths or removes it
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error("crm sync failed — marking connection expired", {
+        connectionId: conn.id,
+        error: message,
+      });
+      await db
+        .update(crmConnections)
+        .set({ status: "expired", updatedAt: new Date() })
+        .where(eq(crmConnections.id, conn.id));
+      // Return a payload instead of re-throwing so Trigger.dev marks the
+      // run as completed, not failed. The status update + log are the
+      // signal the operator needs.
+      return { skipped: "marked_expired", reason: message };
     }
-
-    const updatedSince = conn.lastSyncedAt
-      ? new Date(conn.lastSyncedAt.getTime() - 5 * 60_000)  // 5-minute overlap
-      : new Date(0);   // first incremental run pulls everything (mirrors backfill safety)
-
-    const { upserted, deleted } = await fetchAndUpsertDeals(conn.id, updatedSince);
-
-    await db
-      .update(crmConnections)
-      .set({ lastSyncedAt: new Date(), updatedAt: new Date() })
-      .where(eq(crmConnections.id, conn.id));
-
-    logger.info("incremental sync complete", { connectionId: conn.id, upserted, deleted });
-    return { upserted, deleted };
   },
 });
