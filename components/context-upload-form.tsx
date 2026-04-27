@@ -849,7 +849,7 @@ export function ContextUploadForm({
             importamos como transcripción o doc de contexto según el formato.
             Si es <strong>carpeta</strong>, la vinculamos a la cuenta e
             importamos los <strong>24 archivos más recientes</strong> al
-            instante. Después cada 30 minutos chequeamos si hay nuevos y los
+            instante. Después cada 10 minutos chequeamos si hay nuevos y los
             importamos solos. Hace falta Drive conectado en el Workspace y que
             la cuenta de Google tenga acceso a la carpeta.
           </p>

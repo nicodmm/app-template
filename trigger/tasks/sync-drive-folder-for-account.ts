@@ -120,14 +120,14 @@ export const syncDriveFolderForAccount = task({
 });
 
 /**
- * Cron — every 30 min iterate every account that has a Drive folder bound
+ * Cron — every 10 min iterate every account that has a Drive folder bound
  * and trigger an incremental sync. Cron-driven syncs always extract tasks
  * (the skipTaskExtraction flag is only set on the initial bulk import via
  * the UI checkbox).
  */
 export const syncAllAccountDriveFolders = schedules.task({
   id: "sync-all-account-drive-folders",
-  cron: "*/30 * * * *",
+  cron: "*/10 * * * *",
   run: async (): Promise<void> => {
     const rows = await db
       .select({
