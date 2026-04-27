@@ -24,7 +24,9 @@ const EVENT_MAP: Record<string, { entityType: "campaign" | "ad_set" | "ad"; even
   create_ad: { entityType: "ad", eventType: "ad_created" },
   update_ad_status: { entityType: "ad", eventType: "ad_status_change" },
   update_ad_creative: { entityType: "ad", eventType: "ad_creative_change" },
-  update_ad_run_status: { entityType: "ad", eventType: "ad_run_status_change" },
+  // update_ad_run_status intentionally dropped — Meta fires it on each ad's
+  // review pipeline (pending_processing → pending_review → active) which
+  // floods the timeline with non-actionable lifecycle noise.
   delete_ad: { entityType: "ad", eventType: "ad_deleted" },
   // Creative asset changes (very common on dynamic ads)
   edit_images: { entityType: "ad", eventType: "ad_images_edited" },
