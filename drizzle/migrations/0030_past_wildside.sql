@@ -1,0 +1,1 @@
+ALTER TABLE "accounts" ADD COLUMN "drive_folder_match_account_name" boolean DEFAULT false NOT NULL;

@@ -23,6 +23,23 @@ interface SyncFolderInput {
 
 const MAX_FILES_PER_RUN = 24;
 
+const ACCENT_MAP: Record<string, string> = {
+  á: "a", à: "a", ä: "a", â: "a", ã: "a",
+  é: "e", è: "e", ë: "e", ê: "e",
+  í: "i", ì: "i", ï: "i", î: "i",
+  ó: "o", ò: "o", ö: "o", ô: "o", õ: "o",
+  ú: "u", ù: "u", ü: "u", û: "u",
+  ñ: "n",
+};
+
+function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .split("")
+    .map((ch) => ACCENT_MAP[ch] ?? ch)
+    .join("");
+}
+
 export const syncDriveFolderForAccount = task({
   id: "sync-drive-folder-for-account",
   retry: {
@@ -35,8 +52,10 @@ export const syncDriveFolderForAccount = task({
     const [acc] = await db
       .select({
         id: accounts.id,
+        name: accounts.name,
         driveFolderId: accounts.driveFolderId,
         driveFolderName: accounts.driveFolderName,
+        driveFolderMatchAccountName: accounts.driveFolderMatchAccountName,
       })
       .from(accounts)
       .where(
@@ -69,9 +88,23 @@ export const syncDriveFolderForAccount = task({
 
     const accessToken = await ensureFreshAccessToken(conn.id);
 
-    const files = await listDriveFolderFiles(accessToken, acc.driveFolderId, {
+    let files = await listDriveFolderFiles(accessToken, acc.driveFolderId, {
       limit: MAX_FILES_PER_RUN,
     });
+
+    // Optional safety filter for shared folders: only import files whose
+    // name mentions the account name. Case- and accent-insensitive `includes`
+    // — same idiom used by the workspace-level matcher.
+    if (acc.driveFolderMatchAccountName) {
+      const normalizedAccount = normalize(acc.name);
+      const before = files.length;
+      files = files.filter((f) => normalize(f.name).includes(normalizedAccount));
+      logger.info("Account-name filter applied to folder sync", {
+        accountId: acc.id,
+        before,
+        after: files.length,
+      });
+    }
 
     let imported = 0;
     let duplicates = 0;

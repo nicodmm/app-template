@@ -376,6 +376,7 @@ export default async function AccountDetailPage({
           <h2 className="font-semibold mb-4">Subir contexto</h2>
           <ContextUploadForm
             accountId={accountId}
+            accountName={account.name}
             boundDriveFolder={
               account.driveFolderId && account.driveFolderName
                 ? {

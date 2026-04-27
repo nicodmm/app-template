@@ -104,7 +104,7 @@ export async function importDriveLinkForAccount(
   accountId: string,
   url: string,
   userNotes?: string,
-  opts?: { skipTaskExtraction?: boolean }
+  opts?: { skipTaskExtraction?: boolean; matchAccountName?: boolean }
 ): Promise<{
   outcome?: "queued" | "duplicate" | "folder_bound";
   fileName?: string;
@@ -124,7 +124,8 @@ export async function importDriveLinkForAccount(
       accountId,
       folderId,
       userId,
-      opts?.skipTaskExtraction ?? false
+      opts?.skipTaskExtraction ?? false,
+      opts?.matchAccountName ?? false
     );
   }
 
@@ -260,7 +261,8 @@ async function bindFolderInternal(
   accountId: string,
   folderId: string,
   userId: string,
-  skipTaskExtraction: boolean
+  skipTaskExtraction: boolean,
+  matchAccountName: boolean
 ): Promise<{
   outcome: "folder_bound";
   folderName: string;
@@ -370,6 +372,7 @@ async function bindFolderInternal(
     .set({
       driveFolderId: folderId,
       driveFolderName: folderName,
+      driveFolderMatchAccountName: matchAccountName,
       updatedAt: new Date(),
     })
     .where(eq(accounts.id, accountId));
@@ -446,6 +449,7 @@ export async function unlinkDriveFolderForAccount(
       driveFolderId: null,
       driveFolderName: null,
       driveFolderSyncedAt: null,
+      driveFolderMatchAccountName: false,
       updatedAt: new Date(),
     })
     .where(

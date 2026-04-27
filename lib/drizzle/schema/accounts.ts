@@ -28,6 +28,9 @@ export const accounts = pgTable(
     driveFolderId: text("drive_folder_id"),
     driveFolderName: text("drive_folder_name"),
     driveFolderSyncedAt: timestamp("drive_folder_synced_at"),
+    driveFolderMatchAccountName: boolean("drive_folder_match_account_name")
+      .notNull()
+      .default(false),
     industry: text("industry"),
     industryCategory: text("industry_category"),
     employeeCount: text("employee_count"),

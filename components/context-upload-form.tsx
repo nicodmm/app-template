@@ -17,6 +17,7 @@ import { TranscriptProgress } from "@/components/transcript-progress";
 
 interface ContextUploadFormProps {
   accountId: string;
+  accountName: string;
   boundDriveFolder: {
     id: string;
     name: string;
@@ -86,6 +87,7 @@ const DOC_TYPE_LABEL: Record<string, string> = {
 
 export function ContextUploadForm({
   accountId,
+  accountName,
   boundDriveFolder,
 }: ContextUploadFormProps) {
   const [tab, setTab] = useState<"transcript" | "note" | "file" | "drive_link">("transcript");
@@ -135,6 +137,10 @@ export function ContextUploadForm({
   // (cron + manual) always extract tasks. Default true — historical files
   // generate stale tasks, almost everyone wants to skip them.
   const [skipTaskExtraction, setSkipTaskExtraction] = useState(true);
+  // Optional cross-contamination guard — only import files whose name
+  // mentions the account name. Useful for shared folders. Default off
+  // because the typical case is a dedicated folder per client.
+  const [matchAccountName, setMatchAccountName] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -329,7 +335,7 @@ export function ContextUploadForm({
       accountId,
       driveLinkUrl.trim(),
       driveLinkNotes.trim() || undefined,
-      { skipTaskExtraction }
+      { skipTaskExtraction, matchAccountName }
     );
     if (result.error) {
       setDriveLinkState({ phase: "error", message: result.error });
@@ -881,22 +887,42 @@ export function ContextUploadForm({
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
           {parseDriveFolderIdFromUrl(driveLinkUrl) && !folder && (
-            <label className="flex items-start gap-2 text-xs text-muted-foreground rounded-md p-2.5 [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)]">
-              <input
-                type="checkbox"
-                checked={skipTaskExtraction}
-                onChange={(e) => setSkipTaskExtraction(e.target.checked)}
-                className="mt-0.5"
-              />
-              <span>
-                <strong className="text-foreground">
-                  No extraer tareas de los archivos viejos
-                </strong>{" "}
-                — recomendado para evitar que tu lista de tareas se llene con
-                cosas obsoletas. Los archivos nuevos que ingresen a la carpeta
-                a partir de ahora sí van a generar tareas automáticamente.
-              </span>
-            </label>
+            <div className="space-y-2">
+              <label className="flex items-start gap-2 text-xs text-muted-foreground rounded-md p-2.5 [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)]">
+                <input
+                  type="checkbox"
+                  checked={skipTaskExtraction}
+                  onChange={(e) => setSkipTaskExtraction(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  <strong className="text-foreground">
+                    No extraer tareas de los archivos viejos
+                  </strong>{" "}
+                  — recomendado para evitar que tu lista de tareas se llene con
+                  cosas obsoletas. Los archivos nuevos que ingresen a la carpeta
+                  a partir de ahora sí van a generar tareas automáticamente.
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-xs text-muted-foreground rounded-md p-2.5 [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)]">
+                <input
+                  type="checkbox"
+                  checked={matchAccountName}
+                  onChange={(e) => setMatchAccountName(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  <strong className="text-foreground">
+                    Solo importar archivos cuyo nombre <em>contenga</em>{" "}
+                    &quot;{accountName}&quot;
+                  </strong>{" "}
+                  — útil si la carpeta es compartida con otros clientes. Hace
+                  matching <em>contains</em> (no exact), case-insensitive y sin
+                  acentos: ej. &quot;Weekly - {accountName} - Abril.docx&quot;
+                  pega bien. Aplica también al sync automático.
+                </span>
+              </label>
+            </div>
           )}
           <textarea
             placeholder="Notas o descripción (opcional — solo aplica a archivos individuales)"
