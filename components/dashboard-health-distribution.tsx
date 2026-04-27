@@ -53,16 +53,22 @@ function TreemapContent({
   const handle = () => {
     if (bucket && onBucketClick) onBucketClick(bucket);
   };
+  // Round positions to integers — Recharts hands us floats which trigger
+  // sub-pixel anti-aliasing and make the SVG <text> look blurry on fills.
+  const rx = Math.round(x);
+  const ry = Math.round(y);
+  const rw = Math.round(width);
+  const rh = Math.round(height);
   return (
     <g
       onClick={handle}
       style={{ cursor: bucket && onBucketClick ? "pointer" : "default" }}
     >
       <rect
-        x={x}
-        y={y}
-        width={width}
-        height={height}
+        x={rx}
+        y={ry}
+        width={rw}
+        height={rh}
         fill={fill}
         stroke="rgba(255,255,255,0.6)"
         strokeWidth={2}
@@ -71,21 +77,24 @@ function TreemapContent({
       {showLabel && (
         <>
           <text
-            x={x + 10}
-            y={y + 18}
+            x={rx + 12}
+            y={ry + 20}
             fill="#ffffff"
-            fontSize={11}
+            fontSize={12}
             fontWeight={600}
-            opacity={0.95}
+            fontFamily="var(--font-geist-sans), system-ui, sans-serif"
+            style={{ textRendering: "geometricPrecision" }}
           >
             {name}
           </text>
           <text
-            x={x + 10}
-            y={y + 36}
+            x={rx + 12}
+            y={ry + 42}
             fill="#ffffff"
-            fontSize={18}
+            fontSize={20}
             fontWeight={700}
+            fontFamily="var(--font-geist-sans), system-ui, sans-serif"
+            style={{ textRendering: "geometricPrecision" }}
           >
             {size}
           </text>
