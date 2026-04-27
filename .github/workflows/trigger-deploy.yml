@@ -1,0 +1,54 @@
+name: Deploy Trigger.dev
+
+# Auto-deploys Trigger.dev tasks whenever code that affects them changes
+# on master. This removes the need to run `npx trigger.dev@latest deploy`
+# manually — without this, fixes to trigger/tasks/* or anything they
+# import (lib/meta, lib/crm, lib/ai, etc.) only land on Vercel and the
+# worker keeps running stale code.
+#
+# Setup (one-time):
+#   1. Generate a Personal Access Token in Trigger.dev →
+#      https://cloud.trigger.dev/account/tokens
+#   2. Add it as TRIGGER_ACCESS_TOKEN in GitHub →
+#      Settings → Secrets and variables → Actions → New repository secret
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "trigger/**"
+      - "trigger.config.ts"
+      - "lib/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/trigger-deploy.yml"
+  # Allow firing manually from the Actions tab if a forced redeploy is needed.
+  workflow_dispatch:
+
+# Cancel any in-flight deploy when a newer commit lands so we don't
+# race two deploys against the same project.
+concurrency:
+  group: trigger-deploy-prod
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy Trigger.dev tasks
+        env:
+          TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
+        run: npx trigger.dev@latest deploy
