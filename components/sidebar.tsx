@@ -6,7 +6,6 @@ import { LayoutGrid, User, BarChart2, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
-  role: string;
   /** True when the user has global users.role === 'admin' (platform owner). */
   isPlatformAdmin: boolean;
   transcriptsCount: number;
@@ -25,7 +24,6 @@ const adminItems = [
 ];
 
 export function Sidebar({
-  role: _role,
   isPlatformAdmin,
   transcriptsCount,
   transcriptsLimit,

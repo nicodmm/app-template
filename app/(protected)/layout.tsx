@@ -42,7 +42,6 @@ export default async function ProtectedLayout({
     workspaceData = await getWorkspaceWithUsage(userId);
   }
 
-  const role = workspaceData?.member.role ?? "member";
   const transcriptsCount = workspaceData?.usage?.transcriptsCount ?? 0;
   const transcriptsLimit = 5;
   const plan = "Free";
@@ -53,7 +52,6 @@ export default async function ProtectedLayout({
       <AppHeader userEmail={email} userInitial={userInitial} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
-          role={role}
           isPlatformAdmin={isPlatformAdmin}
           transcriptsCount={transcriptsCount}
           transcriptsLimit={transcriptsLimit}
