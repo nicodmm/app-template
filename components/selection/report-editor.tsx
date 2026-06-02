@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Loader2, Pencil, Sparkles } from "lucide-react";
 import { generateCandidateReport, saveCandidateReport } from "@/app/actions/selection";
@@ -37,6 +37,23 @@ export function ReportEditor({ accountId, searchId, candidate }: Props) {
 
   const status = candidate.reportStatus ?? "none";
   const isGenerating = status === "generating";
+
+  // While the report is generating, poll the server so it appears on its own
+  // (the trigger.dev task finishes ~20-40s later, out of band). Capped so a
+  // stuck generation doesn't poll forever.
+  useEffect(() => {
+    if (!isGenerating) return;
+    let count = 0;
+    const id = setInterval(() => {
+      count += 1;
+      if (count > 30) {
+        clearInterval(id);
+        return;
+      }
+      router.refresh();
+    }, 4000);
+    return () => clearInterval(id);
+  }, [isGenerating, router]);
 
   function handleGenerate(): void {
     setError(null);
