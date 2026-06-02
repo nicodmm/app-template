@@ -6,6 +6,7 @@ export const ACCOUNT_MODULES = [
   { key: "participants", label: "Contactos y participantes", description: "Contactos de la cuenta" },
   { key: "signals", label: "Señales", description: "Alertas y señales detectadas" },
   { key: "health", label: "Evolución de salud", description: "Timeline del estado de la cuenta" },
+  { key: "selection", label: "Selección", description: "Búsquedas y candidatos del servicio de selección" },
 ] as const;
 
 export type AccountModuleKey = (typeof ACCOUNT_MODULES)[number]["key"];

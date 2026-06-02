@@ -9,6 +9,7 @@ export interface ShareConfig {
   crm: boolean;
   health: boolean;
   paidMedia: boolean;
+  selection: boolean;
 }
 
 export const DEFAULT_SHARE_CONFIG: ShareConfig = {
@@ -22,6 +23,7 @@ export const DEFAULT_SHARE_CONFIG: ShareConfig = {
   crm: false,
   health: false,
   paidMedia: true,
+  selection: false,
 };
 
 export function coerceShareConfig(
@@ -46,4 +48,5 @@ export const SHARE_CONFIG_LABELS: Record<keyof ShareConfig, string> = {
   crm: "CRM",
   health: "Salud de la cuenta",
   paidMedia: "Paid media",
+  selection: "Selección (candidatos)",
 };
