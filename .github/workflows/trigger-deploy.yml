@@ -51,4 +51,7 @@ jobs:
       - name: Deploy Trigger.dev tasks
         env:
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
-        run: npx trigger.dev@latest deploy
+        # Pin the CLI to the installed @trigger.dev/sdk version. Using
+        # `@latest` breaks deploys whenever the CLI moves ahead of the pinned
+        # SDK (CI aborts on version mismatch), as happened with 4.4.6 vs 4.4.4.
+        run: npx trigger.dev@$(node -p "require('@trigger.dev/sdk/package.json').version") deploy

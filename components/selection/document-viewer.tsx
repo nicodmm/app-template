@@ -6,6 +6,7 @@ import { getCandidateCvUrl } from "@/app/actions/selection";
 import { GlassCard } from "@/components/ui/glass-card";
 import { RichMarkdown } from "@/components/ui/rich-markdown";
 import { cn } from "@/lib/utils";
+import { isEmbeddableCv, toEmbeddableCvUrl } from "@/lib/selection/cv-url";
 import type { SelectionCandidate } from "@/lib/drizzle/schema";
 
 interface Props {
@@ -23,8 +24,6 @@ export function DocumentViewer({ accountId, candidate }: Props) {
   const [cvFetched, setCvFetched] = useState(false);
 
   const hasCv = Boolean(candidate.cvStoragePath || candidate.cvUrl);
-  const isPdf =
-    !candidate.cvMimeType || candidate.cvMimeType.toLowerCase().includes("pdf");
 
   // Fetch the signed/external URL the first time the CV tab is active.
   useEffect(() => {
@@ -84,9 +83,9 @@ export function DocumentViewer({ accountId, candidate }: Props) {
               icon={<FileWarning size={28} aria-hidden />}
               text={cvError}
             />
-          ) : cvUrl && isPdf ? (
+          ) : cvUrl && isEmbeddableCv(cvUrl, candidate.cvMimeType) ? (
             <iframe
-              src={cvUrl}
+              src={toEmbeddableCvUrl(cvUrl)}
               title={candidate.cvFileName ?? "CV"}
               className="w-full h-[480px] flex-1 border-0"
             />

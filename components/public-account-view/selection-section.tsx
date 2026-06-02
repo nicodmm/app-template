@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/ui/glass-card";
 import { RichMarkdown } from "@/components/ui/rich-markdown";
 import { StarRating } from "@/components/selection/star-rating";
+import { isEmbeddableCv, toEmbeddableCvUrl } from "@/lib/selection/cv-url";
 import type { PublicAccountSnapshot } from "@/lib/queries/public-account";
 import {
   clientSetCandidateStatus,
@@ -598,12 +599,17 @@ function CvReportViewer({
               <AlertCircle size={16} />
               {cvError}
             </div>
-          ) : cvUrl ? (
+          ) : cvUrl && isEmbeddableCv(cvUrl, null) ? (
             <iframe
-              src={cvUrl}
+              src={toEmbeddableCvUrl(cvUrl)}
               title="CV del candidato"
               className="w-full h-[460px] bg-white"
             />
+          ) : cvUrl ? (
+            <div className="flex flex-col items-center justify-center gap-2 min-h-[460px] px-4 text-center text-sm text-muted-foreground">
+              <FileText size={22} className="opacity-50" />
+              Vista previa no disponible. Usá “Abrir en pestaña nueva”.
+            </div>
           ) : (
             <div className="flex items-center justify-center min-h-[460px] text-sm text-muted-foreground">
               Sin CV disponible
