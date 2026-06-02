@@ -40,6 +40,7 @@ import { ParticipantsSection } from "@/components/account-detail/participants-se
 import { SignalsSection } from "@/components/account-detail/signals-section";
 import { HealthSection } from "@/components/account-detail/health-section";
 import { SectionSkeleton } from "@/components/account-detail/section-skeleton";
+import { SelectionSection } from "@/components/account-detail/selection-section";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
@@ -360,6 +361,13 @@ export default async function AccountDetailPage({
       {isModuleEnabled(account.enabledModules, "crm") && (
         <div className="mb-6">
           <CrmMiniCard workspaceId={workspace.id} accountId={accountId} />
+        </div>
+      )}
+
+      {/* Selección mini-card */}
+      {isModuleEnabled(account.enabledModules, "selection") && (
+        <div className="mb-6">
+          <SelectionSection accountId={accountId} />
         </div>
       )}
 
