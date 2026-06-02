@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Delenio - Gestión de Candidatos</title>
+    <link href="https://cdn.jsdelivr.net/npm/tabler-icons@latest/tabler-icons.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica", "Arial", sans-serif;
+            background: #f5f5f5;
+            color: #220C10;
+        }
+        .header {
+            background: white;
+            border-bottom: 1px solid #E0E0E0;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+            font-size: 18px;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+        }
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #73017B;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+        .role-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #f0f0f0;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #73017B;
+        }
+        .container {
+            display: flex;
+            height: calc(100vh - 70px);
+        }
+        .sidebar {
+            width: 250px;
+            background: white;
+            border-right: 1px solid #E0E0E0;
+            padding: 2rem 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-item {
+            padding: 12px 1.5rem;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sidebar-item:hover {
+            background: #f5f5f5;
+        }
+        .sidebar-item.active {
+            border-left-color: #73017B;
+            background: #f9f0fb;
+            color: #73017B;
+            font-weight: 600;
+        }
+        .sidebar-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            color: #999;
+        }
+        .sidebar-spacer {
+            flex: 1;
+        }
+        .sidebar-footer {
+            border-top: 1px solid #E0E0E0;
+            padding: 1rem 1.5rem;
+            font-size: 11px;
+            color: #999;
+        }
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            flex-direction: column;
+        }
+        .page-header {
+            padding: 2rem;
+            background: white;
+            border-bottom: 1px solid #E0E0E0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .page-subtitle {
+            color: #666;
+            font-size: 13px;
+        }
+        .page-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-primary {
+            background: #73017B;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5a0060;
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #220C10;
+            border: 1px solid #D0D0D0;
+        }
+        .btn-secondary:hover {
+            background: #E0E0E0;
+        }
+        .btn-danger {
+            background: #f8d7da;
+            color: #721C24;
+        }
+        .btn-danger:hover {
+            background: #f5c6d0;
+        }
+        .btn-success {
+            background: #D4EDDA;
+            color: #155724;
+        }
+        .btn-success:hover {
+            background: #c3e6cb;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn i {
+            font-size: 14px;
+        }
+        .page-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .modal-overlay.show {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .modal-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #D0D0D0;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: inherit;
+        }
+        .form-textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;
+            border-color: #73017B;
+            box-shadow: 0 0 0 3px rgba(115, 1, 123, 0.1);
+        }
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            margin-top: 2rem;
+            justify-content: flex-end;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #E0E0E0;
+            padding: 1.5rem;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border-color: #73017B;
+        }
+        .card-title {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+        .card-value {
+            font-size: 32px;
+            font-weight: 600;
+            color: #73017B;
+        }
+        .split-view {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        .list-panel {
+            width: 30%;
+            background: white;
+            border-right: 1px solid #E0E0E0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .detail-panel {
+            flex: 1;
+            background: #fafafa;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .search-box {
+            padding: 1rem;
+            border-bottom: 1px solid #E0E0E0;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #D0D0D0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .candidate-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+        .candidate-item {
+            padding: 12px;
+            border-bottom: 1px solid #E0E0E0;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .candidate-item:hover {
+            background: #f9f0fb;
+        }
+        .candidate-item.selected {
+            background: #f9f0fb;
+            border-left: 3px solid #73017B;
+        }
+        .candidate-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        .candidate-status {
+            display: inline-block;
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-top: 4px;
+        }
+        .status-pending { background: #FFF3CD; color: #856404; }
+        .status-avanza { background: #D4EDDA; color: #155724; }
+        .status-oferta { background: #CCE5FF; color: #004085; }
+        .status-descartado { background: #F8D7DA; color: #721C24; }
+        .detail-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+        .info-row {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #E0E0E0;
+            margin-bottom: 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        .info-item {
+            font-size: 12px;
+        }
+        .info-label {
+            color: #666;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .info-value {
+            font-weight: 600;
+            color: #220C10;
+            font-size: 14px;
+        }
+        .documents-section {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #E0E0E0;
+            margin-bottom: 1.5rem;
+        }
+        .document-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid #D0D0D0;
+            margin-bottom: 1rem;
+        }
+        .doc-tab {
+            padding: 10px 15px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .doc-tab.active {
+            color: #73017B;
+            border-bottom-color: #73017B;
+        }
+        .document-viewer {
+            min-height: 300px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            font-size: 13px;
+        }
+        .notes-rating-section {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #E0E0E0;
+            margin-bottom: 1.5rem;
+        }
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #E0E0E0;
+        }
+        .notes-textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #D0D0D0;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 80px;
+            margin-bottom: 1rem;
+        }
+        .stars {
+            display: flex;
+            gap: 4px;
+        }
+        .star {
+            font-size: 24px;
+            cursor: pointer;
+            color: #D0D0D0;
+            transition: color 0.2s;
+        }
+        .star.filled {
+            color: #E40993;
+        }
+        .star:hover {
+            color: #E40993;
+        }
+        .state-actions {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #E0E0E0;
+            margin-bottom: 1.5rem;
+        }
+        .state-buttons-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 1rem;
+        }
+        .state-btn-small {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .state-btn-avanza {
+            background: #D4EDDA;
+            color: #155724;
+        }
+        .state-btn-avanza:hover {
+            background: #c3e6cb;
+        }
+        .state-btn-descartado {
+            background: #f8d7da;
+            color: #721C24;
+        }
+        .state-btn-descartado:hover {
+            background: #f5c6d0;
+        }
+        .state-btn-oferta {
+            background: #CCE5FF;
+            color: #004085;
+            width: 100%;
+        }
+        .state-btn-oferta:hover {
+            background: #b3d9ff;
+        }
+        .conditional-form {
+            background: #f9f0fb;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-top: 1rem;
+            display: none;
+        }
+        .conditional-form.show {
+            display: block;
+        }
+        .no-selection {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            height: 100%;
+        }
+        .login-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #73017B 0%, #0c01a4 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .login-box {
+            background: white;
+            padding: 3rem;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .login-title {
+            font-size: 24px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+        .login-subtitle {
+            font-size: 13px;
+            color: #666;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .login-input {
+            padding: 12px;
+            border: 1px solid #D0D0D0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .login-btn {
+            padding: 12px;
+            background: #73017B;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .login-btn:hover {
+            background: #5a0060;
+        }
+        .role-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 1rem;
+        }
+        .role-option {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #D0D0D0;
+            border-radius: 6px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .role-option.selected {
+            background: #73017B;
+            color: white;
+            border-color: #73017B;
+        }
+        .permission-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+            background: white;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .permission-table th {
+            background: #f9f0fb;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+            color: #73017B;
+            border-bottom: 2px solid #E0E0E0;
+        }
+        .permission-table td {
+            padding: 12px;
+            border-bottom: 1px solid #E0E0E0;
+            font-size: 13px;
+        }
+        .permission-table tr:last-child td {
+            border-bottom: none;
+        }
+        .permission-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        .permission-check {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .permission-check.yes {
+            background: #D4EDDA;
+            color: #155724;
+        }
+        .permission-check.no {
+            background: #F8D7DA;
+            color: #721C24;
+        }
+        .user-item {
+            background: white;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .user-info-box {
+            flex: 1;
+        }
+        .user-item-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 0.25rem;
+        }
+        .user-item-email {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 0.25rem;
+        }
+        .user-item-role {
+            display: inline-block;
+            padding: 3px 8px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #73017B;
+        }
+        .user-item-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .user-item-actions .btn {
+            padding: 6px 10px;
+            font-size: 11px;
+        }
+        .checkbox-list {
+            background: white;
+            border: 1px solid #D0D0D0;
+            border-radius: 6px;
+            padding: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .checkbox-item:hover {
+            background: #f9f0fb;
+        }
+        .checkbox-item input {
+            margin-right: 8px;
+            cursor: pointer;
+        }
+        .checkbox-item label {
+            flex: 1;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .filters-metrics {
+            padding: 1rem;
+            background: white;
+            border-bottom: 1px solid #E0E0E0;
+            display: flex;
+            gap: 2rem;
+            font-size: 12px;
+        }
+        .metric {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .metric-count {
+            font-weight: 600;
+            font-size: 16px;
+            color: #73017B;
+        }
+        .search-header {
+            padding: 1.5rem;
+            background: white;
+            border-bottom: 1px solid #E0E0E0;
+        }
+        .search-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        .search-subtitle {
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- LOGIN SCREEN -->
+    <div id="loginContainer" class="login-container">
+        <div class="login-box">
+            <h2 class="login-title">Delenio</h2>
+            <p class="login-subtitle">Portal de Selección de Candidatos</p>
+            
+            <div class="login-form">
+                <label style="font-size: 12px; font-weight: 600;">Rol</label>
+                <div class="role-selector">
+                    <div class="role-option selected" data-role="recruiter">Recruiter</div>
+                    <div class="role-option" data-role="cliente">Cliente</div>
+                </div>
+                
+                <input type="email" class="login-input" id="loginEmail" placeholder="usuario@delenio.net" value="recruiter@delenio.net">
+                <input type="password" class="login-input" id="loginPassword" placeholder="Contraseña" value="delenio123">
+                
+                <button class="login-btn" onclick="login()">Ingresar</button>
+            </div>
+            
+            <p style="text-align: center; font-size: 11px; color: #999; margin-top: 1.5rem;">
+                <strong>Demo:</strong> Usa cualquier email/contraseña<br>
+                <strong>Recruiter:</strong> Acceso completo<br>
+                <strong>Cliente:</strong> Visualización limitada
+            </p>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="appContainer" style="display: none; flex-direction: column; height: 100vh;">
+        <!-- HEADER -->
+        <div class="header">
+            <div class="logo">
+                <svg width="30" height="30" viewBox="0 0 30 30" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="4" y="8" width="8" height="14" fill="#73017B" rx="1"/>
+                    <rect x="14" y="4" width="8" height="18" fill="#E40993" rx="1"/>
+                    <rect x="24" y="12" width="2" height="10" fill="#0c01a4" rx="1"/>
+                </svg>
+                <span>Delenio - Portal de Selección</span>
+            </div>
+            <div class="user-info">
+                <span id="userDisplay">Usuario</span>
+                <span class="role-badge" id="roleBadge">Rol</span>
+                <div class="user-avatar" id="userAvatar">U</div>
+                <button onclick="logout()" style="border: none; background: none; color: #73017B; cursor: pointer; font-size: 12px;">Salir</button>
+            </div>
+        </div>
+
+        <!-- MAIN CONTENT -->
+        <div class="container">
+            <!-- SIDEBAR -->
+            <div class="sidebar">
+                <div class="sidebar-item active" onclick="switchView('dashboard')">
+                    <i class="ti ti-dashboard"></i> Dashboard
+                </div>
+                <div class="sidebar-item" onclick="switchView('busquedas')">
+                    <i class="ti ti-search"></i> Búsquedas
+                </div>
+                <div id="recruiterOnlyMenu">
+                    <div class="sidebar-item" onclick="switchView('usuarios')">
+                        <i class="ti ti-users-group"></i> Usuarios
+                    </div>
+                    <div class="sidebar-item" onclick="switchView('permisos')">
+                        <i class="ti ti-lock"></i> Permisos
+                    </div>
+                </div>
+                <div class="sidebar-spacer"></div>
+                <div class="sidebar-footer">
+                    Versión 1.3<br>
+                    <span id="permissionsInfo"></span>
+                </div>
+            </div>
+
+            <!-- MAIN PANEL -->
+            <div class="main-content">
+                <!-- DASHBOARD VIEW -->
+                <div id="dashboardView" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+                    <div class="page-header">
+                        <div>
+                            <div class="page-title">Dashboard</div>
+                            <div class="page-subtitle">Resumen general</div>
+                        </div>
+                    </div>
+                    <div class="page-content">
+                        <div id="recruiterStats">
+                            <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 1rem;">Estadísticas Generales</h3>
+                            <div class="grid" id="dashboardStats"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BÚSQUEDAS VIEW -->
+                <div id="busquedasView" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
+                    <div class="page-header">
+                        <div>
+                            <div class="page-title">Búsquedas Activas</div>
+                            <div class="page-subtitle">Gestiona los procesos de selección</div>
+                        </div>
+                        <div class="page-actions" id="busquedasActions"></div>
+                    </div>
+                    <div class="page-content">
+                        <div class="grid" id="busquedasGrid"></div>
+                    </div>
+                </div>
+
+                <!-- CANDIDATOS VIEW (dentro de búsqueda seleccionada) -->
+                <div id="candidatosView" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
+                    <div class="page-header">
+                        <div>
+                            <div class="page-title" id="searchTitle">Búsqueda</div>
+                            <div class="page-subtitle" id="searchSubtitle">Gestión de candidatos</div>
+                        </div>
+                        <div class="page-actions" id="candidatosActions"></div>
+                    </div>
+                    <div class="filters-metrics">
+                        <div class="metric">
+                            <span>Pendientes:</span>
+                            <span class="metric-count" id="countPending">0</span>
+                        </div>
+                        <div class="metric">
+                            <span>Avanza:</span>
+                            <span class="metric-count" id="countAvanza">0</span>
+                        </div>
+                        <div class="metric">
+                            <span>Oferta:</span>
+                            <span class="metric-count" id="countOferta">0</span>
+                        </div>
+                        <div class="metric">
+                            <span>Descartados:</span>
+                            <span class="metric-count" id="countDescartado">0</span>
+                        </div>
+                    </div>
+                    <div class="split-view">
+                        <!-- LEFT PANEL -->
+                        <div class="list-panel">
+                            <div class="search-box">
+                                <input type="text" id="searchInput" placeholder="Buscar candidato..." onkeyup="searchCandidates()">
+                            </div>
+                            <div class="candidate-list" id="candidateList"></div>
+                        </div>
+                        <!-- RIGHT PANEL -->
+                        <div class="detail-panel">
+                            <div id="noSelection" class="no-selection">
+                                <div style="text-align: center;">
+                                    <i class="ti ti-inbox" style="font-size: 48px; margin-bottom: 1rem; display: block;"></i>
+                                    <p style="font-size: 14px;">Selecciona un candidato</p>
+                                </div>
+                            </div>
+                            <div id="detailView" style="display: none; flex: 1; overflow: hidden; flex-direction: column;">
+                                <div class="detail-content">
+                                    <!-- INFO BÁSICA -->
+                                    <div class="info-row">
+                                        <div class="info-item">
+                                            <div class="info-label">Nombre</div>
+                                            <div class="info-value" id="detailName">-</div>
+                                        </div>
+                                        <div class="info-item">
+                                            <div class="info-label">Remuneración</div>
+                                            <div class="info-value" id="detailSalary">-</div>
+                                        </div>
+                                        <div class="info-item">
+                                            <div class="info-label">Email</div>
+                                            <div class="info-value" id="detailEmail" style="font-size: 12px;">-</div>
+                                        </div>
+                                        <div class="info-item">
+                                            <div class="info-label">Teléfono</div>
+                                            <div class="info-value" id="detailPhone" style="font-size: 12px;">-</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- DOCUMENTOS -->
+                                    <div class="documents-section">
+                                        <div class="document-tabs">
+                                            <button class="doc-tab active" onclick="switchDoc('cv')">CV</button>
+                                            <button class="doc-tab" onclick="switchDoc('informe')">Informe</button>
+                                        </div>
+                                        <div id="cvViewer" class="document-viewer">
+                                            <div style="text-align: center;">
+                                                <i class="ti ti-file-pdf" style="font-size: 32px; margin-bottom: 0.5rem; display: block; color: #E40993;"></i>
+                                                <p style="margin-bottom: 0.5rem;">No hay CV</p>
+                                                <label style="color: #73017B; cursor: pointer; font-size: 11px;">
+                                                    <u>Cargar</u>
+                                                    <input type="file" style="display: none;" onchange="uploadDocument('cv', this)">
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div id="informeViewer" class="document-viewer" style="display: none;">
+                                            <div style="text-align: center;">
+                                                <i class="ti ti-file-text" style="font-size: 32px; margin-bottom: 0.5rem; display: block; color: #0c01a4;"></i>
+                                                <p style="margin-bottom: 0.5rem;">No hay informe</p>
+                                                <label style="color: #73017B; cursor: pointer; font-size: 11px;">
+                                                    <u>Cargar</u>
+                                                    <input type="file" style="display: none;" onchange="uploadDocument('informe', this)">
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- NOTAS Y CALIFICACIÓN -->
+                                    <div class="notes-rating-section">
+                                        <div class="section-title">Notas y Calificación</div>
+                                        <textarea class="notes-textarea" id="candidateNotes" placeholder="Agrega observaciones..."></textarea>
+                                        <div>
+                                            <div style="font-size: 12px; font-weight: 600; margin-bottom: 0.5rem;">Calificación</div>
+                                            <div class="stars" id="ratingStars"></div>
+                                        </div>
+                                        <button class="btn btn-primary" style="margin-top: 1rem; width: 100%;" onclick="saveNotes()">
+                                            <i class="ti ti-check"></i> Guardar
+                                        </button>
+                                    </div>
+
+                                    <!-- CAMBIAR ESTADO -->
+                                    <div class="state-actions" id="workflowSection">
+                                        <div class="state-buttons-row">
+                                            <button class="state-btn-small state-btn-avanza" onclick="setState('avanza')">✓ Avanza</button>
+                                            <button class="state-btn-small state-btn-descartado" onclick="setState('descartado')">✕ Rechazar</button>
+                                        </div>
+                                        <button class="state-btn-oferta" onclick="setState('oferta')">💼 Hacer Oferta</button>
+
+                                        <div id="avanzaForm" class="conditional-form">
+                                            <div class="form-group">
+                                                <label class="form-label">Modalidad</label>
+                                                <select class="form-select" id="entrevistaModalidad">
+                                                    <option>Presencial</option>
+                                                    <option>Virtual</option>
+                                                    <option>Híbrida</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label class="form-label">Horarios</label>
+                                                <input type="text" class="form-input" id="entrevistaHorarios" placeholder="Ej: Lunes 15hs, Martes 10hs">
+                                            </div>
+                                            <button class="btn btn-success" onclick="confirmState('avanza')">
+                                                <i class="ti ti-check"></i> Confirmar
+                                            </button>
+                                        </div>
+
+                                        <div id="ofertaForm" class="conditional-form">
+                                            <div class="form-group">
+                                                <label class="form-label">Condiciones</label>
+                                                <textarea class="form-textarea" id="ofertaTexto" placeholder="Describe las condiciones..."></textarea>
+                                            </div>
+                                            <button class="btn btn-primary" onclick="confirmState('oferta')">
+                                                <i class="ti ti-check"></i> Enviar Oferta
+                                            </button>
+                                        </div>
+
+                                        <div id="descartadoForm" class="conditional-form">
+                                            <div class="form-group">
+                                                <label class="form-label">Motivo del Rechazo *</label>
+                                                <textarea class="form-textarea" id="descartadoMotivo" placeholder="Explica por qué..."></textarea>
+                                            </div>
+                                            <button class="btn btn-danger" onclick="confirmState('descartado')">
+                                                <i class="ti ti-check"></i> Confirmar Rechazo
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- USUARIOS VIEW (RECRUITER ONLY) -->
+                <div id="usuariosView" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
+                    <div class="page-header">
+                        <div>
+                            <div class="page-title">Gestión de Usuarios</div>
+                            <div class="page-subtitle">Crea y administra usuarios clientes</div>
+                        </div>
+                        <div class="page-actions">
+                            <button class="btn btn-primary" onclick="openModal('newUserModal')">
+                                <i class="ti ti-plus"></i> Nuevo Usuario
+                            </button>
+                        </div>
+                    </div>
+                    <div class="page-content">
+                        <div id="usuariosList"></div>
+                    </div>
+                </div>
+
+                <!-- PERMISOS VIEW (RECRUITER ONLY) -->
+                <div id="permisosView" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
+                    <div class="page-header">
+                        <div>
+                            <div class="page-title">Control de Accesos y Permisos</div>
+                            <div class="page-subtitle">Edita permisos para cada rol</div>
+                        </div>
+                    </div>
+                    <div class="page-content">
+                        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 1rem;">Permisos por Rol (Editable)</h3>
+                        <table class="permission-table">
+                            <thead>
+                                <tr>
+                                    <th>Acción / Sección</th>
+                                    <th style="text-align: center;">Recruiter</th>
+                                    <th style="text-align: center;">Cliente</th>
+                                </tr>
+                            </thead>
+                            <tbody id="permissionsTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALS -->
+    <div id="newSearchModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Crear Nueva Búsqueda</span>
+                <button class="modal-close" onclick="closeModal('newSearchModal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Nombre de la Posición *</label>
+                <input type="text" class="form-input" id="searchPosicion" placeholder="Ej: Senior Developer">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Cliente *</label>
+                <input type="text" class="form-input" id="searchCliente" placeholder="Ej: Tech Corp">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Empresa - Razón Social *</label>
+                <input type="text" class="form-input" id="searchEmpresa" placeholder="Ej: Tech Corporation SA">
+            </div>
+            <div class="form-group">
+                <label class="form-label">CUIT *</label>
+                <input type="text" class="form-input" id="searchCUIT" placeholder="Ej: 33-70219232-9">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('newSearchModal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="createSearch()">
+                    <i class="ti ti-plus"></i> Crear
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="newCandidateModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Agregar Candidato</span>
+                <button class="modal-close" onclick="closeModal('newCandidateModal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Nombre *</label>
+                <input type="text" class="form-input" id="candNombre" placeholder="Juan">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Apellido *</label>
+                <input type="text" class="form-input" id="candApellido" placeholder="Pérez">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Email *</label>
+                <input type="email" class="form-input" id="candEmail" placeholder="juan@example.com">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Teléfono</label>
+                <input type="tel" class="form-input" id="candTelefono" placeholder="+54 9 11 XXXX-XXXX">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Remuneración Pretendida</label>
+                <input type="text" class="form-input" id="candSalario" placeholder="$150000">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('newCandidateModal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="createCandidate()">
+                    <i class="ti ti-plus"></i> Agregar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="newUserModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Crear Nuevo Usuario</span>
+                <button class="modal-close" onclick="closeModal('newUserModal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Nombre *</label>
+                <input type="text" class="form-input" id="userName" placeholder="Juan">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Email *</label>
+                <input type="email" class="form-input" id="userEmail" placeholder="juan@empresa.com">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Empresa/Razón Social *</label>
+                <input type="text" class="form-input" id="userCompany" placeholder="Ej: Tech Corp">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Rol *</label>
+                <select class="form-select" id="userRole">
+                    <option value="cliente">Cliente</option>
+                    <option value="recruiter">Recruiter</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('newUserModal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="createUser()">
+                    <i class="ti ti-plus"></i> Crear
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="assignSearchModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Asignar Búsquedas</span>
+                <button class="modal-close" onclick="closeModal('assignSearchModal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Selecciona búsquedas:</label>
+                <div class="checkbox-list" id="searchCheckboxes"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('assignSearchModal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveUserAssignments()">
+                    <i class="ti ti-check"></i> Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const PERMISSIONS = {
+            recruiter: {
+                dashboard: { view: true },
+                busquedas: { view: true, create: true, edit: true, delete: true },
+                candidatos: { view: true, create: true, edit: true, delete: true, changeState: true, rate: true, addNotes: true, uploadDocuments: true },
+                usuarios: { view: true, create: true, edit: true, delete: true, assign: true },
+                permisos: { view: true, manage: true }
+            },
+            cliente: {
+                dashboard: { view: true },
+                busquedas: { view: true, create: false, edit: false, delete: false },
+                candidatos: { view: true, create: false, edit: false, delete: false, changeState: true, rate: true, addNotes: true, uploadDocuments: false },
+                usuarios: { view: false, create: false, edit: false, delete: false },
+                permisos: { view: false, manage: false }
+            }
+        };
+
+        function hasPermission(feature, action) {
+            const userPermissions = PERMISSIONS[appState.currentRole];
+            return userPermissions && userPermissions[feature] && userPermissions[feature][action];
+        }
+
+        const appState = {
+            currentUser: null,
+            currentRole: 'recruiter',
+            currentSearch: null,
+            currentCandidate: null,
+            currentUserForAssign: null,
+            filterState: 'todos',
+            users: [],
+            searches: [
+                {
+                    id: 1,
+                    posicion: 'Senior Developer',
+                    cliente: 'Tech Corp',
+                    fechaInicio: '2024-05-15',
+                    recruiter: 'Juan García',
+                    recruiterContact: '+54 9 11 2345-6789',
+                    empresaRazonSocial: 'Tech Corporation SA',
+                    empresaCUIT: '33-70219232-9',
+                    empresaSitio: 'https://delenio.net',
+                    assignedUsers: [],
+                    candidatos: [
+                        { id: 1, nombre: 'Juan', apellido: 'Pérez', email: 'juan@example.com', telefono: '+54 9 11 1111-1111', salario: '$150000', estado: 'pendiente', rating: 0, notas: '' },
+                        { id: 2, nombre: 'María', apellido: 'González', email: 'maria@example.com', telefono: '+54 9 11 2222-2222', salario: '$160000', estado: 'pendiente', rating: 0, notas: '' },
+                        { id: 3, nombre: 'Carlos', apellido: 'López', email: 'carlos@example.com', telefono: '+54 9 11 3333-3333', salario: '$170000', estado: 'avanza', rating: 4, notas: 'Buen perfil' }
+                    ]
+                }
+            ]
+        };
+
+        function login() {
+            const email = document.getElementById('loginEmail').value;
+            const role = document.querySelector('.role-option.selected').dataset.role;
+            
+            appState.currentUser = email.split('@')[0];
+            appState.currentRole = role;
+            
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('appContainer').style.display = 'flex';
+            
+            document.getElementById('userDisplay').textContent = `${appState.currentUser} (${role === 'recruiter' ? 'Recruiter' : 'Cliente'})`;
+            document.getElementById('roleBadge').textContent = role === 'recruiter' ? '👔 Recruiter' : '🏢 Cliente';
+            document.getElementById('userAvatar').textContent = appState.currentUser[0].toUpperCase();
+            document.getElementById('permissionsInfo').textContent = `Permisos: ${role === 'recruiter' ? 'Completo' : 'Limitado'}`;
+            
+            if (role !== 'recruiter') {
+                document.getElementById('recruiterOnlyMenu').style.display = 'none';
+            }
+            
+            updateUI();
+            renderDashboard();
+        }
+
+        function logout() {
+            appState.currentUser = null;
+            appState.currentRole = 'recruiter';
+            document.getElementById('loginContainer').style.display = 'flex';
+            document.getElementById('appContainer').style.display = 'none';
+            switchView('dashboard');
+        }
+
+        function updateUI() {
+            if (!hasPermission('busquedas', 'create')) {
+                document.getElementById('busquedasActions').innerHTML = '';
+            } else {
+                document.getElementById('busquedasActions').innerHTML = '<button class="btn btn-primary" onclick="openModal(\'newSearchModal\')"><i class="ti ti-plus"></i> Nueva Búsqueda</button>';
+            }
+
+            if (!hasPermission('permisos', 'view')) {
+                const item = document.querySelector('[onclick="switchView(\'permisos\')"]');
+                if (item) item.style.display = 'none';
+            }
+
+            if (!hasPermission('candidatos', 'changeState')) {
+                const wf = document.getElementById('workflowSection');
+                if (wf) wf.style.display = 'none';
+            }
+        }
+
+        function switchView(view) {
+            document.querySelectorAll('[id$="View"]').forEach(v => v.style.display = 'none');
+            document.querySelectorAll('.sidebar-item').forEach(s => s.classList.remove('active'));
+            
+            let sidebarItem;
+            if (view === 'dashboard') {
+                document.getElementById('dashboardView').style.display = 'flex';
+                sidebarItem = document.querySelector('[onclick="switchView(\'dashboard\')"]');
+                renderDashboard();
+            } else if (view === 'busquedas') {
+                if (!hasPermission('busquedas', 'view')) return alert('No tienes permisos');
+                document.getElementById('busquedasView').style.display = 'flex';
+                sidebarItem = document.querySelector('[onclick="switchView(\'busquedas\')"]');
+                renderSearches();
+            } else if (view === 'candidatos') {
+                if (!hasPermission('candidatos', 'view')) return alert('No tienes permisos');
+                document.getElementById('candidatosView').style.display = 'flex';
+                if (appState.currentSearch) {
+                    document.getElementById('searchTitle').textContent = appState.currentSearch.posicion;
+                    document.getElementById('searchSubtitle').textContent = appState.currentSearch.cliente;
+                    if (hasPermission('candidatos', 'create')) {
+                        document.getElementById('candidatosActions').innerHTML = '<button class="btn btn-primary" onclick="openModal(\'newCandidateModal\')"><i class="ti ti-plus"></i> Nuevo Candidato</button>';
+                    } else {
+                        document.getElementById('candidatosActions').innerHTML = '';
+                    }
+                    renderCandidates();
+                    updateMetrics();
+                }
+                sidebarItem = document.querySelector('[onclick="switchView(\'busquedas\')"]');
+            } else if (view === 'usuarios') {
+                if (!hasPermission('usuarios', 'view')) return alert('No tienes permisos');
+                document.getElementById('usuariosView').style.display = 'flex';
+                sidebarItem = document.querySelector('[onclick="switchView(\'usuarios\')"]');
+                renderUsers();
+            } else if (view === 'permisos') {
+                if (!hasPermission('permisos', 'view')) return alert('No tienes permisos');
+                document.getElementById('permisosView').style.display = 'flex';
+                sidebarItem = document.querySelector('[onclick="switchView(\'permisos\')"]');
+                renderPermissions();
+            }
+            
+            if (sidebarItem) sidebarItem.classList.add('active');
+        }
+
+        function renderDashboard() {
+            if (appState.currentRole === 'recruiter') {
+                const totalCandidates = appState.searches.reduce((sum, s) => sum + s.candidatos.length, 0);
+                const pendingFeedback = appState.searches.reduce((sum, s) => sum + s.candidatos.filter(c => c.estado === 'pendiente').length, 0);
+                
+                const stats = `
+                    <div class="card">
+                        <div class="card-title">Búsquedas Activas</div>
+                        <div class="card-value">${appState.searches.length}</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Candidatos Totales</div>
+                        <div class="card-value">${totalCandidates}</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Pendientes de Feedback</div>
+                        <div class="card-value">${pendingFeedback}</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Usuarios Creados</div>
+                        <div class="card-value">${appState.users.length}</div>
+                    </div>
+                `;
+                document.getElementById('dashboardStats').innerHTML = stats;
+            }
+        }
+
+        function renderSearches() {
+            const cards = appState.searches.map(s => `
+                <div class="card">
+                    <div class="card-title">${s.posicion}</div>
+                    <div class="card-subtitle">${s.cliente}</div>
+                    <div class="card-meta">
+                        <div><strong>${s.empresaRazonSocial}</strong><br><span style="font-size: 10px; color: #999;">CUIT: ${s.empresaCUIT}</span></div>
+                        <div><strong>${s.candidatos.length}</strong> candidatos</div>
+                    </div>
+                    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #E0E0E0; font-size: 11px; color: #666;">
+                        <strong>Usuarios asignados:</strong> ${s.assignedUsers.length > 0 ? s.assignedUsers.map(uid => appState.users.find(u => u.id === uid)?.nombre).filter(Boolean).join(', ') : 'Ninguno'}
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" onclick="selectSearch(${s.id}); switchView('candidatos')">Ver</button>
+                        <button class="btn btn-secondary" onclick="openAssignModal(${s.id})">Asignar</button>
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('busquedasGrid').innerHTML = cards;
+        }
+
+        function renderUsers() {
+            const html = appState.users.map(user => `
+                <div class="user-item">
+                    <div class="user-info-box">
+                        <div class="user-item-name">${user.nombre}</div>
+                        <div class="user-item-email">${user.email}</div>
+                        <div style="margin-top: 0.5rem;">
+                            <span class="user-item-role">${user.role === 'recruiter' ? '👔 Recruiter' : '🏢 Cliente'}</span>
+                            <span style="margin-left: 0.5rem; font-size: 11px; color: #999;">${user.searchCount || 0} búsquedas</span>
+                        </div>
+                    </div>
+                    <div class="user-item-actions">
+                        <button class="btn btn-secondary" onclick="openAssignSearchModal(${user.id})">Asignar</button>
+                        <button class="btn btn-danger" onclick="deleteUser(${user.id})">Eliminar</button>
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('usuariosList').innerHTML = html || '<p style="color: #999; text-align: center; padding: 2rem;">No hay usuarios creados aún</p>';
+        }
+
+        function renderCandidates() {
+            if (!appState.currentSearch) return;
+            const filtered = appState.currentSearch.candidatos.filter(c => {
+                const matchesFilter = appState.filterState === 'todos' || c.estado === appState.filterState;
+                const matchesSearch = !document.getElementById('searchInput')?.value || 
+                    c.nombre.toLowerCase().includes(document.getElementById('searchInput').value.toLowerCase()) ||
+                    c.apellido.toLowerCase().includes(document.getElementById('searchInput').value.toLowerCase());
+                return matchesFilter && matchesSearch;
+            });
+            
+            const list = document.getElementById('candidateList');
+            list.innerHTML = filtered.map(c => `
+                <div class="candidate-item ${appState.currentCandidate?.id === c.id ? 'selected' : ''}" onclick="selectCandidate(${c.id})">
+                    <div class="candidate-name">${c.nombre} ${c.apellido}</div>
+                    <div style="font-size: 11px; color: #666; margin-bottom: 4px;">${c.email}</div>
+                    <div class="candidate-status status-${c.estado}">${c.estado.toUpperCase()}</div>
+                </div>
+            `).join('');
+            updateMetrics();
+        }
+
+        function selectSearch(searchId) {
+            appState.currentSearch = appState.searches.find(s => s.id === searchId);
+        }
+
+        function selectCandidate(candidateId) {
+            appState.currentCandidate = appState.currentSearch.candidatos.find(c => c.id === candidateId);
+            renderCandidates();
+            renderCandidateDetail();
+        }
+
+        function renderCandidateDetail() {
+            if (!appState.currentCandidate) return;
+            document.getElementById('noSelection').style.display = 'none';
+            document.getElementById('detailView').style.display = 'flex';
+            
+            const c = appState.currentCandidate;
+            document.getElementById('detailName').textContent = `${c.nombre} ${c.apellido}`;
+            document.getElementById('detailEmail').textContent = c.email;
+            document.getElementById('detailPhone').textContent = c.telefono;
+            document.getElementById('detailSalary').textContent = c.salario;
+            document.getElementById('candidateNotes').value = c.notas;
+            
+            document.getElementById('candidateNotes').disabled = !hasPermission('candidatos', 'addNotes');
+            document.getElementById('workflowSection').style.display = hasPermission('candidatos', 'changeState') ? 'block' : 'none';
+            
+            renderStars();
+        }
+
+        function renderStars() {
+            const container = document.getElementById('ratingStars');
+            container.innerHTML = '';
+            const canRate = hasPermission('candidatos', 'rate');
+            for (let i = 1; i <= 5; i++) {
+                const star = document.createElement('span');
+                star.className = `star ${i <= appState.currentCandidate.rating ? 'filled' : ''}`;
+                star.innerHTML = '★';
+                if (canRate) {
+                    star.onclick = () => { appState.currentCandidate.rating = i; renderStars(); };
+                    star.style.cursor = 'pointer';
+                } else {
+                    star.style.opacity = '0.5';
+                    star.style.cursor = 'not-allowed';
+                }
+                container.appendChild(star);
+            }
+        }
+
+        function renderPermissions() {
+            const perms = [
+                { accion: 'Ver Dashboard', recruiter: true, cliente: true },
+                { accion: 'Ver Búsquedas', recruiter: true, cliente: true },
+                { accion: 'Crear Búsquedas', recruiter: true, cliente: false },
+                { accion: 'Ver Candidatos', recruiter: true, cliente: true },
+                { accion: 'Crear Candidatos', recruiter: true, cliente: false },
+                { accion: 'Calificar Candidatos', recruiter: true, cliente: true },
+                { accion: 'Cambiar Estados', recruiter: true, cliente: true },
+                { accion: 'Agregar Notas', recruiter: true, cliente: true },
+                { accion: 'Subir Documentos', recruiter: true, cliente: false },
+                { accion: 'Crear Usuarios', recruiter: true, cliente: false },
+                { accion: 'Asignar Búsquedas', recruiter: true, cliente: false },
+                { accion: 'Gestionar Permisos', recruiter: true, cliente: false }
+            ];
+
+            const html = perms.map((p, idx) => `
+                <tr>
+                    <td>${p.accion}</td>
+                    <td style="text-align: center;">
+                        <input type="checkbox" class="permission-checkbox" ${p.recruiter ? 'checked' : ''} onchange="updatePermission('recruiter', ${idx}, this.checked)">
+                    </td>
+                    <td style="text-align: center;">
+                        <input type="checkbox" class="permission-checkbox" ${p.cliente ? 'checked' : ''} onchange="updatePermission('cliente', ${idx}, this.checked)">
+                    </td>
+                </tr>
+            `).join('');
+            document.getElementById('permissionsTable').innerHTML = html;
+        }
+
+        function updatePermission(role, index, checked) {
+            console.log(`Permiso actualizado para ${role} en índice ${index}: ${checked}`);
+            alert('✅ Permiso actualizado');
+        }
+
+        function searchCandidates() {
+            renderCandidates();
+        }
+
+        function updateMetrics() {
+            if (!appState.currentSearch) return;
+            document.getElementById('countPending').textContent = appState.currentSearch.candidatos.filter(c => c.estado === 'pendiente').length;
+            document.getElementById('countAvanza').textContent = appState.currentSearch.candidatos.filter(c => c.estado === 'avanza').length;
+            document.getElementById('countOferta').textContent = appState.currentSearch.candidatos.filter(c => c.estado === 'oferta').length;
+            document.getElementById('countDescartado').textContent = appState.currentSearch.candidatos.filter(c => c.estado === 'descartado').length;
+        }
+
+        function saveNotes() {
+            appState.currentCandidate.notas = document.getElementById('candidateNotes').value;
+            alert('✅ Guardado');
+        }
+
+        function setState(newState) {
+            document.querySelectorAll('.conditional-form').forEach(f => f.classList.remove('show'));
+            
+            if (newState === 'avanza') {
+                document.getElementById('avanzaForm').classList.add('show');
+            } else if (newState === 'oferta') {
+                document.getElementById('ofertaForm').classList.add('show');
+            } else if (newState === 'descartado') {
+                document.getElementById('descartadoForm').classList.add('show');
+            }
+        }
+
+        function confirmState(newState) {
+            if (newState === 'descartado' && !document.getElementById('descartadoMotivo').value) {
+                alert('Debes escribir el motivo');
+                return;
+            }
+            appState.currentCandidate.estado = newState;
+            updateMetrics();
+            renderCandidates();
+            renderCandidateDetail();
+            alert(`✅ ${newState.toUpperCase()}`);
+        }
+
+        function switchDoc(doc) {
+            document.querySelectorAll('.doc-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('[id$="Viewer"]').forEach(v => v.style.display = 'none');
+            event.target.classList.add('active');
+            document.getElementById(`${doc}Viewer`).style.display = 'flex';
+        }
+
+        function uploadDocument(type, input) {
+            if (input.files.length > 0) {
+                alert(`✅ Archivo: ${input.files[0].name}`);
+            }
+        }
+
+        function createUser() {
+            const nombre = document.getElementById('userName').value;
+            const email = document.getElementById('userEmail').value;
+            const empresa = document.getElementById('userCompany').value;
+            const role = document.getElementById('userRole').value;
+
+            if (!nombre || !email || !empresa) {
+                alert('Completa todos los campos');
+                return;
+            }
+
+            const newUser = {
+                id: Math.max(...appState.users.map(u => u.id), 0) + 1,
+                nombre,
+                email,
+                empresa,
+                role,
+                searchCount: 0
+            };
+
+            appState.users.push(newUser);
+            closeModal('newUserModal');
+            renderUsers();
+            renderDashboard();
+            document.getElementById('userName').value = '';
+            document.getElementById('userEmail').value = '';
+            document.getElementById('userCompany').value = '';
+            document.getElementById('userRole').value = 'cliente';
+            alert('✅ Usuario creado');
+        }
+
+        function deleteUser(userId) {
+            if (confirm('¿Eliminar usuario?')) {
+                appState.users = appState.users.filter(u => u.id !== userId);
+                appState.searches.forEach(s => {
+                    s.assignedUsers = s.assignedUsers.filter(uid => uid !== userId);
+                });
+                renderUsers();
+                renderDashboard();
+                alert('✅ Eliminado');
+            }
+        }
+
+        function openAssignSearchModal(userId) {
+            appState.currentUserForAssign = userId;
+            const currentAssignments = appState.searches.filter(s => s.assignedUsers.includes(userId));
+            
+            const html = appState.searches.map(search => `
+                <div class="checkbox-item">
+                    <input type="checkbox" id="search_${search.id}" ${currentAssignments.find(s => s.id === search.id) ? 'checked' : ''}>
+                    <label for="search_${search.id}">${search.posicion} - ${search.cliente}</label>
+                </div>
+            `).join('');
+            
+            document.getElementById('searchCheckboxes').innerHTML = html;
+            openModal('assignSearchModal');
+        }
+
+        function openAssignModal(searchId) {
+            appState.currentSearch = appState.searches.find(s => s.id === searchId);
+            appState.currentUserForAssign = null;
+            
+            const html = appState.users.map(user => `
+                <div class="checkbox-item">
+                    <input type="checkbox" id="user_${user.id}" ${appState.currentSearch.assignedUsers.includes(user.id) ? 'checked' : ''}>
+                    <label for="user_${user.id}">${user.nombre} - ${user.empresa}</label>
+                </div>
+            `).join('');
+            
+            document.getElementById('searchCheckboxes').innerHTML = html;
+            document.querySelector('#assignSearchModal .modal-header span').textContent = `Asignar usuarios a "${appState.currentSearch.posicion}"`;
+            openModal('assignSearchModal');
+        }
+
+        function saveUserAssignments() {
+            const checkboxes = document.querySelectorAll('#searchCheckboxes input[type="checkbox"]:checked');
+            
+            if (appState.currentUserForAssign) {
+                appState.searches.forEach(s => {
+                    if (Array.from(checkboxes).find(cb => cb.id === `search_${s.id}`)) {
+                        if (!s.assignedUsers.includes(appState.currentUserForAssign)) {
+                            s.assignedUsers.push(appState.currentUserForAssign);
+                        }
+                    } else {
+                        s.assignedUsers = s.assignedUsers.filter(uid => uid !== appState.currentUserForAssign);
+                    }
+                });
+                
+                const user = appState.users.find(u => u.id === appState.currentUserForAssign);
+                if (user) {
+                    user.searchCount = appState.searches.filter(s => s.assignedUsers.includes(user.id)).length;
+                }
+            } else if (appState.currentSearch) {
+                appState.currentSearch.assignedUsers = Array.from(checkboxes)
+                    .map(cb => parseInt(cb.id.replace('user_', '')));
+                
+                appState.users.forEach(user => {
+                    user.searchCount = appState.searches.filter(s => s.assignedUsers.includes(user.id)).length;
+                });
+            }
+            
+            closeModal('assignSearchModal');
+            renderUsers();
+            renderSearches();
+            renderDashboard();
+            alert('✅ Asignaciones guardadas');
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('show');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+        }
+
+        function createSearch() {
+            const posicion = document.getElementById('searchPosicion').value;
+            const cliente = document.getElementById('searchCliente').value;
+            const empresa = document.getElementById('searchEmpresa').value;
+            const cuit = document.getElementById('searchCUIT').value;
+
+            if (!posicion || !cliente || !empresa || !cuit) {
+                alert('Completa todos los campos');
+                return;
+            }
+
+            const newSearch = {
+                id: appState.searches.length + 1,
+                posicion,
+                cliente,
+                fechaInicio: new Date().toISOString().split('T')[0],
+                recruiter: appState.currentUser,
+                recruiterContact: '+54 9 11 0000-0000',
+                empresaRazonSocial: empresa,
+                empresaCUIT: cuit,
+                empresaSitio: 'https://delenio.net',
+                assignedUsers: [],
+                candidatos: []
+            };
+
+            appState.searches.push(newSearch);
+            closeModal('newSearchModal');
+            renderSearches();
+            renderDashboard();
+            document.getElementById('searchPosicion').value = '';
+            document.getElementById('searchCliente').value = '';
+            document.getElementById('searchEmpresa').value = '';
+            document.getElementById('searchCUIT').value = '';
+            alert('✅ Búsqueda creada');
+        }
+
+        function createCandidate() {
+            if (!appState.currentSearch) {
+                alert('Selecciona una búsqueda primero');
+                return;
+            }
+
+            const nombre = document.getElementById('candNombre').value;
+            const apellido = document.getElementById('candApellido').value;
+            const email = document.getElementById('candEmail').value;
+            const telefono = document.getElementById('candTelefono').value;
+            const salario = document.getElementById('candSalario').value;
+
+            if (!nombre || !apellido || !email) {
+                alert('Completa los campos requeridos');
+                return;
+            }
+
+            const newCandidate = {
+                id: Math.max(...appState.currentSearch.candidatos.map(c => c.id), 0) + 1,
+                nombre,
+                apellido,
+                email,
+                telefono: telefono || 'No especificado',
+                salario: salario || 'No especificado',
+                estado: 'pendiente',
+                rating: 0,
+                notas: ''
+            };
+
+            appState.currentSearch.candidatos.push(newCandidate);
+            closeModal('newCandidateModal');
+            renderCandidates();
+            document.getElementById('candNombre').value = '';
+            document.getElementById('candApellido').value = '';
+            document.getElementById('candEmail').value = '';
+            document.getElementById('candTelefono').value = '';
+            document.getElementById('candSalario').value = '';
+            alert('✅ Candidato agregado');
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.role-option').forEach(el => {
+                el.addEventListener('click', function() {
+                    document.querySelectorAll('.role-option').forEach(e => e.classList.remove('selected'));
+                    this.classList.add('selected');
+                });
+            });
+        });
+    </script>
+</body>
+</html>
