@@ -18,6 +18,8 @@ import {
   workspaces,
   workspaceMembers,
   users,
+  selectionSearches,
+  selectionCandidates,
 } from "@/lib/drizzle/schema";
 import { and, desc, eq, gte, inArray, ne } from "drizzle-orm";
 import { coerceShareConfig, type ShareConfig } from "@/lib/share/share-config";
@@ -151,6 +153,31 @@ export interface PublicAccountSnapshot {
         clicks: number;
       };
     } | null;
+    selection: {
+      searches: Array<{
+        id: string;
+        position: string;
+        candidates: Array<{
+          id: string;
+          firstName: string;
+          lastName: string;
+          email: string | null;
+          phone: string | null;
+          linkedinUrl: string | null;
+          expectedSalary: string | null;
+          status: string;
+          clientRating: number;
+          clientNotes: string | null;
+          interviewModality: string | null;
+          interviewSchedule: string | null;
+          offerConditions: string | null;
+          rejectionReason: string | null;
+          hasCv: boolean;
+          reportContent: string | null;
+          reportStatus: string;
+        }>;
+      }>;
+    } | null;
   };
 }
 
@@ -281,6 +308,7 @@ export async function getPublicAccountSnapshot(
     crmData,
     healthData,
     paidMediaData,
+    selectionData,
   ] = await Promise.all([
     config.lastMeeting
       ? db
@@ -371,6 +399,9 @@ export async function getPublicAccountSnapshot(
     config.paidMedia
       ? loadPaidMediaForAccount(accountRow.id)
       : Promise.resolve(null),
+    config.selection
+      ? loadSelectionForAccount(accountRow.id)
+      : Promise.resolve(null),
   ]);
 
   // Best-effort view tracking (non-awaited, ignore failures).
@@ -431,6 +462,7 @@ export async function getPublicAccountSnapshot(
       crm: crmData,
       health: healthData,
       paidMedia: paidMediaData,
+      selection: selectionData,
     },
   };
 
@@ -655,5 +687,72 @@ async function loadPaidMediaForAccount(accountId: string) {
       thumbnailUrl: a.thumbnailUrl,
     })),
     kpis,
+  };
+}
+
+async function loadSelectionForAccount(accountId: string) {
+  const searches = await db
+    .select({ id: selectionSearches.id, position: selectionSearches.position })
+    .from(selectionSearches)
+    .where(
+      and(
+        eq(selectionSearches.accountId, accountId),
+        eq(selectionSearches.status, "active")
+      )
+    )
+    .orderBy(desc(selectionSearches.createdAt));
+  if (searches.length === 0) return { searches: [] };
+  const searchIds = searches.map((s) => s.id);
+  const cands = await db
+    .select({
+      id: selectionCandidates.id,
+      searchId: selectionCandidates.searchId,
+      firstName: selectionCandidates.firstName,
+      lastName: selectionCandidates.lastName,
+      email: selectionCandidates.email,
+      phone: selectionCandidates.phone,
+      linkedinUrl: selectionCandidates.linkedinUrl,
+      expectedSalary: selectionCandidates.expectedSalary,
+      status: selectionCandidates.status,
+      clientRating: selectionCandidates.clientRating,
+      clientNotes: selectionCandidates.clientNotes,
+      interviewModality: selectionCandidates.interviewModality,
+      interviewSchedule: selectionCandidates.interviewSchedule,
+      offerConditions: selectionCandidates.offerConditions,
+      rejectionReason: selectionCandidates.rejectionReason,
+      cvStoragePath: selectionCandidates.cvStoragePath,
+      cvUrl: selectionCandidates.cvUrl,
+      reportContent: selectionCandidates.reportContent,
+      reportStatus: selectionCandidates.reportStatus,
+    })
+    .from(selectionCandidates)
+    .where(inArray(selectionCandidates.searchId, searchIds))
+    .orderBy(desc(selectionCandidates.createdAt));
+  return {
+    searches: searches.map((s) => ({
+      id: s.id,
+      position: s.position,
+      candidates: cands
+        .filter((c) => c.searchId === s.id)
+        .map((c) => ({
+          id: c.id,
+          firstName: c.firstName,
+          lastName: c.lastName,
+          email: c.email,
+          phone: c.phone,
+          linkedinUrl: c.linkedinUrl,
+          expectedSalary: c.expectedSalary,
+          status: c.status,
+          clientRating: c.clientRating,
+          clientNotes: c.clientNotes,
+          interviewModality: c.interviewModality,
+          interviewSchedule: c.interviewSchedule,
+          offerConditions: c.offerConditions,
+          rejectionReason: c.rejectionReason,
+          hasCv: c.cvStoragePath != null || c.cvUrl != null,
+          reportContent: c.reportContent,
+          reportStatus: c.reportStatus,
+        })),
+    })),
   };
 }
