@@ -10,6 +10,7 @@ import { SignalsSection } from "./signals-section";
 import { HealthSection } from "./health-section";
 import { CrmSection } from "./crm-section";
 import { PaidMediaSection } from "./paid-media-section";
+import { SelectionSection } from "./selection-section";
 
 interface Props {
   snapshot: PublicAccountSnapshot;
@@ -59,6 +60,12 @@ export function PublicAccountView({ snapshot }: Props) {
       {config.files && data.files && <FilesSection rows={data.files} />}
       {config.paidMedia && data.paidMedia && (
         <PaidMediaSection data={data.paidMedia} />
+      )}
+      {data.selection && (
+        <SelectionSection
+          token={snapshot.share.token}
+          selection={data.selection}
+        />
       )}
 
       <footer className="pt-8 mt-8 [border-top:1px_solid_var(--glass-border)] text-center space-y-1">
