@@ -44,7 +44,7 @@ export function SearchList({ accountId, searches }: Props) {
       search: {
         id: search.id,
         position: search.position,
-        positionDescription: null, // not available from list query
+        positionDescription: search.positionDescription,
         status: search.status,
         razonSocial: search.razonSocial,
         cuit: search.cuit,

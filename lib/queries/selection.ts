@@ -37,6 +37,7 @@ export async function getSelectionKpis(accountId: string): Promise<SelectionKpis
 export interface SearchWithCounts {
   id: string;
   position: string;
+  positionDescription: string | null;
   status: string;
   razonSocial: string | null;
   cuit: string | null;
@@ -52,6 +53,7 @@ export async function listSearchesForAccount(
     .select({
       id: selectionSearches.id,
       position: selectionSearches.position,
+      positionDescription: selectionSearches.positionDescription,
       status: selectionSearches.status,
       razonSocial: selectionSearches.razonSocial,
       cuit: selectionSearches.cuit,
