@@ -14,6 +14,19 @@ import { createAdminClient, SELECTION_CV_BUCKET } from "@/lib/supabase/admin";
 
 type ActionResult = { success: boolean; error?: string; id?: string };
 
+function rethrowIfRedirect(e: unknown): void {
+  if (
+    typeof e === "object" &&
+    e !== null &&
+    "digest" in e &&
+    typeof (e as { digest?: unknown }).digest === "string" &&
+    ((e as { digest: string }).digest.startsWith("NEXT_REDIRECT") ||
+      (e as { digest: string }).digest === "NEXT_NOT_FOUND")
+  ) {
+    throw e;
+  }
+}
+
 /** Ensures the account belongs to the caller's workspace. Returns workspaceId. */
 async function requireAccountInWorkspace(accountId: string): Promise<string> {
   const userId = await requireUserId();
@@ -49,9 +62,11 @@ export async function createSearch(input: {
         cuit: input.cuit,
       })
       .returning({ id: selectionSearches.id });
+    if (!row) return { success: false, error: "Insert failed" };
     revalidatePath(`/app/accounts/${input.accountId}/selection`);
     return { success: true, id: row.id };
   } catch (e) {
+    rethrowIfRedirect(e);
     return { success: false, error: e instanceof Error ? e.message : "Error" };
   }
 }
@@ -88,6 +103,7 @@ export async function updateSearch(input: {
     revalidatePath(`/app/accounts/${input.accountId}/selection/${input.searchId}`);
     return { success: true };
   } catch (e) {
+    rethrowIfRedirect(e);
     return { success: false, error: e instanceof Error ? e.message : "Error" };
   }
 }
@@ -122,9 +138,11 @@ export async function createCandidate(input: {
         currentSalary: input.currentSalary,
       })
       .returning({ id: selectionCandidates.id });
+    if (!row) return { success: false, error: "Insert failed" };
     revalidatePath(`/app/accounts/${input.accountId}/selection/${input.searchId}`);
     return { success: true, id: row.id };
   } catch (e) {
+    rethrowIfRedirect(e);
     return { success: false, error: e instanceof Error ? e.message : "Error" };
   }
 }
@@ -164,6 +182,7 @@ export async function updateCandidate(input: {
     revalidatePath(`/app/accounts/${input.accountId}/selection/${input.searchId}`);
     return { success: true };
   } catch (e) {
+    rethrowIfRedirect(e);
     return { success: false, error: e instanceof Error ? e.message : "Error" };
   }
 }
@@ -186,6 +205,7 @@ export async function deleteCandidate(input: {
     revalidatePath(`/app/accounts/${input.accountId}/selection/${input.searchId}`);
     return { success: true };
   } catch (e) {
+    rethrowIfRedirect(e);
     return { success: false, error: e instanceof Error ? e.message : "Error" };
   }
 }
@@ -234,6 +254,7 @@ export async function uploadCandidateCv(input: {
     revalidatePath(`/app/accounts/${input.accountId}/selection/${input.searchId}`);
     return { success: true };
   } catch (e) {
+    rethrowIfRedirect(e);
     return { success: false, error: e instanceof Error ? e.message : "Error" };
   }
 }
@@ -265,6 +286,7 @@ export async function setCandidateCvUrl(input: {
     revalidatePath(`/app/accounts/${input.accountId}/selection/${input.searchId}`);
     return { success: true };
   } catch (e) {
+    rethrowIfRedirect(e);
     return { success: false, error: e instanceof Error ? e.message : "Error" };
   }
 }
@@ -282,7 +304,12 @@ export async function getCandidateCvUrl(input: {
         cvUrl: selectionCandidates.cvUrl,
       })
       .from(selectionCandidates)
-      .where(eq(selectionCandidates.id, input.candidateId))
+      .where(
+        and(
+          eq(selectionCandidates.id, input.candidateId),
+          eq(selectionCandidates.accountId, input.accountId)
+        )
+      )
       .limit(1);
     if (!c) return { url: null, error: "No candidate" };
     if (c.cvUrl) return { url: c.cvUrl };
@@ -296,6 +323,7 @@ export async function getCandidateCvUrl(input: {
     }
     return { url: null };
   } catch (e) {
+    rethrowIfRedirect(e);
     return { url: null, error: e instanceof Error ? e.message : "Error" };
   }
 }
@@ -320,6 +348,7 @@ export async function saveRecruiterNotes(input: {
     revalidatePath(`/app/accounts/${input.accountId}/selection/${input.searchId}`);
     return { success: true };
   } catch (e) {
+    rethrowIfRedirect(e);
     return { success: false, error: e instanceof Error ? e.message : "Error" };
   }
 }
@@ -352,12 +381,18 @@ export async function generateCandidateReport(input: {
       await db
         .update(selectionCandidates)
         .set({ reportStatus: "error", reportError: "No se pudo encolar la tarea" })
-        .where(eq(selectionCandidates.id, input.candidateId));
+        .where(
+          and(
+            eq(selectionCandidates.id, input.candidateId),
+            eq(selectionCandidates.accountId, input.accountId)
+          )
+        );
       return { success: false, error: "No se pudo encolar la generación" };
     }
     revalidatePath(`/app/accounts/${input.accountId}/selection/${input.searchId}`);
     return { success: true };
   } catch (e) {
+    rethrowIfRedirect(e);
     return { success: false, error: e instanceof Error ? e.message : "Error" };
   }
 }
@@ -388,6 +423,7 @@ export async function saveCandidateReport(input: {
     revalidatePath(`/app/accounts/${input.accountId}/selection/${input.searchId}`);
     return { success: true };
   } catch (e) {
+    rethrowIfRedirect(e);
     return { success: false, error: e instanceof Error ? e.message : "Error" };
   }
 }
