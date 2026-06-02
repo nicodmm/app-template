@@ -61,7 +61,7 @@ export function PublicAccountView({ snapshot }: Props) {
       {config.paidMedia && data.paidMedia && (
         <PaidMediaSection data={data.paidMedia} />
       )}
-      {data.selection && (
+      {config.selection && data.selection && (
         <SelectionSection
           token={snapshot.share.token}
           selection={data.selection}

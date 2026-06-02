@@ -123,6 +123,17 @@ export async function createCandidate(input: {
     const workspaceId = await requireAccountInWorkspace(input.accountId);
     if (!input.firstName.trim() || !input.lastName.trim())
       return { success: false, error: "Nombre y apellido requeridos" };
+    const [search] = await db
+      .select({ id: selectionSearches.id })
+      .from(selectionSearches)
+      .where(
+        and(
+          eq(selectionSearches.id, input.searchId),
+          eq(selectionSearches.accountId, input.accountId)
+        )
+      )
+      .limit(1);
+    if (!search) return { success: false, error: "Búsqueda no encontrada" };
     const [row] = await db
       .insert(selectionCandidates)
       .values({
