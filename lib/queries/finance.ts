@@ -6,8 +6,9 @@ import {
   financeFeeShares,
   workspaceMembers,
   users,
+  fxRates,
 } from "@/lib/drizzle/schema";
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 export interface AccountTerms {
   termsRawText: string | null;
@@ -143,4 +144,61 @@ export async function getFinanceMembers(
     memberId: r.memberId,
     name: r.fullName ?? r.email,
   }));
+}
+
+export interface FxRateRow {
+  id: string;
+  year: number;
+  month: number;
+  mepRate: number;
+  ipcCoefficient: number;
+}
+
+export async function listFxRates(workspaceId: string): Promise<FxRateRow[]> {
+  const rows = await db
+    .select({
+      id: fxRates.id,
+      year: fxRates.year,
+      month: fxRates.month,
+      mepRate: fxRates.mepRate,
+      ipcCoefficient: fxRates.ipcCoefficient,
+    })
+    .from(fxRates)
+    .where(eq(fxRates.workspaceId, workspaceId))
+    .orderBy(desc(fxRates.year), desc(fxRates.month));
+
+  return rows.map((r) => ({
+    id: r.id,
+    year: r.year,
+    month: r.month,
+    mepRate: Number(r.mepRate),
+    ipcCoefficient: Number(r.ipcCoefficient ?? 1),
+  }));
+}
+
+export async function getFxRate(
+  workspaceId: string,
+  year: number,
+  month: number
+): Promise<{ mepRate: number; ipcCoefficient: number } | null> {
+  const [row] = await db
+    .select({
+      mepRate: fxRates.mepRate,
+      ipcCoefficient: fxRates.ipcCoefficient,
+    })
+    .from(fxRates)
+    .where(
+      and(
+        eq(fxRates.workspaceId, workspaceId),
+        eq(fxRates.year, year),
+        eq(fxRates.month, month)
+      )
+    )
+    .limit(1);
+
+  if (!row) return null;
+  return {
+    mepRate: Number(row.mepRate),
+    ipcCoefficient: Number(row.ipcCoefficient ?? 1),
+  };
 }

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/drizzle/db";
-import { accounts, accountFinance, accountConsultants } from "@/lib/drizzle/schema";
+import { accounts, accountFinance, accountConsultants, fxRates } from "@/lib/drizzle/schema";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspace";
 import { createAdminClient, FINANCE_DOCS_BUCKET } from "@/lib/supabase/admin";
@@ -20,6 +20,21 @@ function rethrowIfRedirect(e: unknown): void {
       (e as { digest: string }).digest === "NEXT_NOT_FOUND")
   )
     throw e;
+}
+
+/** Require finance-admin in the caller's workspace. Returns { workspaceId, userId }. */
+async function requireFinanceWorkspace(): Promise<{ workspaceId: string; userId: string }> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) throw new Error("No workspace");
+  const member = await getWorkspaceMember(workspace.id, userId);
+  const allowed =
+    !!member &&
+    (member.financeAdmin === true ||
+      member.role === "owner" ||
+      member.role === "admin");
+  if (!allowed) throw new Error("Sin permiso de finanzas");
+  return { workspaceId: workspace.id, userId };
 }
 
 /** Require finance-admin AND the account in the caller's workspace. Returns workspaceId. */
@@ -232,6 +247,41 @@ export async function extractNda(input: { accountId: string }): Promise<R> {
       return { success: false, error: "No se pudo encolar la extracción" };
     }
     revalidatePath(`/app/accounts/${input.accountId}`);
+    return { success: true };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
+export async function upsertFxRate(input: {
+  year: number;
+  month: number;
+  mepRate: number;
+  ipcCoefficient: number | null;
+}): Promise<R> {
+  try {
+    const { workspaceId, userId } = await requireFinanceWorkspace();
+    if (input.month < 1 || input.month > 12) return { success: false, error: "Mes inválido" };
+    await db
+      .insert(fxRates)
+      .values({
+        workspaceId,
+        year: input.year,
+        month: input.month,
+        mepRate: String(input.mepRate),
+        ipcCoefficient: input.ipcCoefficient == null ? "1" : String(input.ipcCoefficient),
+        createdByUserId: userId,
+      })
+      .onConflictDoUpdate({
+        target: [fxRates.workspaceId, fxRates.year, fxRates.month],
+        set: {
+          mepRate: String(input.mepRate),
+          ipcCoefficient: input.ipcCoefficient == null ? "1" : String(input.ipcCoefficient),
+          updatedAt: new Date(),
+        },
+      });
+    revalidatePath("/app/finanzas");
     return { success: true };
   } catch (e) {
     rethrowIfRedirect(e);
