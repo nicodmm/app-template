@@ -8,6 +8,7 @@ export type WorkspaceMemberWithUser = {
   role: string;
   displayName: string;
   email: string;
+  financeAdmin: boolean;
 };
 
 export async function getWorkspaceByUserId(
@@ -87,6 +88,7 @@ export async function getWorkspaceMembers(
     .select({
       userId: workspaceMembers.userId,
       role: workspaceMembers.role,
+      financeAdmin: workspaceMembers.financeAdmin,
       fullName: users.fullName,
       email: users.email,
     })
@@ -97,6 +99,7 @@ export async function getWorkspaceMembers(
   return rows.map((r) => ({
     userId: r.userId,
     role: r.role,
+    financeAdmin: r.financeAdmin,
     displayName: r.fullName ?? r.email,
     email: r.email,
   }));

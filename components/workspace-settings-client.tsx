@@ -9,6 +9,7 @@ import {
   revokeWorkspaceInvite,
   removeWorkspaceMember,
   changeWorkspaceMemberRole,
+  setMemberFinanceAdmin,
 } from "@/app/actions/workspace";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
 import type { PendingInvite } from "@/lib/queries/workspace-invites";
@@ -150,6 +151,23 @@ export function WorkspaceSettingsClient(props: WorkspaceSettingsClientProps) {
                     <span className="inline-flex items-center rounded-full bg-accent px-2 py-0.5 text-xs font-medium">
                       {ROLE_LABEL[m.role] ?? m.role}
                     </span>
+                  )}
+                  {canManage && !isOwner && !isSelf && (
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={m.financeAdmin}
+                        disabled={pending}
+                        onChange={(e) =>
+                          startTransition(async () => {
+                            await setMemberFinanceAdmin(m.userId, e.target.checked);
+                            router.refresh();
+                          })
+                        }
+                        className="h-3.5 w-3.5 rounded border-input accent-primary"
+                      />
+                      <span className="text-xs text-muted-foreground">Finanzas</span>
+                    </label>
                   )}
                   {canManage && !isOwner && !isSelf && (
                     <button

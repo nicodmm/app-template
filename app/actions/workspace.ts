@@ -251,6 +251,28 @@ export async function changeWorkspaceMemberRole(
   return {};
 }
 
+export async function setMemberFinanceAdmin(
+  targetUserId: string,
+  value: boolean
+): Promise<{ error?: string }> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) return { error: "Workspace no encontrado" };
+  const actor = await getWorkspaceMember(workspace.id, userId);
+  assertCanManage(actor?.role);
+  await db
+    .update(workspaceMembers)
+    .set({ financeAdmin: value })
+    .where(
+      and(
+        eq(workspaceMembers.workspaceId, workspace.id),
+        eq(workspaceMembers.userId, targetUserId)
+      )
+    );
+  revalidatePath("/app/settings/workspace");
+  return {};
+}
+
 const SERVICE_MAX_LEN = 60;
 const SERVICES_MAX_COUNT = 40;
 
