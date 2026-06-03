@@ -4,6 +4,10 @@ import { db } from "@/lib/drizzle/db";
 import { users } from "@/lib/drizzle/schema";
 import { eq } from "drizzle-orm";
 import type { User } from "@/lib/drizzle/schema/users";
+import {
+  getWorkspaceByUserId,
+  getWorkspaceMember,
+} from "@/lib/queries/workspace";
 
 export async function getCurrentUserId(): Promise<string | null> {
   const supabase = await createClient();
@@ -39,4 +43,18 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
 export async function requireAdminAccess(): Promise<void> {
   const isAdmin = await isCurrentUserAdmin();
   if (!isAdmin) redirect("/unauthorized");
+}
+
+export async function isFinanceAdmin(): Promise<boolean> {
+  const userId = await getCurrentUserId();
+  if (!userId) return false;
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) return false;
+  const member = await getWorkspaceMember(workspace.id, userId);
+  return (
+    !!member &&
+    (member.financeAdmin === true ||
+      member.role === "owner" ||
+      member.role === "admin")
+  );
 }

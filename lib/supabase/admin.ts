@@ -14,3 +14,4 @@ export function createAdminClient() {
 }
 
 export const SELECTION_CV_BUCKET = "selection-cvs";
+export const FINANCE_DOCS_BUCKET = "finance-docs";
