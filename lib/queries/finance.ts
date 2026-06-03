@@ -1,14 +1,17 @@
 import { db } from "@/lib/drizzle/db";
 import {
   accountFinance,
+  accounts,
   financeEngagements,
   financeEngagementPeriods,
   financeFeeShares,
+  billingRecords,
   workspaceMembers,
   users,
   fxRates,
 } from "@/lib/drizzle/schema";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { convertToArs, isActiveInMonth, type BillingRule } from "@/lib/finance/compute";
 
 export interface AccountTerms {
   termsRawText: string | null;
@@ -201,4 +204,234 @@ export async function getFxRate(
     mepRate: Number(row.mepRate),
     ipcCoefficient: Number(row.ipcCoefficient ?? 1),
   };
+}
+
+export interface FinanceAccountOption {
+  id: string;
+  name: string;
+}
+
+/** All accounts in the workspace, for the "add charge" account picker. */
+export async function listFinanceAccounts(
+  workspaceId: string
+): Promise<FinanceAccountOption[]> {
+  const rows = await db
+    .select({ id: accounts.id, name: accounts.name })
+    .from(accounts)
+    .where(eq(accounts.workspaceId, workspaceId))
+    .orderBy(asc(accounts.name));
+  return rows.map((r) => ({ id: r.id, name: r.name }));
+}
+
+export interface BillingRow {
+  id: string;
+  accountId: string;
+  accountName: string;
+  concept: string;
+  amountOriginal: number;
+  currencyOriginal: string;
+  amountArs: number | null;
+  status: string;
+  isAdditional: boolean;
+}
+
+export async function getBillingForMonth(
+  workspaceId: string,
+  year: number,
+  month: number
+): Promise<BillingRow[]> {
+  const rows = await db
+    .select({
+      id: billingRecords.id,
+      accountId: billingRecords.accountId,
+      accountName: accounts.name,
+      concept: billingRecords.concept,
+      amountOriginal: billingRecords.amountOriginal,
+      currencyOriginal: billingRecords.currencyOriginal,
+      amountArs: billingRecords.amountArs,
+      status: billingRecords.status,
+      isAdditional: billingRecords.isAdditional,
+    })
+    .from(billingRecords)
+    .innerJoin(accounts, eq(billingRecords.accountId, accounts.id))
+    .where(
+      and(
+        eq(billingRecords.workspaceId, workspaceId),
+        eq(billingRecords.year, year),
+        eq(billingRecords.month, month)
+      )
+    )
+    .orderBy(asc(accounts.name));
+
+  return rows.map((r) => ({
+    id: r.id,
+    accountId: r.accountId,
+    accountName: r.accountName,
+    concept: r.concept,
+    amountOriginal: Number(r.amountOriginal),
+    currencyOriginal: r.currencyOriginal,
+    amountArs: r.amountArs == null ? null : Number(r.amountArs),
+    status: r.status,
+    isAdditional: r.isAdditional,
+  }));
+}
+
+export interface BillingHistoryRow {
+  year: number;
+  month: number;
+  totalArs: number;
+}
+
+export async function getBillingHistory(
+  workspaceId: string
+): Promise<BillingHistoryRow[]> {
+  const rows = await db
+    .select({
+      year: billingRecords.year,
+      month: billingRecords.month,
+      totalArs: sql<string>`coalesce(sum(${billingRecords.amountArs}), 0)`,
+    })
+    .from(billingRecords)
+    .where(eq(billingRecords.workspaceId, workspaceId))
+    .groupBy(billingRecords.year, billingRecords.month)
+    .orderBy(asc(billingRecords.year), asc(billingRecords.month));
+
+  return rows.map((r) => ({
+    year: r.year,
+    month: r.month,
+    totalArs: Number(r.totalArs),
+  }));
+}
+
+export interface LtvRow {
+  accountId: string;
+  accountName: string;
+  billedToDate: number;
+  projectedArs: number;
+  ltv: number;
+}
+
+/** Whole months from one {year,month} to another, inclusive of the start month
+ * up to (but not including) the end month. Returns 0 if `to` is before `from`. */
+function monthsBetween(
+  from: { year: number; month: number },
+  to: { year: number; month: number }
+): number {
+  const diff = (to.year - from.year) * 12 + (to.month - from.month);
+  return diff < 0 ? 0 : diff;
+}
+
+/**
+ * Per-account lifetime value: billed-to-date (sum of all amount_ars rows) plus
+ * a rough projection of remaining contracted fees. Projection is an ESTIMATE:
+ * for each active engagement we take the currently-active (or latest) period
+ * fee, convert at the LATEST available fx for the workspace, and multiply by
+ * the remaining months until engagement.endDate (or 12 if open-ended).
+ */
+export async function getLtvByAccount(workspaceId: string): Promise<LtvRow[]> {
+  // Billed to date per account.
+  const billedRows = await db
+    .select({
+      accountId: billingRecords.accountId,
+      accountName: accounts.name,
+      billedToDate: sql<string>`coalesce(sum(${billingRecords.amountArs}), 0)`,
+    })
+    .from(billingRecords)
+    .innerJoin(accounts, eq(billingRecords.accountId, accounts.id))
+    .where(eq(billingRecords.workspaceId, workspaceId))
+    .groupBy(billingRecords.accountId, accounts.name);
+
+  // All workspace accounts (so accounts with engagements but no billing yet
+  // still appear in LTV via their projection).
+  const accountRows = await db
+    .select({ id: accounts.id, name: accounts.name })
+    .from(accounts)
+    .where(eq(accounts.workspaceId, workspaceId));
+
+  const billedMap = new Map<string, { name: string; billedToDate: number }>();
+  for (const r of billedRows) {
+    billedMap.set(r.accountId, {
+      name: r.accountName,
+      billedToDate: Number(r.billedToDate),
+    });
+  }
+
+  // Latest fx for the workspace (for the projection conversion).
+  const [latestFx] = await db
+    .select({ mepRate: fxRates.mepRate, ipcCoefficient: fxRates.ipcCoefficient })
+    .from(fxRates)
+    .where(eq(fxRates.workspaceId, workspaceId))
+    .orderBy(desc(fxRates.year), desc(fxRates.month))
+    .limit(1);
+
+  const mepRate = latestFx ? Number(latestFx.mepRate) : null;
+  const ipcCoefficient = latestFx ? Number(latestFx.ipcCoefficient ?? 1) : null;
+
+  // Active engagements + their periods for the workspace.
+  const engagements = await db
+    .select()
+    .from(financeEngagements)
+    .where(
+      and(
+        eq(financeEngagements.workspaceId, workspaceId),
+        eq(financeEngagements.status, "active")
+      )
+    );
+
+  const engagementIds = engagements.map((e) => e.id);
+  const periods = engagementIds.length
+    ? await db
+        .select()
+        .from(financeEngagementPeriods)
+        .where(inArray(financeEngagementPeriods.engagementId, engagementIds))
+        .orderBy(asc(financeEngagementPeriods.fromDate))
+    : [];
+
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth() + 1;
+
+  const projectedMap = new Map<string, number>();
+  for (const e of engagements) {
+    const ePeriods = periods.filter((p) => p.engagementId === e.id);
+    if (ePeriods.length === 0) continue;
+    // Prefer the period active this month, else the latest by fromDate.
+    const active = ePeriods.find((p) =>
+      isActiveInMonth(p.fromDate, p.toDate, curYear, curMonth)
+    );
+    const period = active ?? ePeriods[ePeriods.length - 1];
+    const fee = Number(period.fee);
+    const perMonthArs = convertToArs(
+      fee,
+      period.currency,
+      e.billingRule as BillingRule,
+      mepRate,
+      ipcCoefficient
+    );
+    if (perMonthArs == null) continue; // USD w/o fx or billed-in-USD: skip projection.
+
+    let remaining = 12;
+    if (e.endDate) {
+      const [ey, em] = e.endDate.split("-").map((s) => parseInt(s, 10));
+      remaining = monthsBetween({ year: curYear, month: curMonth }, { year: ey, month: em });
+    }
+    const projected = perMonthArs * remaining;
+    projectedMap.set(e.accountId, (projectedMap.get(e.accountId) ?? 0) + projected);
+  }
+
+  const out: LtvRow[] = accountRows.map((a) => {
+    const billed = billedMap.get(a.id)?.billedToDate ?? 0;
+    const projected = projectedMap.get(a.id) ?? 0;
+    return {
+      accountId: a.id,
+      accountName: a.name,
+      billedToDate: billed,
+      projectedArs: projected,
+      ltv: billed + projected,
+    };
+  });
+
+  return out
+    .filter((r) => r.ltv > 0 || r.billedToDate > 0)
+    .sort((a, b) => b.ltv - a.ltv);
 }

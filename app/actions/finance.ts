@@ -1,12 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/drizzle/db";
-import { accounts, accountFinance, accountConsultants, fxRates } from "@/lib/drizzle/schema";
+import {
+  accounts,
+  accountFinance,
+  accountConsultants,
+  fxRates,
+  financeEngagements,
+  financeEngagementPeriods,
+  billingRecords,
+} from "@/lib/drizzle/schema";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspace";
 import { createAdminClient, FINANCE_DOCS_BUCKET } from "@/lib/supabase/admin";
+import { getFxRate } from "@/lib/queries/finance";
+import {
+  isActiveInMonth,
+  convertToArs,
+  type BillingRule,
+} from "@/lib/finance/compute";
 
 type R = { success: boolean; error?: string; id?: string };
 
@@ -323,5 +337,202 @@ export async function getFinanceDocUrl(input: {
   } catch (e) {
     rethrowIfRedirect(e);
     return { url: null, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
+/**
+ * Generate (upsert) monthly billing rows from active engagements for the given
+ * month. One row per (account, engagement) for the active period, with
+ * USD→ARS conversion applied per the engagement billing rule. Only the
+ * amount-related fields are touched on re-generation — status/billedAt/paidAt
+ * are preserved.
+ */
+export async function generateBillingForMonth(input: {
+  year: number;
+  month: number;
+}): Promise<{ success: boolean; error?: string; created?: number; updated?: number }> {
+  try {
+    const { workspaceId } = await requireFinanceWorkspace();
+    const { year, month } = input;
+    if (month < 1 || month > 12) return { success: false, error: "Mes inválido" };
+
+    const fx = await getFxRate(workspaceId, year, month);
+
+    const engagements = await db
+      .select()
+      .from(financeEngagements)
+      .where(
+        and(
+          eq(financeEngagements.workspaceId, workspaceId),
+          eq(financeEngagements.status, "active")
+        )
+      );
+
+    if (engagements.length === 0) {
+      return { success: true, created: 0, updated: 0 };
+    }
+
+    const engagementIds = engagements.map((e) => e.id);
+    const periods = await db
+      .select()
+      .from(financeEngagementPeriods)
+      .where(inArray(financeEngagementPeriods.engagementId, engagementIds));
+
+    let created = 0;
+    let updated = 0;
+
+    for (const engagement of engagements) {
+      const activePeriod = periods.find(
+        (p) =>
+          p.engagementId === engagement.id &&
+          isActiveInMonth(p.fromDate, p.toDate, year, month)
+      );
+      if (!activePeriod) continue;
+
+      const fee = Number(activePeriod.fee);
+      const currency = activePeriod.currency;
+      const amountArs = convertToArs(
+        fee,
+        currency,
+        engagement.billingRule as BillingRule,
+        fx?.mepRate ?? null,
+        fx?.ipcCoefficient ?? null
+      );
+
+      const [existing] = await db
+        .select({ id: billingRecords.id })
+        .from(billingRecords)
+        .where(
+          and(
+            eq(billingRecords.accountId, engagement.accountId),
+            eq(billingRecords.engagementId, engagement.id),
+            eq(billingRecords.year, year),
+            eq(billingRecords.month, month),
+            eq(billingRecords.isAdditional, false)
+          )
+        )
+        .limit(1);
+
+      if (existing) {
+        await db
+          .update(billingRecords)
+          .set({
+            amountOriginal: String(fee),
+            currencyOriginal: currency,
+            amountArs: amountArs == null ? null : String(amountArs),
+            fxRateUsed: fx ? String(fx.mepRate) : null,
+            ipcUsed: fx ? String(fx.ipcCoefficient) : null,
+            concept: engagement.neurona,
+            updatedAt: new Date(),
+          })
+          .where(eq(billingRecords.id, existing.id));
+        updated += 1;
+      } else {
+        await db.insert(billingRecords).values({
+          workspaceId,
+          accountId: engagement.accountId,
+          engagementId: engagement.id,
+          year,
+          month,
+          concept: engagement.neurona,
+          amountOriginal: String(fee),
+          currencyOriginal: currency,
+          amountArs: amountArs == null ? null : String(amountArs),
+          fxRateUsed: fx ? String(fx.mepRate) : null,
+          ipcUsed: fx ? String(fx.ipcCoefficient) : null,
+          status: "pending",
+          isAdditional: false,
+        });
+        created += 1;
+      }
+    }
+
+    revalidatePath("/app/finanzas");
+    return { success: true, created, updated };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
+export async function setBillingStatus(input: {
+  id: string;
+  status: "pending" | "billed" | "paid";
+}): Promise<R> {
+  try {
+    const { workspaceId } = await requireFinanceWorkspace();
+    await db
+      .update(billingRecords)
+      .set({
+        status: input.status,
+        billedAt: input.status === "pending" ? null : new Date(),
+        paidAt: input.status === "paid" ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(eq(billingRecords.id, input.id), eq(billingRecords.workspaceId, workspaceId))
+      );
+    revalidatePath("/app/finanzas");
+    return { success: true };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
+export async function addBillingCharge(input: {
+  accountId: string;
+  year: number;
+  month: number;
+  concept: string;
+  amount: number;
+  currency: string;
+}): Promise<R> {
+  try {
+    const workspaceId = await requireFinanceAccount(input.accountId);
+    if (input.month < 1 || input.month > 12) return { success: false, error: "Mes inválido" };
+    if (!input.concept.trim()) return { success: false, error: "Concepto requerido" };
+    if (isNaN(input.amount)) return { success: false, error: "Monto inválido" };
+    const [row] = await db
+      .insert(billingRecords)
+      .values({
+        workspaceId,
+        accountId: input.accountId,
+        engagementId: null,
+        year: input.year,
+        month: input.month,
+        concept: input.concept.trim(),
+        amountOriginal: String(input.amount),
+        currencyOriginal: input.currency,
+        amountArs: null,
+        status: "pending",
+        isAdditional: true,
+      })
+      .returning({ id: billingRecords.id });
+    revalidatePath("/app/finanzas");
+    return { success: true, id: row?.id };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
+export async function deleteBillingCharge(input: { id: string }): Promise<R> {
+  try {
+    const { workspaceId } = await requireFinanceWorkspace();
+    await db
+      .delete(billingRecords)
+      .where(
+        and(
+          eq(billingRecords.id, input.id),
+          eq(billingRecords.workspaceId, workspaceId),
+          eq(billingRecords.isAdditional, true)
+        )
+      );
+    revalidatePath("/app/finanzas");
+    return { success: true };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
   }
 }
