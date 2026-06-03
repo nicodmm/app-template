@@ -13,7 +13,6 @@ import {
 import type {
   BillingRow,
   BillingHistoryRow,
-  LtvRow,
   FinanceAccountOption,
 } from "@/lib/queries/finance";
 
@@ -22,7 +21,6 @@ interface Props {
   month: number;
   billing: BillingRow[];
   history: BillingHistoryRow[];
-  ltv: LtvRow[];
   accounts: FinanceAccountOption[];
 }
 
@@ -64,6 +62,13 @@ function formatArs(n: number): string {
   return arsFmt.format(n);
 }
 
+const usdFmt = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 function formatOriginal(amount: number, currency: string): string {
   return new Intl.NumberFormat("es-AR", {
     minimumFractionDigits: 2,
@@ -71,7 +76,7 @@ function formatOriginal(amount: number, currency: string): string {
   }).format(amount) + ` ${currency}`;
 }
 
-export function BillingList({ year, month, billing, history, ltv, accounts }: Props) {
+export function BillingList({ year, month, billing, history, accounts }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -398,11 +403,11 @@ export function BillingList({ year, month, billing, history, ltv, accounts }: Pr
         )}
       </GlassCard>
 
-      {/* History + LTV panels */}
-      <div className="grid gap-4 md:grid-cols-2">
+      {/* History panel */}
+      <div className="grid gap-4">
         <GlassCard className="p-4">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-            Historial facturado (ARS)
+            Historial facturado
           </h3>
           {history.length === 0 ? (
             <p className="text-sm text-muted-foreground">Sin historial aún.</p>
@@ -421,55 +426,16 @@ export function BillingList({ year, month, billing, history, ltv, accounts }: Pr
                       }}
                     />
                   </span>
-                  <span className="w-28 shrink-0 text-right text-xs tabular-nums">
+                  <span className="w-32 shrink-0 text-right text-xs tabular-nums">
                     {formatArs(h.totalArs)}
+                  </span>
+                  <span className="w-28 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                    {usdFmt.format(h.totalUsd)}
                   </span>
                 </li>
               ))}
             </ul>
           )}
-        </GlassCard>
-
-        <GlassCard className="p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-            LTV por cuenta
-          </h3>
-          <p className="text-[11px] text-muted-foreground mb-3">
-            Facturado + proyección estimada (al TC más reciente).
-          </p>
-          {ltv.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin datos de LTV.</p>
-          ) : (
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b [border-color:var(--glass-border)]">
-                  <th className="py-1.5 text-left font-semibold text-muted-foreground">Cuenta</th>
-                  <th className="py-1.5 text-right font-semibold text-muted-foreground">Facturado</th>
-                  <th className="py-1.5 text-right font-semibold text-muted-foreground">Proyectado*</th>
-                  <th className="py-1.5 text-right font-semibold text-muted-foreground">LTV</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ltv.map((r) => (
-                  <tr
-                    key={r.accountId}
-                    className="border-b last:border-0 [border-color:var(--glass-border)]"
-                  >
-                    <td className="py-1.5 font-medium">{r.accountName}</td>
-                    <td className="py-1.5 text-right tabular-nums">{formatArs(r.billedToDate)}</td>
-                    <td className="py-1.5 text-right tabular-nums text-muted-foreground">
-                      {formatArs(r.projectedArs)}
-                    </td>
-                    <td className="py-1.5 text-right tabular-nums font-medium">{formatArs(r.ltv)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          <p className="mt-2 text-[10px] text-muted-foreground">
-            * Estimación: fee del período activo × meses restantes (o 12 si es
-            indefinido), convertido al TC más reciente.
-          </p>
         </GlassCard>
       </div>
     </div>

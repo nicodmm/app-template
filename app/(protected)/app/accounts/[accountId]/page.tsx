@@ -187,7 +187,7 @@ export default async function AccountDetailPage({
       {canFinance && (
         <GlassCard className="p-6 mb-6 space-y-5">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="font-semibold">Términos de contratación</h2>
+            <h2 className="font-semibold">Términos de contratación y pagos</h2>
             <Link
               href={`/app/finanzas/${accountId}`}
               className="text-xs text-primary hover:underline"

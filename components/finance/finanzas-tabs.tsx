@@ -10,7 +10,6 @@ import type {
   BillingRow,
   FxRateRow,
   BillingHistoryRow,
-  LtvRow,
   FinanceAccountOption,
   FinanceAccountCard,
   HonorarioRow,
@@ -23,7 +22,6 @@ interface Props {
   billing: BillingRow[];
   rates: FxRateRow[];
   history: BillingHistoryRow[];
-  ltv: LtvRow[];
   accounts: FinanceAccountOption[];
   accountCards: FinanceAccountCard[];
   honorarios: HonorarioRow[];
@@ -47,7 +45,6 @@ export function FinanzasTabs({
   billing,
   rates,
   history,
-  ltv,
   accounts,
   accountCards,
   honorarios,
@@ -89,7 +86,6 @@ export function FinanzasTabs({
           month={month}
           billing={billing}
           history={history}
-          ltv={ltv}
           accounts={accounts}
         />
       )}
