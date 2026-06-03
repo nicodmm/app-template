@@ -47,6 +47,8 @@ export const accounts = pgTable(
     clientSummaryUpdatedAt: timestamp("client_summary_updated_at"),
     lastActivityAt: timestamp("last_activity_at"),
     closedAt: timestamp("closed_at"),
+    closeReason: text("close_reason"),
+    endDate: date("end_date"),
     hasAdConnections: boolean("has_ad_connections").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
