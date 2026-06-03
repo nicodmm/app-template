@@ -239,6 +239,13 @@
       "when": 1780455288547,
       "tag": "0033_dry_whiplash",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1780510983919,
+      "tag": "0034_rare_retro_girl",
+      "breakpoints": true
     }
   ]
 }

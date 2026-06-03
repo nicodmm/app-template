@@ -9,6 +9,7 @@ import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
 import { ServiceScopeCheckboxes } from "@/components/service-scope-checkboxes";
 import { AccountModulesToggles } from "@/components/account-modules-toggles";
 import { AccountDangerZone } from "@/components/account-danger-zone";
+import { EndDateField } from "@/components/end-date-field";
 
 interface EditAccountFormProps {
   account: AccountWithOwner;
@@ -132,6 +133,8 @@ export function EditAccountForm({ account, members, services }: EditAccountFormP
           />
         </div>
       </div>
+
+      <EndDateField defaultValue={account.endDate} />
 
       <div>
         <label htmlFor="websiteUrl" className="block text-sm font-medium mb-1">

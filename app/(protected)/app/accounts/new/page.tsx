@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { ServiceScopeCheckboxes } from "@/components/service-scope-checkboxes";
 import { AccountModulesToggles } from "@/components/account-modules-toggles";
 import { NewAccountSubmit } from "@/components/new-account-submit";
+import { EndDateField } from "@/components/end-date-field";
 
 interface PageProps {
   searchParams: Promise<{ error?: string }>;
@@ -69,7 +70,7 @@ export default async function NewAccountPage({ searchParams }: PageProps) {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="terms">Términos de Contratación</Label>
+          <Label htmlFor="terms">Términos de contratación y pagos</Label>
           <textarea
             id="terms"
             name="terms"
@@ -97,22 +98,23 @@ export default async function NewAccountPage({ searchParams }: PageProps) {
             </select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="consultantIds">Consultores</Label>
-            <select
-              id="consultantIds"
-              name="consultantIds"
-              multiple
-              className="flex w-full min-h-[42px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
+            <Label>Consultores</Label>
+            <div className="grid grid-cols-1 gap-2">
               {members.map((m) => (
-                <option key={m.userId} value={m.userId}>
+                <label
+                  key={m.userId}
+                  className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm cursor-pointer hover:bg-muted/50 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+                >
+                  <input
+                    type="checkbox"
+                    name="consultantIds"
+                    value={m.userId}
+                    className="rounded border-border text-primary"
+                  />
                   {m.displayName}
-                </option>
+                </label>
               ))}
-            </select>
-            <p className="text-xs text-muted-foreground">
-              Ctrl/Cmd para elegir varios.
-            </p>
+            </div>
           </div>
         </div>
 
@@ -139,6 +141,8 @@ export default async function NewAccountPage({ searchParams }: PageProps) {
             />
           </div>
         </div>
+
+        <EndDateField />
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="websiteUrl">Página web</Label>

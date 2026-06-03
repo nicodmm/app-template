@@ -16,6 +16,8 @@ import {
   getBillingForMonth,
 } from "@/lib/queries/finance";
 import { runMonthlyBilling } from "@/lib/finance/run-monthly-billing";
+import { projectAccountBilling } from "@/lib/finance/projection";
+import { AccountProjectionPanel } from "@/components/finance/account-projection-panel";
 import { GlassCard } from "@/components/ui/glass-card";
 import { FinanceDocs } from "@/components/finance/finance-docs";
 import { TermsEditor } from "@/components/finance/terms-editor";
@@ -103,6 +105,7 @@ export default async function AccountFinancePage({
     email: r.email,
   }));
   const billing = allBilling.filter((b) => b.accountId === accountId);
+  const projection = await projectAccountBilling(workspace.id, accountId, year, month);
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
@@ -172,6 +175,11 @@ export default async function AccountFinancePage({
           month={month}
           billing={billing}
         />
+      </GlassCard>
+
+      {/* 6. Proyección 6 meses */}
+      <GlassCard className="p-6">
+        <AccountProjectionPanel months={projection} />
       </GlassCard>
     </div>
   );

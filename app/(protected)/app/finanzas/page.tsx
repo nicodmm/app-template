@@ -5,7 +5,6 @@ import {
   getBillingForMonth,
   listFxRates,
   getBillingHistory,
-  getLtvByAccount,
   listFinanceAccounts,
   listFinanceAccountCards,
   listMemberCompensation,
@@ -77,7 +76,6 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
     billing,
     rates,
     history,
-    ltv,
     accountsList,
     accountCards,
     honorarios,
@@ -86,7 +84,6 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
     getBillingForMonth(workspace.id, year, month),
     listFxRates(workspace.id),
     getBillingHistory(workspace.id),
-    getLtvByAccount(workspace.id),
     listFinanceAccounts(workspace.id),
     listFinanceAccountCards(workspace.id),
     computeHonorarios(workspace.id, year, month),
@@ -123,7 +120,6 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
         billing={billing}
         rates={rates}
         history={history}
-        ltv={ltv}
         accounts={accountsList}
         accountCards={accountCards}
         honorarios={honorarios}

@@ -9,8 +9,9 @@ import {
   accountFinance,
   accountConsultants,
 } from "@/lib/drizzle/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { requireUserId } from "@/lib/auth";
+import type { AccountStatus } from "@/lib/accounts/status";
 import { getWorkspaceByUserId, getMonthlyUsage, getWorkspaceMember } from "@/lib/queries/workspace";
 import { getAccountsCount, getAccountById } from "@/lib/queries/accounts";
 import { buildEnabledModulesFromForm } from "@/lib/modules-client";
@@ -50,6 +51,10 @@ function parseStartDate(raw: string | null): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : null;
+}
+
+function parseEndDate(raw: string | null): string | null {
+  return parseStartDate(raw);
 }
 
 function parseUrl(raw: string | null): string | null {
@@ -102,6 +107,7 @@ export async function createAccount(formData: FormData): Promise<void> {
   const serviceScope = serviceScopeValues.length > 0 ? serviceScopeValues.join(", ") : null;
   const ownerId = (formData.get("ownerId") as string) || userId;
   const startDate = parseStartDate(formData.get("startDate") as string | null);
+  const endDate = parseEndDate(formData.get("endDate") as string | null);
   const fee = parseFee(formData.get("fee") as string | null);
   const websiteUrl = parseUrl(formData.get("websiteUrl") as string | null);
   const linkedinUrl = parseUrl(formData.get("linkedinUrl") as string | null);
@@ -120,6 +126,7 @@ export async function createAccount(formData: FormData): Promise<void> {
       serviceScope,
       ownerId,
       startDate,
+      endDate,
       fee,
       enabledModules,
       websiteUrl,
@@ -216,6 +223,7 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
   const serviceScope = serviceScopeValues.length > 0 ? serviceScopeValues.join(", ") : null;
   const ownerId = (formData.get("ownerId") as string) || null;
   const startDate = parseStartDate(formData.get("startDate") as string | null);
+  const endDate = parseEndDate(formData.get("endDate") as string | null);
   const fee = parseFee(formData.get("fee") as string | null);
   const websiteUrl = parseUrl(formData.get("websiteUrl") as string | null);
   const linkedinUrl = parseUrl(formData.get("linkedinUrl") as string | null);
@@ -271,6 +279,7 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
       serviceScope,
       ownerId,
       startDate,
+      endDate,
       fee,
       enabledModules,
       websiteUrl,
@@ -366,42 +375,93 @@ export async function updateHealthSignal(
   revalidatePath("/app/portfolio");
 }
 
-export async function closeAccount(accountId: string): Promise<void> {
+export async function setAccountStatus(
+  accountId: string,
+  status: AccountStatus
+): Promise<{ success: boolean; error?: string }> {
   const userId = await requireUserId();
   const workspace = await getWorkspaceOrThrow(userId);
-  await assertCanWriteAccount(userId, workspace.id, accountId);
-
+  try {
+    await assertCanWriteAccount(userId, workspace.id, accountId);
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Sin permisos",
+    };
+  }
   await db
     .update(accounts)
     .set({
-      closedAt: new Date(),
+      closedAt:
+        status === "active" ? null : sql`coalesce(${accounts.closedAt}, now())`,
+      closeReason: status === "active" ? null : status,
       updatedAt: new Date(),
     })
-    .where(
-      and(eq(accounts.id, accountId), eq(accounts.workspaceId, workspace.id))
-    );
-
+    .where(and(eq(accounts.id, accountId), eq(accounts.workspaceId, workspace.id)));
   revalidatePath(`/app/accounts/${accountId}`);
   revalidatePath("/app/portfolio");
   revalidatePath("/app/dashboard");
+  return { success: true };
 }
 
+/** Reabrir = volver a activo. Conservado para el banner de archivada. */
 export async function reopenAccount(accountId: string): Promise<void> {
+  await setAccountStatus(accountId, "active");
+}
+
+export async function bulkSetAccountStatus(
+  accountIds: string[],
+  status: AccountStatus
+): Promise<{ success: boolean; updated: number; denied: number }> {
   const userId = await requireUserId();
   const workspace = await getWorkspaceOrThrow(userId);
-  await assertCanWriteAccount(userId, workspace.id, accountId);
-
-  await db
-    .update(accounts)
-    .set({
-      closedAt: null,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(eq(accounts.id, accountId), eq(accounts.workspaceId, workspace.id))
-    );
-
-  revalidatePath(`/app/accounts/${accountId}`);
+  let updated = 0;
+  let denied = 0;
+  for (const id of accountIds) {
+    try {
+      await assertCanWriteAccount(userId, workspace.id, id);
+    } catch {
+      denied += 1;
+      continue;
+    }
+    await db
+      .update(accounts)
+      .set({
+        closedAt:
+          status === "active"
+            ? null
+            : sql`coalesce(${accounts.closedAt}, now())`,
+        closeReason: status === "active" ? null : status,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(accounts.id, id), eq(accounts.workspaceId, workspace.id)));
+    updated += 1;
+  }
   revalidatePath("/app/portfolio");
   revalidatePath("/app/dashboard");
+  return { success: true, updated, denied };
+}
+
+export async function bulkDeleteAccounts(
+  accountIds: string[]
+): Promise<{ success: boolean; deleted: number; denied: number }> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceOrThrow(userId);
+  let deleted = 0;
+  let denied = 0;
+  for (const id of accountIds) {
+    try {
+      await assertCanWriteAccount(userId, workspace.id, id);
+    } catch {
+      denied += 1;
+      continue;
+    }
+    await db
+      .delete(accounts)
+      .where(and(eq(accounts.id, id), eq(accounts.workspaceId, workspace.id)));
+    deleted += 1;
+  }
+  revalidatePath("/app/portfolio");
+  revalidatePath("/app/dashboard");
+  return { success: true, deleted, denied };
 }

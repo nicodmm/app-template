@@ -341,6 +341,7 @@ export interface BillingHistoryRow {
   year: number;
   month: number;
   totalArs: number;
+  totalUsd: number;
 }
 
 export async function getBillingHistory(
@@ -350,18 +351,39 @@ export async function getBillingHistory(
     .select({
       year: billingRecords.year,
       month: billingRecords.month,
-      totalArs: sql<string>`coalesce(sum(${billingRecords.amountArs}), 0)`,
+      amountArs: billingRecords.amountArs,
+      amountOriginal: billingRecords.amountOriginal,
+      currencyOriginal: billingRecords.currencyOriginal,
+      fxRateUsed: billingRecords.fxRateUsed,
     })
     .from(billingRecords)
-    .where(eq(billingRecords.workspaceId, workspaceId))
-    .groupBy(billingRecords.year, billingRecords.month)
-    .orderBy(asc(billingRecords.year), asc(billingRecords.month));
+    .where(eq(billingRecords.workspaceId, workspaceId));
 
-  return rows.map((r) => ({
-    year: r.year,
-    month: r.month,
-    totalArs: Number(r.totalArs),
-  }));
+  const map = new Map<string, BillingHistoryRow>();
+  for (const r of rows) {
+    const key = `${r.year}-${r.month}`;
+    const ars = r.amountArs == null ? 0 : Number(r.amountArs);
+    const fx = r.fxRateUsed == null ? 0 : Number(r.fxRateUsed);
+    const usd =
+      r.currencyOriginal === "USD"
+        ? Number(r.amountOriginal)
+        : fx > 0
+          ? ars / fx
+          : 0;
+    const acc =
+      map.get(key) ?? { year: r.year, month: r.month, totalArs: 0, totalUsd: 0 };
+    acc.totalArs += ars;
+    acc.totalUsd += usd;
+    map.set(key, acc);
+  }
+
+  return Array.from(map.values())
+    .map((r) => ({
+      ...r,
+      totalArs: round2(r.totalArs),
+      totalUsd: round2(r.totalUsd),
+    }))
+    .sort((a, b) => a.year - b.year || a.month - b.month);
 }
 
 export interface LtvRow {
