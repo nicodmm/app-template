@@ -232,6 +232,13 @@
       "when": 1780410818431,
       "tag": "0032_majestic_justin_hammer",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1780455288547,
+      "tag": "0033_dry_whiplash",
+      "breakpoints": true
     }
   ]
 }
