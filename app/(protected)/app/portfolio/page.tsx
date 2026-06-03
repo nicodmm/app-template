@@ -10,7 +10,7 @@ import {
   getOnboardingState,
   type OnboardingState,
 } from "@/lib/queries/onboarding";
-import { AccountCard } from "@/components/account-card";
+import { PortfolioGrid } from "@/components/portfolio-grid";
 import { PortfolioStatusTabs } from "@/components/portfolio-status-tabs";
 import { OnboardingChecklist } from "@/components/onboarding-checklist";
 import { redirect } from "next/navigation";
@@ -134,11 +134,7 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
           </div>
         )
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {accounts.map((account) => (
-            <AccountCard key={account.id} account={account} />
-          ))}
-        </div>
+        <PortfolioGrid accounts={accounts} />
       )}
     </div>
   );

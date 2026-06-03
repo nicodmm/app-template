@@ -45,9 +45,17 @@ function relativeTime(date: Date | string | null): string {
 
 interface AccountCardProps {
   account: AccountWithOwner;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggle?: (id: string) => void;
 }
 
-export function AccountCard({ account }: AccountCardProps) {
+export function AccountCard({
+  account,
+  selectable = false,
+  selected = false,
+  onToggle,
+}: AccountCardProps) {
   const signal = (account.healthSignal ?? "inactive") as keyof typeof HEALTH_CONFIG;
   const config = HEALTH_CONFIG[signal] ?? HEALTH_CONFIG.inactive;
   const Icon = config.Icon;
@@ -59,24 +67,23 @@ export function AccountCard({ account }: AccountCardProps) {
       )
     : null;
 
-  return (
-    <Link
-      href={`/app/accounts/${account.id}`}
-      className={cn(
-        "group block rounded-xl p-5 backdrop-blur-[14px] transition-all",
-        "[background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]",
-        "hover:[background:var(--glass-bg-strong)] hover:translate-y-[-1px] hover:[box-shadow:0_14px_44px_-14px_rgba(15,18,53,0.22)]",
-        account.closedAt && "opacity-60"
-      )}
-    >
+  const inner = (
+    <>
       <div className="flex items-start justify-between gap-3 mb-3">
         <h3 className="font-semibold text-sm leading-tight group-hover:text-primary transition-colors line-clamp-2">
           {account.name}
         </h3>
         <div className="flex shrink-0 items-center gap-1.5">
           {account.closedAt && (
-            <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300 ring-1 ring-slate-300 dark:ring-slate-700">
-              Cerrado
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1",
+                account.closeReason === "inactive"
+                  ? "bg-amber-100 text-amber-800 ring-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-800"
+                  : "bg-slate-200 text-slate-700 ring-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
+              )}
+            >
+              {account.closeReason === "inactive" ? "Inactiva" : "Finalizada"}
             </span>
           )}
           <span
@@ -111,6 +118,55 @@ export function AccountCard({ account }: AccountCardProps) {
           )}
         </span>
       </div>
+    </>
+  );
+
+  const base = cn(
+    "group block rounded-xl p-5 backdrop-blur-[14px] transition-all relative",
+    "[background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]",
+    account.closedAt && "opacity-60"
+  );
+
+  if (selectable) {
+    return (
+      <div
+        role="checkbox"
+        aria-checked={selected}
+        tabIndex={0}
+        onClick={() => onToggle?.(account.id)}
+        onKeyDown={(e) => {
+          if (e.key === " " || e.key === "Enter") {
+            e.preventDefault();
+            onToggle?.(account.id);
+          }
+        }}
+        className={cn(
+          base,
+          "cursor-pointer",
+          selected && "ring-2 ring-primary [background:var(--glass-bg-strong)]"
+        )}
+      >
+        <input
+          type="checkbox"
+          checked={selected}
+          readOnly
+          aria-hidden
+          className="absolute right-3 top-3 rounded border-border text-primary pointer-events-none"
+        />
+        {inner}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={`/app/accounts/${account.id}`}
+      className={cn(
+        base,
+        "hover:[background:var(--glass-bg-strong)] hover:translate-y-[-1px] hover:[box-shadow:0_14px_44px_-14px_rgba(15,18,53,0.22)]"
+      )}
+    >
+      {inner}
     </Link>
   );
 }
