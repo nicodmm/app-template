@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, uniqueIndex, check } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, uniqueIndex, check, boolean } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users";
 import { workspaces } from "./workspaces";
@@ -14,6 +14,7 @@ export const workspaceMembers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: text("role").notNull().default("member"),
+    financeAdmin: boolean("finance_admin").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
