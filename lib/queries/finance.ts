@@ -12,7 +12,14 @@ import {
   memberCompensation,
 } from "@/lib/drizzle/schema";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
-import { convertToArs, isActiveInMonth, type BillingRule } from "@/lib/finance/compute";
+import {
+  convertToArs,
+  isActiveInMonth,
+  monthBounds,
+  round2,
+  shareAmount,
+  type BillingRule,
+} from "@/lib/finance/compute";
 
 export interface AccountTerms {
   termsRawText: string | null;
@@ -499,4 +506,204 @@ export function currentCompensation(
   return active.reduce((best, cur) =>
     cur.effectiveFrom > best.effectiveFrom ? cur : best
   );
+}
+
+export interface HonorarioLine {
+  accountName: string;
+  neurona: string;
+  amount: number;
+  currency: string;
+}
+
+export interface HonorarioRow {
+  userId: string;
+  name: string;
+  fixed: { amount: number; currency: string } | null;
+  variable: HonorarioLine[];
+  /** Includes fixed + variable, summed per currency. */
+  totalsByCurrency: Record<string, number>;
+  /** Everything converted to ARS at MEP (USD→mep, ARS passthrough); approximate. */
+  arsApprox: number;
+}
+
+/**
+ * Compute monthly consultant fees (fixed compensation + variable fee-share lines)
+ * for the given month. Returns one row per workspace member (admin view) or, when
+ * `opts.userId` is set, exactly that one user's row.
+ *
+ * Member→user mapping: fee shares reference `workspace_members.id`, so we build a
+ * full member map (memberId → {userId, name}) regardless of any user filter, then
+ * attribute each share's amount to the member's userId. The output is filtered to
+ * `opts.userId` only at assembly time.
+ *
+ * arsApprox: every line (fixed + variable) is converted via convertToArs with rule
+ * "mep" (USD→ARS at the MEP rate, ARS passes through). If no MEP rate is loaded for
+ * the month, USD lines contribute 0 to arsApprox — but they still appear in
+ * `totalsByCurrency`, so nothing is lost.
+ */
+export async function computeHonorarios(
+  workspaceId: string,
+  year: number,
+  month: number,
+  opts?: { userId?: string }
+): Promise<HonorarioRow[]> {
+  // 1. Member map (memberId → {userId, name}) + list of all members.
+  const memberRows = await db
+    .select({
+      memberId: workspaceMembers.id,
+      userId: workspaceMembers.userId,
+      fullName: users.fullName,
+      email: users.email,
+    })
+    .from(workspaceMembers)
+    .innerJoin(users, eq(workspaceMembers.userId, users.id))
+    .where(eq(workspaceMembers.workspaceId, workspaceId));
+
+  const memberMap = new Map<string, { userId: string; name: string }>();
+  const allMembers: Array<{ userId: string; name: string }> = [];
+  for (const m of memberRows) {
+    const name = m.fullName ?? m.email ?? "—";
+    memberMap.set(m.memberId, { userId: m.userId, name });
+    allMembers.push({ userId: m.userId, name });
+  }
+
+  // 2. FX for the month.
+  const fx = await getFxRate(workspaceId, year, month);
+  const mep = fx?.mepRate ?? null;
+  const ipc = fx?.ipcCoefficient ?? null;
+
+  // 3. Fixed compensation per user.
+  const comp = await listMemberCompensation(workspaceId);
+  const monthEnd = monthBounds(year, month).end;
+
+  // 4. Variable: active engagements + accounts, their active periods, fee shares.
+  const engagements = await db
+    .select({
+      id: financeEngagements.id,
+      neurona: financeEngagements.neurona,
+      currency: financeEngagements.currency,
+      accountName: accounts.name,
+    })
+    .from(financeEngagements)
+    .innerJoin(accounts, eq(financeEngagements.accountId, accounts.id))
+    .where(
+      and(
+        eq(financeEngagements.workspaceId, workspaceId),
+        eq(financeEngagements.status, "active")
+      )
+    );
+
+  const engagementIds = engagements.map((e) => e.id);
+
+  const periodRows = engagementIds.length
+    ? await db
+        .select()
+        .from(financeEngagementPeriods)
+        .where(inArray(financeEngagementPeriods.engagementId, engagementIds))
+        .orderBy(asc(financeEngagementPeriods.fromDate))
+    : [];
+
+  const shareRows = engagementIds.length
+    ? await db
+        .select()
+        .from(financeFeeShares)
+        .where(inArray(financeFeeShares.engagementId, engagementIds))
+        .orderBy(asc(financeFeeShares.createdAt))
+    : [];
+
+  // userId → variable lines.
+  const variableByUser = new Map<string, HonorarioLine[]>();
+
+  for (const e of engagements) {
+    const periods = periodRows.filter((p) => p.engagementId === e.id);
+    const activePeriod = periods.find((p) =>
+      isActiveInMonth(p.fromDate, p.toDate, year, month)
+    );
+    if (!activePeriod) continue;
+
+    const periodFee = Number(activePeriod.fee);
+    const shares = shareRows.filter((s) => s.engagementId === e.id);
+
+    for (const s of shares) {
+      if (!s.memberId) continue;
+      // Both null => always applies; otherwise must overlap the month.
+      const alwaysApplies = s.appliesFrom == null && s.appliesTo == null;
+      if (
+        !alwaysApplies &&
+        !isActiveInMonth(s.appliesFrom, s.appliesTo, year, month)
+      ) {
+        continue;
+      }
+
+      const member = memberMap.get(s.memberId);
+      if (!member) continue;
+
+      const shareType = s.shareType === "percent" ? "percent" : "fixed";
+      const amount = shareAmount(
+        shareType,
+        Number(s.shareValue),
+        periodFee
+      );
+      const currency =
+        shareType === "percent"
+          ? activePeriod.currency
+          : s.shareCurrency ?? e.currency;
+
+      const line: HonorarioLine = {
+        accountName: e.accountName,
+        neurona: e.neurona,
+        amount,
+        currency,
+      };
+      const list = variableByUser.get(member.userId);
+      if (list) {
+        list.push(line);
+      } else {
+        variableByUser.set(member.userId, [line]);
+      }
+    }
+  }
+
+  // 5. Assemble rows.
+  const targets = opts?.userId
+    ? allMembers.filter((m) => m.userId === opts.userId)
+    : allMembers;
+
+  // When filtering to a single user that isn't a member (edge case), still
+  // return an empty row so the member view can render its empty state.
+  if (opts?.userId && targets.length === 0) {
+    targets.push({ userId: opts.userId, name: "—" });
+  }
+
+  const rows: HonorarioRow[] = targets.map((m) => {
+    const compRow = currentCompensation(comp, m.userId, monthEnd);
+    const fixed = compRow
+      ? { amount: compRow.amount, currency: compRow.currency }
+      : null;
+    const variable = variableByUser.get(m.userId) ?? [];
+
+    const totalsByCurrency: Record<string, number> = {};
+    let arsApprox = 0;
+
+    const addLine = (amount: number, currency: string): void => {
+      totalsByCurrency[currency] = round2(
+        (totalsByCurrency[currency] ?? 0) + amount
+      );
+      arsApprox += convertToArs(amount, currency, "mep", mep, ipc) ?? 0;
+    };
+
+    if (fixed) addLine(fixed.amount, fixed.currency);
+    for (const line of variable) addLine(line.amount, line.currency);
+
+    return {
+      userId: m.userId,
+      name: m.name,
+      fixed,
+      variable,
+      totalsByCurrency,
+      arsApprox: round2(arsApprox),
+    };
+  });
+
+  return rows;
 }

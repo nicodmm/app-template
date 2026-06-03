@@ -4,12 +4,15 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { FxEditor } from "@/components/finance/fx-editor";
 import { BillingList } from "@/components/finance/billing-list";
+import { HonorariosAdmin } from "@/components/finance/honorarios-admin";
 import type {
   BillingRow,
   FxRateRow,
   BillingHistoryRow,
   LtvRow,
   FinanceAccountOption,
+  HonorarioRow,
+  CompensationRow,
 } from "@/lib/queries/finance";
 
 interface Props {
@@ -20,15 +23,18 @@ interface Props {
   history: BillingHistoryRow[];
   ltv: LtvRow[];
   accounts: FinanceAccountOption[];
+  honorarios: HonorarioRow[];
+  compensationRows: CompensationRow[];
+  members: Array<{ userId: string; name: string }>;
+  initialTab?: TabId;
 }
 
-type TabId = "billing" | "fx";
-// Task 15 adds a "honorarios" member view tab here.
-// const TABS: { id: TabId; label: string }[] = [..., { id: "honorarios", label: "Mis honorarios" }];
+type TabId = "billing" | "fx" | "honorarios";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "billing", label: "A facturar" },
   { id: "fx", label: "TC / IPC" },
+  { id: "honorarios", label: "Honorarios" },
 ];
 
 export function FinanzasTabs({
@@ -39,8 +45,12 @@ export function FinanzasTabs({
   history,
   ltv,
   accounts,
+  honorarios,
+  compensationRows,
+  members,
+  initialTab,
 }: Props) {
-  const [tab, setTab] = useState<TabId>("billing");
+  const [tab, setTab] = useState<TabId>(initialTab ?? "billing");
 
   return (
     <div className="space-y-5">
@@ -67,7 +77,7 @@ export function FinanzasTabs({
         ))}
       </div>
 
-      {tab === "billing" ? (
+      {tab === "billing" && (
         <BillingList
           year={year}
           month={month}
@@ -76,8 +86,16 @@ export function FinanzasTabs({
           ltv={ltv}
           accounts={accounts}
         />
-      ) : (
-        <FxEditor rates={rates} />
+      )}
+      {tab === "fx" && <FxEditor rates={rates} />}
+      {tab === "honorarios" && (
+        <HonorariosAdmin
+          rows={honorarios}
+          compensationRows={compensationRows}
+          members={members}
+          year={year}
+          month={month}
+        />
       )}
     </div>
   );

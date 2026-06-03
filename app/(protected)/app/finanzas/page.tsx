@@ -1,41 +1,24 @@
 import { redirect } from "next/navigation";
-import { Lock } from "lucide-react";
 import { requireUserId, isFinanceAdmin, getCurrentUserId } from "@/lib/auth";
 import { getWorkspaceByUserId } from "@/lib/queries/workspace";
-import { GlassCard } from "@/components/ui/glass-card";
 import {
   getBillingForMonth,
   listFxRates,
   getBillingHistory,
   getLtvByAccount,
   listFinanceAccounts,
+  listMemberCompensation,
+  computeHonorarios,
 } from "@/lib/queries/finance";
 import { FinanzasTabs } from "@/components/finance/finanzas-tabs";
+import { MisHonorarios } from "@/components/finance/mis-honorarios";
 
 interface PageProps {
-  searchParams: Promise<{ year?: string; month?: string }>;
+  searchParams: Promise<{ year?: string; month?: string; tab?: string }>;
 }
 
 export default async function FinanzasPage({ searchParams }: PageProps) {
   await requireUserId();
-
-  const finance = await isFinanceAdmin();
-  if (!finance) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-6">
-        <GlassCard className="max-w-md p-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <Lock size={20} className="text-primary" aria-hidden />
-          </div>
-          <h1 className="text-lg font-semibold mb-1">Sin acceso a Finanzas</h1>
-          <p className="text-sm text-muted-foreground">
-            No tenés permisos para ver el módulo de Finanzas. Si necesitás
-            acceso, pedíselo a un administrador del workspace.
-          </p>
-        </GlassCard>
-      </div>
-    );
-  }
 
   const userId = await getCurrentUserId();
   if (!userId) redirect("/auth/login");
@@ -55,20 +38,75 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
       ? parsedMonth
       : now.getMonth() + 1;
 
-  const [billing, rates, history, ltv, accountsList] = await Promise.all([
+  const finance = await isFinanceAdmin();
+
+  if (!finance) {
+    // Regular member: self-view of their own honorarios.
+    const rows = await computeHonorarios(workspace.id, year, month, {
+      userId,
+    });
+    const row = rows[0] ?? {
+      userId,
+      name: "—",
+      fixed: null,
+      variable: [],
+      totalsByCurrency: {},
+      arsApprox: 0,
+    };
+    return (
+      <div className="p-4 md:p-6 space-y-6">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">
+            Mis honorarios
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Tu compensación fija y honorarios variables por mes.
+          </p>
+        </div>
+        <MisHonorarios row={row} year={year} month={month} />
+      </div>
+    );
+  }
+
+  const [
+    billing,
+    rates,
+    history,
+    ltv,
+    accountsList,
+    honorarios,
+    compensationRows,
+  ] = await Promise.all([
     getBillingForMonth(workspace.id, year, month),
     listFxRates(workspace.id),
     getBillingHistory(workspace.id),
     getLtvByAccount(workspace.id),
     listFinanceAccounts(workspace.id),
+    computeHonorarios(workspace.id, year, month),
+    listMemberCompensation(workspace.id),
   ]);
+
+  // Member options for the compensation editor (deduped by userId).
+  const memberMap = new Map<string, string>();
+  for (const r of honorarios) memberMap.set(r.userId, r.name);
+  const members = Array.from(memberMap, ([uid, name]) => ({
+    userId: uid,
+    name,
+  }));
+
+  const initialTab =
+    params.tab === "fx" || params.tab === "honorarios"
+      ? params.tab
+      : params.tab === "billing"
+        ? "billing"
+        : undefined;
 
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Finanzas</h1>
         <p className="text-sm text-muted-foreground">
-          Facturación mensual, tipos de cambio e historial.
+          Facturación mensual, tipos de cambio, honorarios e historial.
         </p>
       </div>
       <FinanzasTabs
@@ -79,6 +117,10 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
         history={history}
         ltv={ltv}
         accounts={accountsList}
+        honorarios={honorarios}
+        compensationRows={compensationRows}
+        members={members}
+        initialTab={initialTab}
       />
     </div>
   );
