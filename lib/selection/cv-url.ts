@@ -30,6 +30,35 @@ export function toEmbeddableCvUrl(url: string): string {
 }
 
 /**
+ * Convert a CV link into a server-fetchable download URL so we can pull the
+ * bytes and extract text. Google Drive file links → the `uc?export=download`
+ * endpoint; Google Docs documents → plain-text export; anything else is
+ * returned unchanged. Requires the file to be shared "anyone with the link".
+ */
+export function toDownloadableCvUrl(
+  url: string
+): { url: string; kind: "pdf" | "docx" | "text" | "unknown" } {
+  if (/drive\.google\.com/.test(url)) {
+    const fileId =
+      url.match(/\/file\/d\/([^/?#]+)/)?.[1] ?? url.match(/[?&]id=([^&]+)/)?.[1];
+    if (fileId) {
+      return {
+        url: `https://drive.google.com/uc?export=download&id=${fileId}`,
+        kind: "unknown",
+      };
+    }
+  }
+  const docMatch = url.match(/docs\.google\.com\/document\/d\/([^/?#]+)/);
+  if (docMatch) {
+    return {
+      url: `https://docs.google.com/document/d/${docMatch[1]}/export?format=txt`,
+      kind: "text",
+    };
+  }
+  return { url, kind: "unknown" };
+}
+
+/**
  * Whether the CV can be previewed inside an iframe. Google Drive/Docs links
  * always can (via the /preview form); otherwise we rely on the mime type
  * (uploaded files) or a `.pdf` extension in the URL.

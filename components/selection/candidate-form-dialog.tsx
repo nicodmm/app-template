@@ -13,8 +13,8 @@ interface Props {
   onClose: () => void;
   mode: "create" | "edit";
   candidate?: SelectionCandidate;
-  /** Called after a successful save (before onClose). */
-  onSuccess?: () => void;
+  /** Called after a successful save (before onClose). Receives the new id on create. */
+  onSuccess?: (newId?: string) => void;
 }
 
 export function CandidateFormDialog({
@@ -50,7 +50,7 @@ export function CandidateFormDialog({
     setError(null);
 
     startTransition(async () => {
-      let result: { success: boolean; error?: string };
+      let result: { success: boolean; error?: string; id?: string };
 
       if (isEdit && candidate) {
         result = await updateCandidate({
@@ -85,7 +85,7 @@ export function CandidateFormDialog({
       }
 
       router.refresh();
-      onSuccess?.();
+      onSuccess?.(result.id);
       handleClose();
     });
   }

@@ -12,7 +12,6 @@ import {
   deleteShareLink,
 } from "@/app/actions/share-links";
 import {
-  DEFAULT_SHARE_CONFIG,
   SHARE_CONFIG_LABELS,
   type ShareConfig,
 } from "@/lib/share/share-config";
@@ -77,13 +76,13 @@ export function AccountShareSection({ accountId, existing }: Props) {
 
   async function handleGenerate() {
     withAction("create", async () => {
-      const { token } = await createShareLink(accountId);
+      const { token, id, shareConfig } = await createShareLink(accountId);
       setLink({
-        id: "",
+        id,
         token,
         isActive: true,
         hasPassword: false,
-        shareConfig: { ...DEFAULT_SHARE_CONFIG },
+        shareConfig,
         viewCount: 0,
         lastAccessedAt: null,
       });

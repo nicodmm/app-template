@@ -38,7 +38,10 @@ export function CandidateWorkspace({ accountId, searchId, search, candidates }: 
 
   const selectedCandidate = candidates.find((c) => c.id === selectedId) ?? null;
 
-  function handleCreated(): void {
+  function handleCreated(newId?: string): void {
+    // Seleccionar el candidato recién creado para que aparezca al instante
+    // (router.refresh actualiza la lista, pero el estado de selección persiste).
+    if (newId) setSelectedId(newId);
     router.refresh();
     setDialogOpen(false);
   }

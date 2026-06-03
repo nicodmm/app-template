@@ -44,7 +44,7 @@ async function assertCanManageShareLink(
 
 export async function createShareLink(
   accountId: string
-): Promise<{ token: string }> {
+): Promise<{ token: string; id: string; shareConfig: ShareConfig }> {
   const userId = await requireUserId();
   await assertCanManageShareLink(userId, accountId);
 
@@ -55,20 +55,27 @@ export async function createShareLink(
     .limit(1);
   if (existing) {
     revalidatePath(`/app/accounts/${accountId}`);
-    return { token: existing.token };
+    return {
+      token: existing.token,
+      id: existing.id,
+      shareConfig: coerceShareConfig(existing.shareConfig),
+    };
   }
 
   const token = generateShareToken();
-  await db.insert(accountShareLinks).values({
-    accountId,
-    token,
-    shareConfig: { ...DEFAULT_SHARE_CONFIG } as unknown as Record<
-      string,
-      boolean
-    >,
-  });
+  const [row] = await db
+    .insert(accountShareLinks)
+    .values({
+      accountId,
+      token,
+      shareConfig: { ...DEFAULT_SHARE_CONFIG } as unknown as Record<
+        string,
+        boolean
+      >,
+    })
+    .returning({ id: accountShareLinks.id });
   revalidatePath(`/app/accounts/${accountId}`);
-  return { token };
+  return { token, id: row.id, shareConfig: { ...DEFAULT_SHARE_CONFIG } };
 }
 
 export async function updateShareConfig(

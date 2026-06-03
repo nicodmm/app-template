@@ -8,6 +8,7 @@ import {
   SELECTION_REPORT_SYSTEM,
   buildReportUserMessage,
 } from "@/lib/ai/selection-report-prompt";
+import { resolveCvText } from "@/lib/selection/extract-cv-text-server";
 
 const MODEL = "claude-haiku-4-5-20251001";
 const anthropic = new Anthropic();
@@ -37,11 +38,27 @@ export const generateSelectionReport = task({
       .limit(1);
 
     try {
+      // CVs subidos como archivo traen texto extraído en el cliente; los CV por
+      // URL (ej. Drive) no, así que acá lo bajamos y extraemos server-side.
+      const cvText = await resolveCvText({
+        cvStoragePath: c.cvStoragePath,
+        cvUrl: c.cvUrl,
+        cvExtractedText: c.cvExtractedText,
+      });
+
+      // Persistir el texto extraído si lo conseguimos por primera vez.
+      if (cvText && cvText !== c.cvExtractedText) {
+        await db
+          .update(selectionCandidates)
+          .set({ cvExtractedText: cvText, updatedAt: new Date() })
+          .where(eq(selectionCandidates.id, payload.candidateId));
+      }
+
       const userMsg = buildReportUserMessage({
         candidateName: `${c.firstName} ${c.lastName}`,
         position: search?.position ?? "",
         positionDescription: search?.positionDescription ?? null,
-        cvText: c.cvExtractedText,
+        cvText,
         recruiterNotes: c.recruiterNotes,
         linkedinUrl: c.linkedinUrl,
         expectedSalary: c.expectedSalary,
