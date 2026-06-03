@@ -20,7 +20,8 @@ import { AccountHealthBadge } from "@/components/account-health-badge";
 import { RichMarkdown } from "@/components/ui/rich-markdown";
 import { EditAccountForm } from "@/components/edit-account-form";
 import { ContextUploadForm } from "@/components/context-upload-form";
-import { AccountStatusActions } from "@/components/account-status-actions";
+import { AccountStatusSelect } from "@/components/account-status-select";
+import { accountStatus } from "@/lib/accounts/status";
 import { ArchivedAccountBanner } from "@/components/archived-account-banner";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PaidMediaMiniCard } from "@/components/paid-media-mini-card";
@@ -138,6 +139,7 @@ export default async function AccountDetailPage({
         <ArchivedAccountBanner
           accountId={accountId}
           closedAt={account.closedAt}
+          closeReason={account.closeReason}
         />
       )}
 
@@ -168,9 +170,9 @@ export default async function AccountDetailPage({
           >
             Editar
           </Link>
-          <AccountStatusActions
+          <AccountStatusSelect
             accountId={accountId}
-            closedAt={account.closedAt}
+            status={accountStatus(account)}
           />
         </div>
       </div>

@@ -7,11 +7,13 @@ import { reopenAccount } from "@/app/actions/accounts";
 interface ArchivedAccountBannerProps {
   accountId: string;
   closedAt: Date;
+  closeReason: string | null;
 }
 
 export function ArchivedAccountBanner({
   accountId,
   closedAt,
+  closeReason,
 }: ArchivedAccountBannerProps) {
   const [pending, startTransition] = useTransition();
   const formattedDate = new Date(closedAt).toLocaleDateString("es-AR", {
@@ -30,7 +32,10 @@ export function ArchivedAccountBanner({
             aria-hidden
           />
           <div className="text-sm">
-            <p className="font-medium">Esta cuenta está archivada</p>
+            <p className="font-medium">
+              Esta cuenta está{" "}
+              {closeReason === "inactive" ? "inactiva" : "finalizada"}
+            </p>
             <p className="text-xs text-muted-foreground mt-0.5">
               Archivada el {formattedDate}. Las métricas del dashboard no la
               incluyen.
