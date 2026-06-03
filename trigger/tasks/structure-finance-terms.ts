@@ -126,6 +126,7 @@ export const structureFinanceTerms = task({
         serviceScope: accounts.serviceScope,
         startDate: accounts.startDate,
         fee: accounts.fee,
+        ownerId: accounts.ownerId,
       })
       .from(accounts)
       .where(eq(accounts.id, payload.accountId))
@@ -141,6 +142,7 @@ export const structureFinanceTerms = task({
     // 3. Load account consultants joined with users.
     const consultantRows = await db
       .select({
+        userId: accountConsultants.userId,
         fullName: users.fullName,
         email: users.email,
         neurona: accountConsultants.neurona,
@@ -153,6 +155,19 @@ export const structureFinanceTerms = task({
       name: c.fullName ?? c.email,
       neurona: c.neurona,
     }));
+
+    // The project lead (owner) always counts as a consultant for term
+    // resolution, even if not explicitly in account_consultants.
+    if (account.ownerId && !consultantRows.some((c) => c.userId === account.ownerId)) {
+      const [owner] = await db
+        .select({ fullName: users.fullName, email: users.email })
+        .from(users)
+        .where(eq(users.id, account.ownerId))
+        .limit(1);
+      if (owner) {
+        consultants.unshift({ name: owner.fullName ?? owner.email, neurona: null });
+      }
+    }
 
     const neuronasContratadas = account.serviceScope
       ? account.serviceScope
@@ -226,9 +241,10 @@ export const structureFinanceTerms = task({
           )
         );
 
-      // 6a-bis. The base-fee engagement (source="account_fee") survives the
-      // delete above, so its previously-attached LLM shares must be cleared
-      // here before re-inserting. Load it once so base-fee shares can attach.
+      // 6a-bis. Load the auto base-fee engagement (source="account_fee") so we
+      // can suppress it when the LLM produces the full fee structure (the fee
+      // is a single total; LLM engagements split/define it, so the base must
+      // not also bill — that was the double-counting bug).
       const [baseEngagement] = await db
         .select({ id: financeEngagements.id })
         .from(financeEngagements)
@@ -239,17 +255,6 @@ export const structureFinanceTerms = task({
           )
         )
         .limit(1);
-
-      if (baseEngagement) {
-        await db
-          .delete(financeFeeShares)
-          .where(
-            and(
-              eq(financeFeeShares.engagementId, baseEngagement.id),
-              eq(financeFeeShares.source, "llm")
-            )
-          );
-      }
 
       // 6b. Determine engagement start.
       const engStart = account.startDate ?? firstOfCurrentMonthISO();
@@ -298,36 +303,10 @@ export const structureFinanceTerms = task({
       };
 
       // 6c. Insert engagements + periods + shares.
+      let insertedCount = 0;
       for (const eng of engagements) {
         const neurona = (eng.neurona ?? "").trim();
         if (!neurona) continue;
-
-        // Base-fee shares: the LLM may emit a "Fee mensual" engagement carrying
-        // only fee shares for the recurring base service. We do NOT create a
-        // duplicate engagement (the base fee is the auto account_fee engagement);
-        // instead we attach those shares to the base engagement.
-        if (normalizeName(neurona) === "fee mensual" && baseEngagement) {
-          const baseShares = Array.isArray(eng.shares) ? eng.shares : [];
-          for (const share of baseShares) {
-            const consultantName = (share.consultantName ?? "").trim();
-            const memberId = consultantName
-              ? resolveMemberId(consultantName)
-              : null;
-            const shareType = share.type === "fixed" ? "fixed" : "percent";
-            await db.insert(financeFeeShares).values({
-              engagementId: baseEngagement.id,
-              accountId: payload.accountId,
-              workspaceId: payload.workspaceId,
-              memberId,
-              consultantNameRaw: consultantName || null,
-              shareType,
-              shareValue: String(share.value ?? 0),
-              shareCurrency: share.currency ?? null,
-              source: "llm",
-            });
-          }
-          continue;
-        }
 
         const currency = eng.currency === "ARS" ? "ARS" : "USD";
         const billingRule =
@@ -350,6 +329,7 @@ export const structureFinanceTerms = task({
           .returning({ id: financeEngagements.id });
 
         const engagementId = insertedEng.id;
+        insertedCount += 1;
 
         const periods = Array.isArray(eng.periods) ? eng.periods : [];
         for (const period of periods) {
@@ -396,6 +376,20 @@ export const structureFinanceTerms = task({
             source: "llm",
           });
         }
+      }
+
+      // 6c-bis. Suppress or revive the auto base-fee engagement. When the LLM
+      // produced the full fee structure, the base must NOT also bill (it would
+      // double-count the fee). When the LLM produced nothing, keep the base
+      // active so account.fee still bills.
+      if (baseEngagement) {
+        await db
+          .update(financeEngagements)
+          .set({
+            status: insertedCount > 0 ? "ended" : "active",
+            updatedAt: new Date(),
+          })
+          .where(eq(financeEngagements.id, baseEngagement.id));
       }
 
       // 6d. additionalCharges — not materialized in v1.

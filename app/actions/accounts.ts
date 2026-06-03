@@ -144,11 +144,15 @@ export async function createAccount(formData: FormData): Promise<void> {
     termsRawText: terms,
   });
 
-  if (consultantIds.length) {
+  // El líder/responsable también cuenta como consultor.
+  const consultantUserIds = Array.from(
+    new Set([ownerId, ...consultantIds].filter(Boolean))
+  );
+  if (consultantUserIds.length) {
     await db
       .insert(accountConsultants)
       .values(
-        consultantIds.map((uid) => ({
+        consultantUserIds.map((uid) => ({
           workspaceId: workspace.id,
           accountId: account.id,
           userId: uid,
@@ -159,7 +163,11 @@ export async function createAccount(formData: FormData): Promise<void> {
       .onConflictDoNothing();
   }
 
-  await ensureBaseEngagement(account.id, workspace.id, { fee, startDate });
+  await ensureBaseEngagement(account.id, workspace.id, {
+    fee,
+    startDate,
+    serviceScope,
+  });
 
   if (terms) {
     try {
@@ -286,7 +294,11 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
   }
 
   // Mantener sincronizado el engagement base (fee mensual) con la cuenta.
-  await ensureBaseEngagement(accountId, workspace.id, { fee, startDate });
+  await ensureBaseEngagement(accountId, workspace.id, {
+    fee,
+    startDate,
+    serviceScope,
+  });
 
   revalidatePath(`/app/accounts/${accountId}`);
   return {};

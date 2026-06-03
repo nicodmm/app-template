@@ -69,6 +69,23 @@ async function requireFinanceAccount(accountId: string): Promise<string> {
   return workspace.id;
 }
 
+/**
+ * Sanea un nombre de archivo para usarlo como clave de Supabase Storage. Las
+ * claves no admiten espacios, comas ni varios símbolos (rompen con "Invalid
+ * key"). Conservamos letras/números ASCII, punto, guion y guion bajo; el resto
+ * se colapsa a "_". El nombre original se guarda aparte para mostrar.
+ */
+function sanitizeStorageName(fileName: string): string {
+  const cleaned = fileName
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "") // quitar acentos
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^[_.]+/, "")
+    .slice(0, 120);
+  return cleaned || "archivo";
+}
+
 async function ensureAccountFinance(
   accountId: string,
   workspaceId: string
@@ -187,7 +204,7 @@ export async function uploadFinanceDoc(input: {
     const workspaceId = await requireFinanceAccount(input.accountId);
     await ensureAccountFinance(input.accountId, workspaceId);
     const admin = createAdminClient();
-    const path = `${input.accountId}/${input.kind}/${Date.now()}-${input.fileName}`;
+    const path = `${input.accountId}/${input.kind}/${Date.now()}-${sanitizeStorageName(input.fileName)}`;
     const buffer = Buffer.from(input.fileBase64, "base64");
     const { error: upErr } = await admin.storage
       .from(FINANCE_DOCS_BUCKET)

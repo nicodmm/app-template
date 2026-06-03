@@ -11,23 +11,57 @@ function firstOfCurrentMonthISO(): string {
 }
 
 /**
+ * Concepto del fee base: si hay exactamente un servicio contratado, usarlo (así
+ * el bill dice "Growth 1500" en vez de "Fee mensual 1500"). Si hay varios o
+ * ninguno, etiqueta genérica.
+ */
+function baseConcept(serviceScope: string | null | undefined): string {
+  const services = (serviceScope ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return services.length === 1 ? services[0] : BASE_NEURONA;
+}
+
+/** True si la cuenta tiene engagements LLM activos (los términos definen el fee). */
+async function hasActiveLlmEngagements(accountId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: financeEngagements.id })
+    .from(financeEngagements)
+    .where(
+      and(
+        eq(financeEngagements.accountId, accountId),
+        eq(financeEngagements.source, "llm"),
+        eq(financeEngagements.status, "active")
+      )
+    )
+    .limit(1);
+  return !!row;
+}
+
+/**
  * Idempotente. Mantiene a lo sumo UN engagement base (source="account_fee") por
- * cuenta que representa el fee mensual recurrente en USD (regla MEP).
- * - fee null/0 → si existe, lo marca status="ended"; no crea nada.
- * - fee > 0 → crea engagement+período base si no existe; si existe, sincroniza
- *   el fee del período base y la fecha de inicio, y reactiva (status="active").
+ * cuenta, que representa el fee mensual recurrente en USD (regla MEP) como UN
+ * único total.
  *
- * El engagement base nunca lo borra la task de estructuración (que solo borra
- * source="llm"), así que la facturación recurrente siempre está presente.
+ * El fee es un total único: cuando los términos están estructurados (existen
+ * engagements LLM activos que definen/reparten el fee), el base se SUPRIME
+ * (status="ended") para no duplicar el fee. Cuando no hay términos, el base =
+ * account.fee y es la única línea.
+ *
+ * - hay engagements LLM activos → base "ended" (los términos mandan).
+ * - fee null/0 → base "ended"; no crea nada.
+ * - fee > 0 y sin términos → crea/sincroniza el base con account.fee.
  */
 export async function ensureBaseEngagement(
   accountId: string,
   workspaceId: string,
-  opts: { fee: string | null; startDate: string | null }
+  opts: { fee: string | null; startDate: string | null; serviceScope?: string | null }
 ): Promise<void> {
   const start = opts.startDate ?? firstOfCurrentMonthISO();
   const feeNum = opts.fee != null ? Number(opts.fee) : NaN;
   const hasFee = Number.isFinite(feeNum) && feeNum > 0;
+  const concept = baseConcept(opts.serviceScope);
 
   const [existing] = await db
     .select()
@@ -40,7 +74,10 @@ export async function ensureBaseEngagement(
     )
     .limit(1);
 
-  if (!hasFee) {
+  // Los términos estructurados definen el fee → suprimir el base.
+  const llmActive = await hasActiveLlmEngagements(accountId);
+
+  if (!hasFee || llmActive) {
     if (existing && existing.status !== "ended") {
       await db
         .update(financeEngagements)
@@ -56,7 +93,7 @@ export async function ensureBaseEngagement(
       .values({
         workspaceId,
         accountId,
-        neurona: BASE_NEURONA,
+        neurona: concept,
         currency: "USD",
         billingRule: "mep",
         startDate: start,
@@ -80,7 +117,7 @@ export async function ensureBaseEngagement(
 
   await db
     .update(financeEngagements)
-    .set({ status: "active", startDate: start, updatedAt: new Date() })
+    .set({ status: "active", neurona: concept, startDate: start, updatedAt: new Date() })
     .where(eq(financeEngagements.id, existing.id));
 
   // Sincronizar el período base abierto. Si no hay, crear uno.
