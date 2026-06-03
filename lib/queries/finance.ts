@@ -9,6 +9,7 @@ import {
   workspaceMembers,
   users,
   fxRates,
+  memberCompensation,
 } from "@/lib/drizzle/schema";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { convertToArs, isActiveInMonth, type BillingRule } from "@/lib/finance/compute";
@@ -434,4 +435,68 @@ export async function getLtvByAccount(workspaceId: string): Promise<LtvRow[]> {
   return out
     .filter((r) => r.ltv > 0 || r.billedToDate > 0)
     .sort((a, b) => b.ltv - a.ltv);
+}
+
+export interface CompensationRow {
+  id: string;
+  userId: string;
+  userName: string;
+  amount: number;
+  currency: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+}
+
+export async function listMemberCompensation(
+  workspaceId: string
+): Promise<CompensationRow[]> {
+  const rows = await db
+    .select({
+      id: memberCompensation.id,
+      userId: memberCompensation.userId,
+      userName: users.fullName,
+      userEmail: users.email,
+      amount: memberCompensation.amount,
+      currency: memberCompensation.currency,
+      effectiveFrom: memberCompensation.effectiveFrom,
+      effectiveTo: memberCompensation.effectiveTo,
+    })
+    .from(memberCompensation)
+    .innerJoin(users, eq(users.id, memberCompensation.userId))
+    .where(eq(memberCompensation.workspaceId, workspaceId))
+    .orderBy(desc(memberCompensation.effectiveFrom));
+
+  return rows.map((r) => ({
+    id: r.id,
+    userId: r.userId,
+    userName: r.userName ?? r.userEmail ?? "—",
+    amount: Number(r.amount),
+    currency: r.currency,
+    effectiveFrom: r.effectiveFrom,
+    effectiveTo: r.effectiveTo,
+  }));
+}
+
+/**
+ * Pure helper: returns the active compensation row for a given userId as of
+ * todayISO (effectiveFrom <= today && (effectiveTo null || effectiveTo >= today)).
+ * If multiple rows match, picks the one with the latest effectiveFrom.
+ * Will be reused by honorarios (Task 15).
+ */
+export function currentCompensation(
+  rows: CompensationRow[],
+  userId: string,
+  todayISO: string
+): CompensationRow | null {
+  const active = rows.filter(
+    (r) =>
+      r.userId === userId &&
+      r.effectiveFrom <= todayISO &&
+      (r.effectiveTo == null || r.effectiveTo >= todayISO)
+  );
+  if (active.length === 0) return null;
+  // Pick the one with the latest effectiveFrom
+  return active.reduce((best, cur) =>
+    cur.effectiveFrom > best.effectiveFrom ? cur : best
+  );
 }

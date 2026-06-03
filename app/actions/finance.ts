@@ -11,6 +11,7 @@ import {
   financeEngagements,
   financeEngagementPeriods,
   billingRecords,
+  memberCompensation,
 } from "@/lib/drizzle/schema";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspace";
@@ -527,6 +528,54 @@ export async function deleteBillingCharge(input: { id: string }): Promise<R> {
           eq(billingRecords.id, input.id),
           eq(billingRecords.workspaceId, workspaceId),
           eq(billingRecords.isAdditional, true)
+        )
+      );
+    revalidatePath("/app/finanzas");
+    return { success: true };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
+export async function setMemberCompensation(input: {
+  userId: string;
+  amount: number;
+  currency: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+}): Promise<R> {
+  try {
+    const { workspaceId } = await requireFinanceWorkspace();
+    const [row] = await db
+      .insert(memberCompensation)
+      .values({
+        workspaceId,
+        userId: input.userId,
+        amount: String(input.amount),
+        currency: input.currency,
+        effectiveFrom: input.effectiveFrom,
+        effectiveTo: input.effectiveTo,
+      })
+      .returning({ id: memberCompensation.id });
+    if (!row) return { success: false, error: "No se pudo guardar" };
+    revalidatePath("/app/finanzas");
+    return { success: true, id: row.id };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
+export async function deleteMemberCompensation(input: { id: string }): Promise<R> {
+  try {
+    const { workspaceId } = await requireFinanceWorkspace();
+    await db
+      .delete(memberCompensation)
+      .where(
+        and(
+          eq(memberCompensation.id, input.id),
+          eq(memberCompensation.workspaceId, workspaceId)
         )
       );
     revalidatePath("/app/finanzas");
