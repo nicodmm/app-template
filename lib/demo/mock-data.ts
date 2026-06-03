@@ -320,6 +320,8 @@ function buildAccount(seed: DemoAccountSeed): AccountWithOwner {
     clientSummaryUpdatedAt: daysAgo(Math.max(seed.lastActivityDaysAgo, 1)),
     lastActivityAt: daysAgo(seed.lastActivityDaysAgo),
     closedAt: seed.closed ? daysAgo(0) : null,
+    closeReason: seed.closed ? "finished" : null,
+    endDate: null,
     hasAdConnections:
       seed.serviceScope.includes("Paid Media") ? true : false,
     createdAt: daysAgo(seed.startDateDaysAgo),
