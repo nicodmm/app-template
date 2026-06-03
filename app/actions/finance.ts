@@ -213,6 +213,32 @@ export async function setFinanceDocUrl(input: {
   }
 }
 
+export async function extractNda(input: { accountId: string }): Promise<R> {
+  try {
+    const workspaceId = await requireFinanceAccount(input.accountId);
+    await ensureAccountFinance(input.accountId, workspaceId);
+    await db
+      .update(accountFinance)
+      .set({ ndaExtractionStatus: "extracting", ndaExtractionError: null, updatedAt: new Date() })
+      .where(eq(accountFinance.accountId, input.accountId));
+    try {
+      const { tasks } = await import("@trigger.dev/sdk/v3");
+      await tasks.trigger("extract-nda-fields", { accountId: input.accountId, workspaceId });
+    } catch (err) {
+      await db
+        .update(accountFinance)
+        .set({ ndaExtractionStatus: "error", ndaExtractionError: "No se pudo encolar" })
+        .where(eq(accountFinance.accountId, input.accountId));
+      return { success: false, error: "No se pudo encolar la extracción" };
+    }
+    revalidatePath(`/app/accounts/${input.accountId}`);
+    return { success: true };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
 export async function getFinanceDocUrl(input: {
   accountId: string;
   kind: "nda" | "proposal";

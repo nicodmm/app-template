@@ -11,6 +11,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { FinanceTeam } from "./finance-team";
 import { FinanceBillingForm } from "./finance-billing-form";
 import { TermsEditor } from "@/components/finance/terms-editor";
+import { FinanceDocs } from "@/components/finance/finance-docs";
 
 interface Props {
   accountId: string;
@@ -81,7 +82,24 @@ export async function FinanceSection({ accountId, workspaceId, services }: Props
           />
         </div>
 
-        {/* TODO Task 10: NDA/Propuesta docs */}
+        {/* NDA / Propuesta docs */}
+        <div className="pt-6 [border-top:1px_solid_var(--glass-border)]">
+          <FinanceDocs
+            accountId={accountId}
+            nda={{
+              fileName: finance?.ndaFileName ?? null,
+              url: finance?.ndaUrl ?? null,
+              hasDoc: !!(finance?.ndaStoragePath || finance?.ndaUrl),
+            }}
+            proposal={{
+              fileName: finance?.proposalFileName ?? null,
+              url: finance?.proposalUrl ?? null,
+              hasDoc: !!(finance?.proposalStoragePath || finance?.proposalUrl),
+            }}
+            ndaExtractionStatus={finance?.ndaExtractionStatus ?? "none"}
+            ndaExtractionError={finance?.ndaExtractionError ?? null}
+          />
+        </div>
       </div>
     </GlassCard>
   );
