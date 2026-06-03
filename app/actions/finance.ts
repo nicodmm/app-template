@@ -12,6 +12,7 @@ import {
   financeEngagementPeriods,
   billingRecords,
   memberCompensation,
+  workspaceMembers,
 } from "@/lib/drizzle/schema";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspace";
@@ -131,6 +132,12 @@ export async function addAccountConsultant(input: {
 }): Promise<R> {
   try {
     const workspaceId = await requireFinanceAccount(input.accountId);
+    const [m] = await db
+      .select({ id: workspaceMembers.id })
+      .from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, input.userId)))
+      .limit(1);
+    if (!m) return { success: false, error: "Usuario no pertenece al workspace" };
     const [row] = await db
       .insert(accountConsultants)
       .values({
@@ -494,6 +501,14 @@ export async function addBillingCharge(input: {
     if (input.month < 1 || input.month > 12) return { success: false, error: "Mes inválido" };
     if (!input.concept.trim()) return { success: false, error: "Concepto requerido" };
     if (isNaN(input.amount)) return { success: false, error: "Monto inválido" };
+    const fx = await getFxRate(workspaceId, input.year, input.month);
+    const ars = convertToArs(
+      input.amount,
+      input.currency,
+      input.currency === "ARS" ? "same" : "mep",
+      fx?.mepRate ?? null,
+      fx?.ipcCoefficient ?? null
+    );
     const [row] = await db
       .insert(billingRecords)
       .values({
@@ -505,7 +520,9 @@ export async function addBillingCharge(input: {
         concept: input.concept.trim(),
         amountOriginal: String(input.amount),
         currencyOriginal: input.currency,
-        amountArs: null,
+        amountArs: ars == null ? null : String(ars),
+        fxRateUsed: fx ? String(fx.mepRate) : null,
+        ipcUsed: fx ? String(fx.ipcCoefficient) : null,
         status: "pending",
         isAdditional: true,
       })
