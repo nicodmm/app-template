@@ -41,7 +41,9 @@ import { SignalsSection } from "@/components/account-detail/signals-section";
 import { HealthSection } from "@/components/account-detail/health-section";
 import { SectionSkeleton } from "@/components/account-detail/section-skeleton";
 import { SelectionSection } from "@/components/account-detail/selection-section";
-import { FinanceSection } from "@/components/account-detail/finance-section";
+import { AccountConsultantsInline } from "@/components/account-detail/account-consultants-inline";
+import { AccountTermsField } from "@/components/account-detail/account-terms-field";
+import { accountFinance, accountConsultants, users as usersTable } from "@/lib/drizzle/schema";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
@@ -93,6 +95,32 @@ export default async function AccountDetailPage({
     viewerMember.financeAdmin === true ||
     viewerMember.role === "owner" ||
     viewerMember.role === "admin";
+
+  // Finanzas (slim): consultores + texto de términos, solo para finance-admins.
+  const [consultantRows, financeRow] = canFinance
+    ? await Promise.all([
+        db
+          .select({
+            id: accountConsultants.id,
+            fullName: usersTable.fullName,
+            email: usersTable.email,
+          })
+          .from(accountConsultants)
+          .innerJoin(usersTable, eq(accountConsultants.userId, usersTable.id))
+          .where(eq(accountConsultants.accountId, accountId)),
+        db
+          .select({ termsRawText: accountFinance.termsRawText })
+          .from(accountFinance)
+          .where(eq(accountFinance.accountId, accountId))
+          .limit(1),
+      ])
+    : [[], []];
+  const financeConsultants = consultantRows.map((r) => ({
+    id: r.id,
+    displayName: r.fullName ?? r.email,
+  }));
+  const termsText =
+    (financeRow as { termsRawText: string | null }[])[0]?.termsRawText ?? null;
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -152,13 +180,26 @@ export default async function AccountDetailPage({
         existing={existingShareLink}
       />
 
-      {/* Finance section — visible only to finance admins, owners, and admins */}
+      {/* Términos de contratación + consultores — solo finance admins/owners/admins.
+          La operación financiera completa vive en /app/finanzas/[accountId]. */}
       {canFinance && (
-        <FinanceSection
-          accountId={accountId}
-          workspaceId={workspace.id}
-          services={workspace.services ?? []}
-        />
+        <GlassCard className="p-6 mb-6 space-y-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-semibold">Términos de contratación</h2>
+            <Link
+              href={`/app/finanzas/${accountId}`}
+              className="text-xs text-primary hover:underline"
+            >
+              Ver finanzas de la cuenta →
+            </Link>
+          </div>
+          <AccountConsultantsInline
+            accountId={accountId}
+            consultants={financeConsultants}
+            members={members}
+          />
+          <AccountTermsField accountId={accountId} initialText={termsText} />
+        </GlassCard>
       )}
 
       {/* Edit form */}
