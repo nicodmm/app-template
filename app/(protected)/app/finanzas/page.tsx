@@ -7,9 +7,11 @@ import {
   getBillingHistory,
   getLtvByAccount,
   listFinanceAccounts,
+  listFinanceAccountCards,
   listMemberCompensation,
   computeHonorarios,
 } from "@/lib/queries/finance";
+import { runMonthlyBilling } from "@/lib/finance/run-monthly-billing";
 import { FinanzasTabs } from "@/components/finance/finanzas-tabs";
 import { MisHonorarios } from "@/components/finance/mis-honorarios";
 
@@ -68,12 +70,16 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
     );
   }
 
+  // Auto-generar la facturación del mes visto (idempotente, preserva estados).
+  await runMonthlyBilling(workspace.id, year, month);
+
   const [
     billing,
     rates,
     history,
     ltv,
     accountsList,
+    accountCards,
     honorarios,
     compensationRows,
   ] = await Promise.all([
@@ -82,6 +88,7 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
     getBillingHistory(workspace.id),
     getLtvByAccount(workspace.id),
     listFinanceAccounts(workspace.id),
+    listFinanceAccountCards(workspace.id),
     computeHonorarios(workspace.id, year, month),
     listMemberCompensation(workspace.id),
   ]);
@@ -95,11 +102,12 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
   }));
 
   const initialTab =
-    params.tab === "fx" || params.tab === "honorarios"
+    params.tab === "fx" ||
+    params.tab === "honorarios" ||
+    params.tab === "billing" ||
+    params.tab === "accounts"
       ? params.tab
-      : params.tab === "billing"
-        ? "billing"
-        : undefined;
+      : undefined;
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -117,6 +125,7 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
         history={history}
         ltv={ltv}
         accounts={accountsList}
+        accountCards={accountCards}
         honorarios={honorarios}
         compensationRows={compensationRows}
         members={members}

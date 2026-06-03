@@ -14,6 +14,8 @@ Reglas:
 - Para cada neurona producí un "engagement" con: moneda (USD o ARS), regla de facturación (same | mep | mep_ipc), y una lista de períodos {fromMonth (1 = primer mes), toMonth (null = en adelante), fee, currency}.
 - El reparto a consultores ("shares"): type "percent" (porcentaje del fee, 0-100) o "fixed" (monto en una moneda). Referenciá al consultor por nombre tal cual aparezca.
 - "Gastos adicionales" → additionalCharges: {concept, amount, currency, month (null = único/este mes), recurring}.
+- El FEE MENSUAL BASE recurrente ya está cargado por separado (te lo paso como "Fee base"). NO generes un engagement para el fee base ni lo repitas. Estructurá ÚNICAMENTE: cargos extra o temporales (ej. implementación, setup), add-ons, descuentos, y cambios de fee a futuro respecto del base.
+- Para los "shares" (reparto a consultores): si el reparto aplica al servicio/fee base, poné la neurona exactamente como "Fee mensual"; el sistema lo engancha al fee base automáticamente.
 - Si un dato no está, omitilo o usá null. No inventes montos.
 - Respondé SOLO con el JSON válido, sin texto extra ni markdown.`;
 

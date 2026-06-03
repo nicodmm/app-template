@@ -226,6 +226,31 @@ export const structureFinanceTerms = task({
           )
         );
 
+      // 6a-bis. The base-fee engagement (source="account_fee") survives the
+      // delete above, so its previously-attached LLM shares must be cleared
+      // here before re-inserting. Load it once so base-fee shares can attach.
+      const [baseEngagement] = await db
+        .select({ id: financeEngagements.id })
+        .from(financeEngagements)
+        .where(
+          and(
+            eq(financeEngagements.accountId, payload.accountId),
+            eq(financeEngagements.source, "account_fee")
+          )
+        )
+        .limit(1);
+
+      if (baseEngagement) {
+        await db
+          .delete(financeFeeShares)
+          .where(
+            and(
+              eq(financeFeeShares.engagementId, baseEngagement.id),
+              eq(financeFeeShares.source, "llm")
+            )
+          );
+      }
+
       // 6b. Determine engagement start.
       const engStart = account.startDate ?? firstOfCurrentMonthISO();
 
@@ -276,6 +301,34 @@ export const structureFinanceTerms = task({
       for (const eng of engagements) {
         const neurona = (eng.neurona ?? "").trim();
         if (!neurona) continue;
+
+        // Base-fee shares: the LLM may emit a "Fee mensual" engagement carrying
+        // only fee shares for the recurring base service. We do NOT create a
+        // duplicate engagement (the base fee is the auto account_fee engagement);
+        // instead we attach those shares to the base engagement.
+        if (normalizeName(neurona) === "fee mensual" && baseEngagement) {
+          const baseShares = Array.isArray(eng.shares) ? eng.shares : [];
+          for (const share of baseShares) {
+            const consultantName = (share.consultantName ?? "").trim();
+            const memberId = consultantName
+              ? resolveMemberId(consultantName)
+              : null;
+            const shareType = share.type === "fixed" ? "fixed" : "percent";
+            await db.insert(financeFeeShares).values({
+              engagementId: baseEngagement.id,
+              accountId: payload.accountId,
+              workspaceId: payload.workspaceId,
+              memberId,
+              consultantNameRaw: consultantName || null,
+              shareType,
+              shareValue: String(share.value ?? 0),
+              shareCurrency: share.currency ?? null,
+              source: "llm",
+            });
+          }
+          continue;
+        }
+
         const currency = eng.currency === "ARS" ? "ARS" : "USD";
         const billingRule =
           eng.billingRule === "same" || eng.billingRule === "mep_ipc"

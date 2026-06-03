@@ -214,6 +214,59 @@ export async function getFxRate(
   };
 }
 
+export interface FinanceAccountCard {
+  id: string;
+  name: string;
+  ownerName: string | null;
+  fee: number | null;
+  hasNda: boolean;
+  hasBillingData: boolean;
+  termsStatus: string;
+  hasTermsText: boolean;
+  closed: boolean;
+}
+
+/**
+ * Cards de la pantalla de Finanzas: una por cuenta del workspace, con flags de
+ * completitud para mostrar alertas (NDA, datos de facturación, términos).
+ */
+export async function listFinanceAccountCards(
+  workspaceId: string
+): Promise<FinanceAccountCard[]> {
+  const rows = await db
+    .select({
+      id: accounts.id,
+      name: accounts.name,
+      fee: accounts.fee,
+      closedAt: accounts.closedAt,
+      ownerName: users.fullName,
+      ownerEmail: users.email,
+      ndaStoragePath: accountFinance.ndaStoragePath,
+      ndaUrl: accountFinance.ndaUrl,
+      razonSocial: accountFinance.razonSocial,
+      cuit: accountFinance.cuit,
+      termsStatus: accountFinance.termsStatus,
+      termsRawText: accountFinance.termsRawText,
+    })
+    .from(accounts)
+    .leftJoin(users, eq(accounts.ownerId, users.id))
+    .leftJoin(accountFinance, eq(accountFinance.accountId, accounts.id))
+    .where(eq(accounts.workspaceId, workspaceId))
+    .orderBy(asc(accounts.name));
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    ownerName: r.ownerName ?? r.ownerEmail ?? null,
+    fee: r.fee == null ? null : Number(r.fee),
+    hasNda: !!(r.ndaStoragePath || r.ndaUrl),
+    hasBillingData: !!(r.razonSocial && r.cuit),
+    termsStatus: r.termsStatus ?? "none",
+    hasTermsText: !!(r.termsRawText && r.termsRawText.trim()),
+    closed: r.closedAt != null,
+  }));
+}
+
 export interface FinanceAccountOption {
   id: string;
   name: string;
