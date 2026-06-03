@@ -41,6 +41,7 @@ import { SignalsSection } from "@/components/account-detail/signals-section";
 import { HealthSection } from "@/components/account-detail/health-section";
 import { SectionSkeleton } from "@/components/account-detail/section-skeleton";
 import { SelectionSection } from "@/components/account-detail/selection-section";
+import { FinanceSection } from "@/components/account-detail/finance-section";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
@@ -88,6 +89,10 @@ export default async function AccountDetailPage({
 
   const isEditing = edit === "1";
   const hasAgencyContext = Boolean(workspace.agencyContext?.trim());
+  const canFinance =
+    viewerMember.financeAdmin === true ||
+    viewerMember.role === "owner" ||
+    viewerMember.role === "admin";
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -146,6 +151,15 @@ export default async function AccountDetailPage({
         accountId={accountId}
         existing={existingShareLink}
       />
+
+      {/* Finance section — visible only to finance admins, owners, and admins */}
+      {canFinance && (
+        <FinanceSection
+          accountId={accountId}
+          workspaceId={workspace.id}
+          services={workspace.services ?? []}
+        />
+      )}
 
       {/* Edit form */}
       {isEditing && (
