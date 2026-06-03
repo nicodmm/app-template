@@ -3,13 +3,19 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/drizzle/db";
-import { accounts, usageTracking } from "@/lib/drizzle/schema";
+import {
+  accounts,
+  usageTracking,
+  accountFinance,
+  accountConsultants,
+} from "@/lib/drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getMonthlyUsage, getWorkspaceMember } from "@/lib/queries/workspace";
 import { getAccountsCount, getAccountById } from "@/lib/queries/accounts";
 import { buildEnabledModulesFromForm } from "@/lib/modules-client";
 import { normalizeAccountFields } from "@/lib/ai/normalize-account-fields";
+import { ensureBaseEngagement } from "@/lib/finance/base-engagement";
 
 async function assertCanWriteAccount(
   userId: string,
@@ -126,6 +132,47 @@ export async function createAccount(formData: FormData): Promise<void> {
     await triggerEnrichment(account.id, workspace.id, websiteUrl, linkedinUrl);
   }
 
+  // Finanzas: fila account_finance con términos + consultores + engagement base.
+  const terms = ((formData.get("terms") as string) || "").trim() || null;
+  const consultantIds = (formData.getAll("consultantIds") as string[]).filter(
+    Boolean
+  );
+
+  await db.insert(accountFinance).values({
+    accountId: account.id,
+    workspaceId: workspace.id,
+    termsRawText: terms,
+  });
+
+  if (consultantIds.length) {
+    await db
+      .insert(accountConsultants)
+      .values(
+        consultantIds.map((uid) => ({
+          workspaceId: workspace.id,
+          accountId: account.id,
+          userId: uid,
+          neurona: null,
+          roleLabel: null,
+        }))
+      )
+      .onConflictDoNothing();
+  }
+
+  await ensureBaseEngagement(account.id, workspace.id, { fee, startDate });
+
+  if (terms) {
+    try {
+      const { tasks } = await import("@trigger.dev/sdk/v3");
+      await tasks.trigger("structure-finance-terms", {
+        accountId: account.id,
+        workspaceId: workspace.id,
+      });
+    } catch (err) {
+      console.error("Failed to enqueue structure-finance-terms", err);
+    }
+  }
+
   // Sync usage_tracking.accounts_count
   const newCount = await getAccountsCount(workspace.id);
   const now = new Date();
@@ -237,6 +284,9 @@ export async function updateAccount(formData: FormData): Promise<{ error?: strin
   if (websiteChanged && websiteUrl) {
     await triggerEnrichment(accountId, workspace.id, websiteUrl, linkedinUrl);
   }
+
+  // Mantener sincronizado el engagement base (fee mensual) con la cuenta.
+  await ensureBaseEngagement(accountId, workspace.id, { fee, startDate });
 
   revalidatePath(`/app/accounts/${accountId}`);
   return {};

@@ -69,20 +69,51 @@ export default async function NewAccountPage({ searchParams }: PageProps) {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="ownerId">Responsable</Label>
-          <select
-            id="ownerId"
-            name="ownerId"
-            defaultValue={userId}
-            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value="">Sin responsable</option>
-            {members.map((m) => (
-              <option key={m.userId} value={m.userId}>
-                {m.displayName}
-              </option>
-            ))}
-          </select>
+          <Label htmlFor="terms">Términos de Contratación</Label>
+          <textarea
+            id="terms"
+            name="terms"
+            rows={3}
+            placeholder="Modo de contratación y condiciones. Ej: fee mensual + los primeros 3 meses se suma un cargo por implementación de CRM."
+            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="ownerId">Responsable</Label>
+            <select
+              id="ownerId"
+              name="ownerId"
+              defaultValue={userId}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">Sin responsable</option>
+              {members.map((m) => (
+                <option key={m.userId} value={m.userId}>
+                  {m.displayName}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="consultantIds">Consultores</Label>
+            <select
+              id="consultantIds"
+              name="consultantIds"
+              multiple
+              className="flex w-full min-h-[42px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {members.map((m) => (
+                <option key={m.userId} value={m.userId}>
+                  {m.displayName}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Ctrl/Cmd para elegir varios.
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-col gap-2">

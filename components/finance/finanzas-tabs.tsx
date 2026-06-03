@@ -5,12 +5,14 @@ import { cn } from "@/lib/utils";
 import { FxEditor } from "@/components/finance/fx-editor";
 import { BillingList } from "@/components/finance/billing-list";
 import { HonorariosAdmin } from "@/components/finance/honorarios-admin";
+import { FinanceAccountsGrid } from "@/components/finance/finance-accounts-grid";
 import type {
   BillingRow,
   FxRateRow,
   BillingHistoryRow,
   LtvRow,
   FinanceAccountOption,
+  FinanceAccountCard,
   HonorarioRow,
   CompensationRow,
 } from "@/lib/queries/finance";
@@ -23,15 +25,17 @@ interface Props {
   history: BillingHistoryRow[];
   ltv: LtvRow[];
   accounts: FinanceAccountOption[];
+  accountCards: FinanceAccountCard[];
   honorarios: HonorarioRow[];
   compensationRows: CompensationRow[];
   members: Array<{ userId: string; name: string }>;
   initialTab?: TabId;
 }
 
-type TabId = "billing" | "fx" | "honorarios";
+type TabId = "accounts" | "billing" | "fx" | "honorarios";
 
 const TABS: { id: TabId; label: string }[] = [
+  { id: "accounts", label: "Cuentas" },
   { id: "billing", label: "A facturar" },
   { id: "fx", label: "TC / IPC" },
   { id: "honorarios", label: "Honorarios" },
@@ -45,12 +49,13 @@ export function FinanzasTabs({
   history,
   ltv,
   accounts,
+  accountCards,
   honorarios,
   compensationRows,
   members,
   initialTab,
 }: Props) {
-  const [tab, setTab] = useState<TabId>(initialTab ?? "billing");
+  const [tab, setTab] = useState<TabId>(initialTab ?? "accounts");
 
   return (
     <div className="space-y-5">
@@ -77,6 +82,7 @@ export function FinanzasTabs({
         ))}
       </div>
 
+      {tab === "accounts" && <FinanceAccountsGrid accounts={accountCards} />}
       {tab === "billing" && (
         <BillingList
           year={year}
