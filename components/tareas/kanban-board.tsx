@@ -226,6 +226,7 @@ export function KanbanBoard({ accountId, initialTasks, members }: KanbanBoardPro
   const router = useRouter();
   const [cols, setCols] = useState<Cols>(() => groupByColumn(initialTasks));
   const [selected, setSelected] = useState<KanbanTask | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setCols(groupByColumn(initialTasks));
@@ -253,13 +254,33 @@ export function KanbanBoard({ accountId, initialTasks, members }: KanbanBoardPro
       const overIndex = next[to].findIndex((t) => t.id === overId);
       const insertAt = overIndex >= 0 ? overIndex : next[to].length;
       next[to].splice(insertAt, 0, { ...moving, column: to });
-      void moveTask(activeId, accountId, to, insertAt).then(() => router.refresh());
+      void moveTask(activeId, accountId, to, insertAt)
+        .then((res) => {
+          if (res?.error) setError(res.error);
+          router.refresh();
+        })
+        .catch(() => {
+          setError("No se pudo mover la tarea.");
+          router.refresh();
+        });
       return next;
     });
   }
 
   return (
     <>
+      {error && (
+        <div className="mb-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive flex items-center justify-between">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="underline underline-offset-2"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="flex gap-3 overflow-x-auto pb-2">
           {TAREA_COLUMNS.map((column) => (

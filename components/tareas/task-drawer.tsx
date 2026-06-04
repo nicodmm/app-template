@@ -49,6 +49,7 @@ export function TaskDrawer({ task, accountId, members, onClose }: TaskDrawerProp
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [description, setDescription] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setDescription(task?.description ?? "");
@@ -60,18 +61,35 @@ export function TaskDrawer({ task, accountId, members, onClose }: TaskDrawerProp
     t: KanbanTask,
     fields: Parameters<typeof updateTaskFields>[2]
   ): void {
+    setError(null);
     startTransition(async () => {
-      await updateTaskFields(t.id, accountId, fields);
-      router.refresh();
+      try {
+        const res = await updateTaskFields(t.id, accountId, fields);
+        if (res?.error) {
+          setError(res.error);
+          return;
+        }
+        router.refresh();
+      } catch {
+        setError("No se pudo guardar el cambio.");
+      }
     });
   }
 
   function handleDelete(t: KanbanTask): void {
     if (!window.confirm("¿Eliminar esta tarea?")) return;
     startTransition(async () => {
-      await deleteKanbanTask(t.id, accountId);
-      onClose();
-      router.refresh();
+      try {
+        const res = await deleteKanbanTask(t.id, accountId);
+        if (res?.error) {
+          setError(res.error);
+          return;
+        }
+        onClose();
+        router.refresh();
+      } catch {
+        setError("No se pudo eliminar la tarea.");
+      }
     });
   }
 
@@ -106,6 +124,19 @@ export function TaskDrawer({ task, accountId, members, onClose }: TaskDrawerProp
         </div>
 
         <div className="space-y-5 p-4">
+          {error && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive flex items-center justify-between">
+              <span>{error}</span>
+              <button
+                type="button"
+                onClick={() => setError(null)}
+                className="underline underline-offset-2"
+              >
+                Cerrar
+              </button>
+            </div>
+          )}
+
           {/* Description */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
