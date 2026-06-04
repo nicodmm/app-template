@@ -3,6 +3,21 @@ import { extractText, getDocumentProxy } from "unpdf";
 import { createAdminClient, SELECTION_CV_BUCKET } from "@/lib/supabase/admin";
 import { toDownloadableCvUrl } from "@/lib/selection/cv-url";
 
+// El pdf.js que trae unpdf usa `Promise.try`, que no existe en el runtime de
+// Node del worker de Trigger.dev → lanza un unhandledRejection que cuelga la
+// task (MAX_DURATION). Polyfill mínimo antes de invocar unpdf.
+const P = Promise as unknown as { try?: unknown };
+if (typeof P.try !== "function") {
+  P.try = (fn: (...a: unknown[]) => unknown, ...args: unknown[]) =>
+    new Promise<unknown>((resolve, reject) => {
+      try {
+        resolve(fn(...args));
+      } catch (e) {
+        reject(e);
+      }
+    });
+}
+
 type CvSource = {
   cvStoragePath: string | null;
   cvUrl: string | null;
