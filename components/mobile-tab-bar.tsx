@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, User, BarChart2, Wallet } from "lucide-react";
+import { LayoutGrid, User, BarChart2, Wallet, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
   { label: "Dashboard", href: "/app/dashboard", Icon: BarChart2 },
   { label: "Portfolio", href: "/app/portfolio", Icon: LayoutGrid },
+  { label: "Tareas", href: "/app/tareas", Icon: ListChecks },
   { label: "Finanzas", href: "/app/finanzas", Icon: Wallet },
   { label: "Perfil", href: "/app/profile", Icon: User },
 ];
