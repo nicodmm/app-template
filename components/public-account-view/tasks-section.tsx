@@ -91,13 +91,17 @@ export function TasksSection({ rows }: Props) {
   const pending = useMemo(
     () =>
       rows.filter(
-        (t) => t.status === "pending" || t.status === "in_progress"
+        (t) => t.status !== "completed" && t.status !== "listas"
       ),
     [rows]
   );
   const completed = useMemo(
     () =>
-      [...rows.filter((t) => t.status === "completed")].sort(
+      [
+        ...rows.filter(
+          (t) => t.status === "completed" || t.status === "listas"
+        ),
+      ].sort(
         (a, b) =>
           (b.completedAt?.getTime() ?? 0) - (a.completedAt?.getTime() ?? 0)
       ),
@@ -208,7 +212,8 @@ function TaskRow({ task }: { task: PublicTask }) {
   const priority = PRIORITY_LABEL[task.priority] ?? "Media";
   const priorityCls = PRIORITY_CLS[task.priority] ?? PRIORITY_CLS[3];
   const hasContext = task.sourceExcerpt || task.sourceContext;
-  const isCompleted = task.status === "completed";
+  const isCompleted =
+    task.status === "completed" || task.status === "listas";
   return (
     <div className="py-2.5">
       <div className="flex items-start gap-3">
