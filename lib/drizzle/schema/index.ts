@@ -39,3 +39,8 @@ export * from "./account_consultants";
 export * from "./member_compensation";
 export * from "./fx_rates";
 export * from "./billing_records";
+export * from "./task_meeting_mentions";
+export * from "./task_comments";
+export * from "./task_comment_mentions";
+export * from "./task_attachments";
+export * from "./notifications";

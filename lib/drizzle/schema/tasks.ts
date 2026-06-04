@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, integer, index, boolean, date } from "drizzle-orm/pg-core";
 import { accounts } from "./accounts";
 import { workspaces } from "./workspaces";
 import { transcripts } from "./transcripts";
@@ -34,6 +34,9 @@ export const tasks = pgTable(
     sourceExcerpt: text("source_excerpt"),
     sourceContext: text("source_context"),
     priority: integer("priority").notNull().default(3),
+    isPublic: boolean("is_public").notNull().default(false),
+    dueDate: date("due_date"),
+    sortOrder: integer("sort_order").notNull().default(0),
     completedAt: timestamp("completed_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
