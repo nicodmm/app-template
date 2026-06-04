@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, User, BarChart2, Shield, Wallet } from "lucide-react";
+import { LayoutGrid, User, BarChart2, Shield, Wallet, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
@@ -16,6 +16,7 @@ interface SidebarProps {
 const navItems = [
   { label: "Dashboard", href: "/app/dashboard", icon: BarChart2 },
   { label: "Portfolio", href: "/app/portfolio", icon: LayoutGrid },
+  { label: "Tareas", href: "/app/tareas", icon: ListChecks },
   { label: "Finanzas", href: "/app/finanzas", icon: Wallet },
   { label: "Perfil", href: "/app/profile", icon: User },
 ];
