@@ -20,6 +20,7 @@ interface Input {
 
 export const generateSelectionReport = task({
   id: "generate-selection-report",
+  maxDuration: 120,
   retry: { maxAttempts: 2, minTimeoutInMs: 1000, maxTimeoutInMs: 5000, factor: 2 },
   run: async (payload: Input): Promise<{ status: string }> => {
     const [c] = await db

@@ -70,8 +70,21 @@ export async function resolveCvText(c: CvSource): Promise<string | null> {
 
     if (c.cvUrl) {
       const { url, kind } = toDownloadableCvUrl(c.cvUrl);
-      const res = await fetch(url, { redirect: "follow" });
+      // Timeout para no colgar la task si Drive no responde o devuelve un
+      // interstitial que mantiene la conexión abierta.
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20_000);
+      let res: Response;
+      try {
+        res = await fetch(url, { redirect: "follow", signal: controller.signal });
+      } finally {
+        clearTimeout(timeout);
+      }
       if (!res.ok) return null;
+      // Si Drive devuelve una página HTML (login / "no se puede escanear" /
+      // confirmación), no es el archivo: no la usamos como CV.
+      const contentType = res.headers.get("content-type")?.toLowerCase() ?? "";
+      if (contentType.includes("text/html")) return null;
       const buffer = await res.arrayBuffer();
       const text = await extractFromBytes(buffer, kind);
       return text.trim() || null;
