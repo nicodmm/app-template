@@ -151,9 +151,15 @@ export default async function AccountFinancePage({
         <TermsEditor accountId={accountId} terms={terms} members={financeMembers} />
       </GlassCard>
 
-      {/* 3. Datos de facturación y legales */}
+      {/* 3. Datos de facturación y legales. El `key` por ndaExtractedAt remonta
+          el form cuando termina la extracción del NDA, así los datos aparecen sin
+          recargar la página. */}
       <GlassCard className="p-6">
-        <FinanceBillingForm accountId={accountId} finance={finance} />
+        <FinanceBillingForm
+          key={finance?.ndaExtractedAt ? new Date(finance.ndaExtractedAt).toISOString() : "none"}
+          accountId={accountId}
+          finance={finance}
+        />
       </GlassCard>
 
       {/* 4. Equipo consultor */}

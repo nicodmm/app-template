@@ -111,6 +111,22 @@ export const extractNdaFields = task({
         return { status: "error" };
       }
 
+      // 4b. El responsable del cliente y el representante legal son la misma
+      // persona en los NDA argentinos. Si el modelo solo encontró uno, usar ese
+      // valor para ambos campos.
+      const repName =
+        (parsed.clientResponsible && parsed.clientResponsible.trim()) ||
+        (parsed.legalRepName && parsed.legalRepName.trim()) ||
+        null;
+      if (repName) {
+        if (!parsed.clientResponsible || !parsed.clientResponsible.trim()) {
+          parsed.clientResponsible = repName;
+        }
+        if (!parsed.legalRepName || !parsed.legalRepName.trim()) {
+          parsed.legalRepName = repName;
+        }
+      }
+
       // 5. Only fill fields that are currently empty/null in the existing row
       type FillFields = {
         razonSocial?: string;
