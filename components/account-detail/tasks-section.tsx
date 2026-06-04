@@ -1,7 +1,5 @@
-import { CheckSquare } from "lucide-react";
-import { CollapsibleSection } from "@/components/collapsible-section";
-import { TasksPanel } from "@/components/tasks-panel";
-import { getAccountTasks } from "@/lib/queries/tasks";
+import { getAccountKanbanTasks } from "@/lib/queries/tareas";
+import { KanbanBoard } from "@/components/tareas/kanban-board";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
 
 interface Props {
@@ -10,25 +8,27 @@ interface Props {
 }
 
 export async function TasksSection({ accountId, members }: Props) {
-  const tasks = await getAccountTasks(accountId);
-  const pendingTasks = tasks.filter((t) => t.status === "pending").length;
-  const completedTasks = tasks.length - pendingTasks;
+  const boardTasks = await getAccountKanbanTasks(accountId);
+  const total = boardTasks.length;
+  const done = boardTasks.filter((t) => t.column === "listas").length;
 
   return (
-    <CollapsibleSection
-      title="Tareas"
-      icon={<CheckSquare size={16} aria-hidden />}
-      summary={
-        tasks.length === 0
-          ? "sin tareas"
-          : `${pendingTasks} pendiente${pendingTasks !== 1 ? "s" : ""}${
-              completedTasks > 0
-                ? ` · ${completedTasks} completada${completedTasks !== 1 ? "s" : ""}`
-                : ""
-            }`
-      }
-    >
-      <TasksPanel tasks={tasks} accountId={accountId} members={members} />
-    </CollapsibleSection>
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-medium text-muted-foreground">
+          Tareas{" "}
+          {total > 0 && (
+            <span>
+              · {done}/{total} listas
+            </span>
+          )}
+        </h2>
+      </div>
+      <KanbanBoard
+        accountId={accountId}
+        initialTasks={boardTasks}
+        members={members}
+      />
+    </section>
   );
 }
