@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useMemo } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -24,7 +23,7 @@ import {
 } from "@/lib/tareas/columns";
 import type { KanbanTask } from "@/lib/queries/tareas";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
-import { moveTask, createKanbanTask } from "@/app/actions/tareas";
+import { moveTask, createKanbanTask, updateTaskFields, deleteKanbanTask } from "@/app/actions/tareas";
 import { TaskCard } from "./task-card";
 import { TaskDrawer } from "./task-drawer";
 
@@ -50,43 +49,32 @@ function findColumnOf(id: string, cols: Cols): TareaColumnKey | null {
   return null;
 }
 
+type NewTaskInput = {
+  description: string;
+  priority: number;
+  assigneeId: string | null;
+  dueDate: string | null;
+};
+
 // ── Inline new-task form ─────────────────────────────────────────────────────
 
 interface NewTaskFormProps {
-  accountId: string;
-  column: TareaColumnKey;
   members: WorkspaceMemberWithUser[];
+  onCreate: (input: NewTaskInput) => void;
   onDone: () => void;
 }
 
-function NewTaskForm({ accountId, column, members, onDone }: NewTaskFormProps) {
+function NewTaskForm({ members, onCreate, onDone }: NewTaskFormProps) {
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState(3);
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const router = useRouter();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    startTransition(async () => {
-      const result = await createKanbanTask(
-        accountId,
-        column,
-        description,
-        priority,
-        assigneeId,
-        dueDate || null
-      );
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      router.refresh();
-      onDone();
-    });
+    if (!description.trim()) return;
+    onCreate({ description, priority, assigneeId, dueDate: dueDate || null });
+    onDone();
   }
 
   return (
@@ -141,13 +129,12 @@ function NewTaskForm({ accountId, column, members, onDone }: NewTaskFormProps) {
         </button>
         <button
           type="submit"
-          disabled={isPending || !description.trim()}
+          disabled={!description.trim()}
           className="flex-1 rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
-          {isPending ? "..." : "Agregar"}
+          Agregar
         </button>
       </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
     </form>
   );
 }
@@ -157,12 +144,12 @@ function NewTaskForm({ accountId, column, members, onDone }: NewTaskFormProps) {
 interface ColumnProps {
   columnKey: TareaColumnKey;
   tasks: KanbanTask[];
-  accountId: string;
   members: WorkspaceMemberWithUser[];
   onOpen: (task: KanbanTask) => void;
+  onCreate: (column: TareaColumnKey, input: NewTaskInput) => void;
 }
 
-function Column({ columnKey, tasks, accountId, members, onOpen }: ColumnProps) {
+function Column({ columnKey, tasks, members, onOpen, onCreate }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: columnKey });
   const [showForm, setShowForm] = useState(false);
 
@@ -188,9 +175,8 @@ function Column({ columnKey, tasks, accountId, members, onOpen }: ColumnProps) {
       {showForm && (
         <div className="mb-2">
           <NewTaskForm
-            accountId={accountId}
-            column={columnKey}
             members={members}
+            onCreate={(input) => onCreate(columnKey, input)}
             onDone={() => setShowForm(false)}
           />
         </div>
@@ -223,18 +209,39 @@ function Column({ columnKey, tasks, accountId, members, onOpen }: ColumnProps) {
 // ── Board ────────────────────────────────────────────────────────────────────
 
 export function KanbanBoard({ accountId, initialTasks, members }: KanbanBoardProps) {
-  const router = useRouter();
-  const [cols, setCols] = useState<Cols>(() => groupByColumn(initialTasks));
-  const [selected, setSelected] = useState<KanbanTask | null>(null);
+  const [tasks, setTasks] = useState<KanbanTask[]>(initialTasks);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Re-sync con el servidor cuando cambian los datos iniciales (navegación / carga).
   useEffect(() => {
-    setCols(groupByColumn(initialTasks));
+    setTasks(initialTasks);
   }, [initialTasks]);
+
+  const cols = useMemo(() => groupByColumn(tasks), [tasks]);
+  const selectedTask = tasks.find((t) => t.id === selectedId) ?? null;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
+
+  function applyServer(
+    prevTasks: KanbanTask[],
+    run: () => Promise<{ error?: string } | undefined>,
+    failMsg: string
+  ): void {
+    run()
+      .then((res) => {
+        if (res?.error) {
+          setTasks(prevTasks);
+          setError(res.error);
+        }
+      })
+      .catch(() => {
+        setTasks(prevTasks);
+        setError(failMsg);
+      });
+  }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -246,25 +253,113 @@ export function KanbanBoard({ accountId, initialTasks, members }: KanbanBoardPro
       ? (overId as TareaColumnKey)
       : findColumnOf(overId, cols);
     if (!from || !to) return;
-    setCols((prev) => {
-      const next = { ...prev, [from]: [...prev[from]], [to]: [...prev[to]] };
-      const moving = next[from].find((t) => t.id === activeId);
-      if (!moving) return prev;
-      next[from] = next[from].filter((t) => t.id !== activeId);
-      const overIndex = next[to].findIndex((t) => t.id === overId);
-      const insertAt = overIndex >= 0 ? overIndex : next[to].length;
-      next[to].splice(insertAt, 0, { ...moving, column: to });
-      void moveTask(activeId, accountId, to, insertAt)
-        .then((res) => {
-          if (res?.error) setError(res.error);
-          router.refresh();
-        })
-        .catch(() => {
-          setError("No se pudo mover la tarea.");
-          router.refresh();
-        });
-      return next;
-    });
+
+    const prevTasks = tasks;
+    const next = { ...cols, [from]: [...cols[from]], [to]: [...cols[to]] };
+    const moving = next[from].find((t) => t.id === activeId);
+    if (!moving) return;
+    next[from] = next[from].filter((t) => t.id !== activeId);
+    const overIndex = next[to].findIndex((t) => t.id === overId);
+    const insertAt = overIndex >= 0 ? overIndex : next[to].length;
+    next[to].splice(insertAt, 0, { ...moving, column: to });
+    const flat = TAREA_COLUMN_KEYS.flatMap((k) => next[k]);
+    setTasks(flat);
+    applyServer(
+      prevTasks,
+      () => moveTask(activeId, accountId, to, insertAt),
+      "No se pudo mover la tarea."
+    );
+  }
+
+  function updateTask(
+    taskId: string,
+    fields: Parameters<typeof updateTaskFields>[2]
+  ): void {
+    const prevTasks = tasks;
+    setTasks((cur) =>
+      cur.map((t) => {
+        if (t.id !== taskId) return t;
+        const patched: KanbanTask = { ...t, ...fields };
+        if (fields.assigneeId !== undefined) {
+          const m = members.find((mm) => mm.userId === fields.assigneeId);
+          patched.assigneeName = m ? m.displayName : null;
+        }
+        return patched;
+      })
+    );
+    applyServer(
+      prevTasks,
+      () => updateTaskFields(taskId, accountId, fields),
+      "No se pudo guardar el cambio."
+    );
+  }
+
+  function deleteTask(taskId: string): void {
+    const prevTasks = tasks;
+    setTasks((cur) => cur.filter((t) => t.id !== taskId));
+    applyServer(
+      prevTasks,
+      () => deleteKanbanTask(taskId, accountId),
+      "No se pudo eliminar la tarea."
+    );
+  }
+
+  function createTask(
+    column: TareaColumnKey,
+    input: NewTaskInput
+  ): void {
+    const prevTasks = tasks;
+    const tempId = `temp-${column}-${tasks.length}-${input.description.slice(0, 8)}`;
+    const m = input.assigneeId ? members.find((mm) => mm.userId === input.assigneeId) : null;
+    const optimistic: KanbanTask = {
+      id: tempId,
+      accountId,
+      workspaceId: "",
+      transcriptId: null,
+      contextDocumentId: null,
+      createdBy: null,
+      assigneeId: input.assigneeId,
+      description: input.description.trim(),
+      status: column,
+      source: "manual",
+      sourceExcerpt: null,
+      sourceContext: null,
+      priority: input.priority,
+      isPublic: false,
+      dueDate: input.dueDate,
+      sortOrder: Number.MAX_SAFE_INTEGER,
+      completedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      column,
+      meetingDate: null,
+      meetingCreatedAt: null,
+      transcriptFileName: null,
+      assigneeName: m ? m.displayName : null,
+      mentionCount: 0,
+    };
+    setTasks((cur) => [...cur, optimistic]);
+    createKanbanTask(
+      accountId,
+      column,
+      input.description,
+      input.priority,
+      input.assigneeId,
+      input.dueDate
+    )
+      .then((res) => {
+        if (res.error || !res.id) {
+          setTasks(prevTasks);
+          setError(res.error ?? "No se pudo crear la tarea.");
+          return;
+        }
+        const realId = res.id;
+        setTasks((cur) => cur.map((t) => (t.id === tempId ? { ...t, id: realId } : t)));
+      })
+      .catch(() => {
+        setTasks(prevTasks);
+        setError("No se pudo crear la tarea.");
+      });
   }
 
   return (
@@ -288,19 +383,27 @@ export function KanbanBoard({ accountId, initialTasks, members }: KanbanBoardPro
               key={column.key}
               columnKey={column.key}
               tasks={cols[column.key]}
-              accountId={accountId}
               members={members}
-              onOpen={setSelected}
+              onOpen={(t) => setSelectedId(t.id)}
+              onCreate={createTask}
             />
           ))}
         </div>
       </DndContext>
 
       <TaskDrawer
-        task={selected}
-        accountId={accountId}
+        task={selectedTask}
         members={members}
-        onClose={() => setSelected(null)}
+        onUpdate={(fields) => {
+          if (selectedId) updateTask(selectedId, fields);
+        }}
+        onDelete={() => {
+          if (selectedId) {
+            deleteTask(selectedId);
+            setSelectedId(null);
+          }
+        }}
+        onClose={() => setSelectedId(null)}
       />
     </>
   );

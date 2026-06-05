@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import {
   X,
   Eye,
@@ -19,12 +18,18 @@ import {
 } from "@/lib/tareas/columns";
 import type { KanbanTask } from "@/lib/queries/tareas";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
-import { updateTaskFields, deleteKanbanTask } from "@/app/actions/tareas";
 
 interface TaskDrawerProps {
   task: KanbanTask | null;
-  accountId: string;
   members: WorkspaceMemberWithUser[];
+  onUpdate: (fields: {
+    description?: string;
+    priority?: number;
+    assigneeId?: string | null;
+    dueDate?: string | null;
+    isPublic?: boolean;
+  }) => void;
+  onDelete: () => void;
   onClose: () => void;
 }
 
@@ -45,52 +50,18 @@ function formatMeetingDate(
   });
 }
 
-export function TaskDrawer({ task, accountId, members, onClose }: TaskDrawerProps) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+export function TaskDrawer({ task, members, onUpdate, onDelete, onClose }: TaskDrawerProps) {
   const [description, setDescription] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setDescription(task?.description ?? "");
-  }, [task]);
+  }, [task?.id, task?.description]);
 
   if (task === null) return null;
 
-  function save(
-    t: KanbanTask,
-    fields: Parameters<typeof updateTaskFields>[2]
-  ): void {
-    setError(null);
-    startTransition(async () => {
-      try {
-        const res = await updateTaskFields(t.id, accountId, fields);
-        if (res?.error) {
-          setError(res.error);
-          return;
-        }
-        router.refresh();
-      } catch {
-        setError("No se pudo guardar el cambio.");
-      }
-    });
-  }
-
-  function handleDelete(t: KanbanTask): void {
+  function handleDelete(): void {
     if (!window.confirm("¿Eliminar esta tarea?")) return;
-    startTransition(async () => {
-      try {
-        const res = await deleteKanbanTask(t.id, accountId);
-        if (res?.error) {
-          setError(res.error);
-          return;
-        }
-        onClose();
-        router.refresh();
-      } catch {
-        setError("No se pudo eliminar la tarea.");
-      }
-    });
+    onDelete();
   }
 
   const priority = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG[3];
@@ -103,7 +74,7 @@ export function TaskDrawer({ task, accountId, members, onClose }: TaskDrawerProp
         onClick={onClose}
         className="absolute inset-0 bg-foreground/20 backdrop-blur-[2px]"
       />
-      <div className="absolute right-0 top-0 h-full w-full max-w-md overflow-y-auto border-l border-border bg-card shadow-xl">
+      <div className="absolute right-0 top-0 h-full w-full sm:max-w-2xl overflow-y-auto border-l border-border bg-card shadow-xl">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-4 py-3">
           <span className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <span
@@ -124,19 +95,6 @@ export function TaskDrawer({ task, accountId, members, onClose }: TaskDrawerProp
         </div>
 
         <div className="space-y-5 p-4">
-          {error && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive flex items-center justify-between">
-              <span>{error}</span>
-              <button
-                type="button"
-                onClick={() => setError(null)}
-                className="underline underline-offset-2"
-              >
-                Cerrar
-              </button>
-            </div>
-          )}
-
           {/* Description */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
@@ -147,7 +105,7 @@ export function TaskDrawer({ task, accountId, members, onClose }: TaskDrawerProp
               onChange={(e) => setDescription(e.target.value)}
               onBlur={() => {
                 if (description.trim() && description.trim() !== task.description) {
-                  save(task, { description });
+                  onUpdate({ description });
                 }
               }}
               rows={3}
@@ -162,8 +120,7 @@ export function TaskDrawer({ task, accountId, members, onClose }: TaskDrawerProp
             </label>
             <select
               value={task.assigneeId ?? ""}
-              disabled={isPending}
-              onChange={(e) => save(task, { assigneeId: e.target.value || null })}
+              onChange={(e) => onUpdate({ assigneeId: e.target.value || null })}
               className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="">Sin asignar</option>
@@ -183,8 +140,7 @@ export function TaskDrawer({ task, accountId, members, onClose }: TaskDrawerProp
             <input
               type="date"
               value={task.dueDate ?? ""}
-              disabled={isPending}
-              onChange={(e) => save(task, { dueDate: e.target.value || null })}
+              onChange={(e) => onUpdate({ dueDate: e.target.value || null })}
               className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
@@ -196,8 +152,7 @@ export function TaskDrawer({ task, accountId, members, onClose }: TaskDrawerProp
             </label>
             <select
               value={task.priority}
-              disabled={isPending}
-              onChange={(e) => save(task, { priority: Number(e.target.value) })}
+              onChange={(e) => onUpdate({ priority: Number(e.target.value) })}
               className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {Object.entries(PRIORITY_CONFIG).map(([p, { label }]) => (
@@ -220,8 +175,7 @@ export function TaskDrawer({ task, accountId, members, onClose }: TaskDrawerProp
             </div>
             <button
               type="button"
-              disabled={isPending}
-              onClick={() => save(task, { isPublic: !task.isPublic })}
+              onClick={() => onUpdate({ isPublic: !task.isPublic })}
               className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
                 task.isPublic ? "bg-emerald-500" : "bg-muted-foreground/30"
               }`}
@@ -297,8 +251,7 @@ export function TaskDrawer({ task, accountId, members, onClose }: TaskDrawerProp
           {/* Delete */}
           <button
             type="button"
-            disabled={isPending}
-            onClick={() => handleDelete(task)}
+            onClick={handleDelete}
             className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
           >
             <Trash2 size={13} /> Eliminar tarea
