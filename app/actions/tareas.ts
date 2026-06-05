@@ -60,7 +60,7 @@ export async function createKanbanTask(
   priority: number,
   assigneeId: string | null,
   dueDate: string | null
-): Promise<{ error?: string }> {
+): Promise<{ id?: string; error?: string }> {
   const { workspaceId, userId } = await authorize(accountId);
   if (!isColumn(column)) return { error: "Columna inválida" };
   if (!description.trim()) return { error: "La descripción es requerida" };
@@ -70,20 +70,23 @@ export async function createKanbanTask(
     .from(tasks)
     .where(and(eq(tasks.accountId, accountId), eq(tasks.status, column)));
 
-  await db.insert(tasks).values({
-    accountId,
-    workspaceId,
-    createdBy: userId,
-    assigneeId: assigneeId || null,
-    description: description.trim(),
-    priority,
-    status: column,
-    source: "manual",
-    sortOrder: Number(maxOrder) + 1,
-    dueDate: dueDate || null,
-  });
+  const [created] = await db
+    .insert(tasks)
+    .values({
+      accountId,
+      workspaceId,
+      createdBy: userId,
+      assigneeId: assigneeId || null,
+      description: description.trim(),
+      priority,
+      status: column,
+      source: "manual",
+      sortOrder: Number(maxOrder) + 1,
+      dueDate: dueDate || null,
+    })
+    .returning({ id: tasks.id });
   revalidate(accountId);
-  return {};
+  return { id: created.id };
 }
 
 export async function updateTaskFields(
