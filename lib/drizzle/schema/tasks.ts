@@ -28,6 +28,7 @@ export const tasks = pgTable(
     assigneeId: uuid("assignee_id").references(() => users.id, {
       onDelete: "set null",
     }),
+    title: text("title"),
     description: text("description").notNull(),
     status: text("status").notNull().default("pending"),
     source: text("source").notNull().default("ai_extracted"),

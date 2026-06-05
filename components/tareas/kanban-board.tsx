@@ -319,6 +319,7 @@ export function KanbanBoard({ accountId, initialTasks, members }: KanbanBoardPro
       contextDocumentId: null,
       createdBy: null,
       assigneeId: input.assigneeId,
+      title: null,
       description: input.description.trim(),
       status: column,
       source: "manual",
