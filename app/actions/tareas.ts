@@ -152,12 +152,31 @@ export async function createLabel(
   return { label: { id: created.id, name: created.name, color: created.color } };
 }
 
+/** Verifica que la tarea pertenezca a la cuenta autorizada. */
+async function assertTaskInAccount(taskId: string, accountId: string): Promise<boolean> {
+  const [t] = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(and(eq(tasks.id, taskId), eq(tasks.accountId, accountId)))
+    .limit(1);
+  return !!t;
+}
+
 export async function assignLabel(
   taskId: string,
   accountId: string,
   labelId: string
 ): Promise<{ error?: string }> {
-  await authorize(accountId);
+  const { workspaceId } = await authorize(accountId);
+  if (!(await assertTaskInAccount(taskId, accountId)))
+    return { error: "Tarea no encontrada" };
+  // La etiqueta debe pertenecer al workspace de la cuenta.
+  const [lbl] = await db
+    .select({ id: taskLabels.id })
+    .from(taskLabels)
+    .where(and(eq(taskLabels.id, labelId), eq(taskLabels.workspaceId, workspaceId)))
+    .limit(1);
+  if (!lbl) return { error: "Etiqueta no encontrada" };
   await db
     .insert(taskLabelAssignments)
     .values({ taskId, labelId })
@@ -172,6 +191,8 @@ export async function unassignLabel(
   labelId: string
 ): Promise<{ error?: string }> {
   await authorize(accountId);
+  if (!(await assertTaskInAccount(taskId, accountId)))
+    return { error: "Tarea no encontrada" };
   await db
     .delete(taskLabelAssignments)
     .where(
