@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import {
   X,
+  Plus,
   Eye,
   EyeOff,
   Trash2,
@@ -16,13 +17,18 @@ import {
   PRIORITY_CONFIG,
   columnLabel,
 } from "@/lib/tareas/columns";
-import type { KanbanTask } from "@/lib/queries/tareas";
+import { labelChipClass, labelDotClass, LABEL_COLORS, type LabelColorKey } from "@/lib/tareas/labels";
+import type { KanbanTask, TaskLabel } from "@/lib/queries/tareas";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
 
 interface TaskDrawerProps {
   task: KanbanTask | null;
   members: WorkspaceMemberWithUser[];
+  labelCatalog: TaskLabel[];
   onUpdate: (fields: { title?: string; description?: string; priority?: number; assigneeId?: string | null; dueDate?: string | null; isPublic?: boolean }) => void;
+  onAssignLabel: (label: TaskLabel) => void;
+  onUnassignLabel: (labelId: string) => void;
+  onCreateLabel: (name: string, color: string) => void;
   onDelete: () => void;
   onClose: () => void;
 }
@@ -44,9 +50,22 @@ function formatMeetingDate(
   });
 }
 
-export function TaskDrawer({ task, members, onUpdate, onDelete, onClose }: TaskDrawerProps) {
+export function TaskDrawer({
+  task,
+  members,
+  labelCatalog,
+  onUpdate,
+  onAssignLabel,
+  onUnassignLabel,
+  onCreateLabel,
+  onDelete,
+  onClose,
+}: TaskDrawerProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [labelPanelOpen, setLabelPanelOpen] = useState(false);
+  const [newLabelName, setNewLabelName] = useState("");
+  const [newLabelColor, setNewLabelColor] = useState<LabelColorKey>(LABEL_COLORS[0].key);
 
   useEffect(() => {
     setTitle(task?.title ?? "");
@@ -202,6 +221,109 @@ export function TaskDrawer({ task, members, onUpdate, onDelete, onClose }: TaskD
                 }`}
               />
             </button>
+          </div>
+
+          {/* Labels */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">
+              Etiquetas
+            </label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {task.labels.map((l) => (
+                <span
+                  key={l.id}
+                  className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ${labelChipClass(l.color)}`}
+                >
+                  {l.name}
+                  <button
+                    type="button"
+                    onClick={() => onUnassignLabel(l.id)}
+                    className="rounded-full hover:bg-foreground/10"
+                    aria-label={`Quitar etiqueta ${l.name}`}
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              ))}
+              <button
+                type="button"
+                onClick={() => setLabelPanelOpen((v) => !v)}
+                className="inline-flex items-center gap-0.5 rounded border border-dashed border-border px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              >
+                <Plus size={11} /> Etiqueta
+              </button>
+            </div>
+
+            {labelPanelOpen && (
+              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+                {(() => {
+                  const available = labelCatalog.filter(
+                    (c) => !task.labels.some((l) => l.id === c.id)
+                  );
+                  return available.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {available.map((label) => (
+                        <button
+                          key={label.id}
+                          type="button"
+                          onClick={() => {
+                            onAssignLabel(label);
+                            setLabelPanelOpen(false);
+                          }}
+                          className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${labelChipClass(label.color)}`}
+                        >
+                          {label.name}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground/70">
+                      No hay más etiquetas disponibles.
+                    </p>
+                  );
+                })()}
+
+                <div className="space-y-2 border-t border-border pt-3">
+                  <p className="text-[11px] font-medium text-muted-foreground">
+                    Crear nueva
+                  </p>
+                  <input
+                    type="text"
+                    value={newLabelName}
+                    onChange={(e) => setNewLabelName(e.target.value)}
+                    placeholder="Nombre de la etiqueta..."
+                    className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {LABEL_COLORS.map((c) => (
+                      <button
+                        key={c.key}
+                        type="button"
+                        onClick={() => setNewLabelColor(c.key)}
+                        aria-label={`Color ${c.key}`}
+                        className={`h-5 w-5 rounded-full ${labelDotClass(c.key)} ${
+                          c.key === newLabelColor
+                            ? "ring-2 ring-ring ring-offset-1 ring-offset-background"
+                            : ""
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!newLabelName.trim()}
+                    onClick={() => {
+                      onCreateLabel(newLabelName, newLabelColor);
+                      setNewLabelName("");
+                      setLabelPanelOpen(false);
+                    }}
+                    className="inline-flex items-center justify-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  >
+                    Crear
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Meeting origin */}

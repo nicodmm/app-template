@@ -1,8 +1,10 @@
 "use server";
 
 import { db } from "@/lib/drizzle/db";
-import { tasks } from "@/lib/drizzle/schema";
+import { tasks, taskLabels, taskLabelAssignments } from "@/lib/drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
+import { isLabelColor } from "@/lib/tareas/labels";
+import type { TaskLabel } from "@/lib/queries/tareas";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId } from "@/lib/queries/workspace";
 import { canAccessAccountTasks } from "@/lib/queries/task-access";
@@ -130,6 +132,75 @@ export async function deleteKanbanTask(
   await db
     .delete(tasks)
     .where(and(eq(tasks.id, taskId), eq(tasks.workspaceId, workspaceId), eq(tasks.accountId, accountId)));
+  revalidate(accountId);
+  return {};
+}
+
+export async function createLabel(
+  accountId: string,
+  name: string,
+  color: string
+): Promise<{ label?: TaskLabel; error?: string }> {
+  const { workspaceId } = await authorize(accountId);
+  if (!name.trim()) return { error: "El nombre es requerido" };
+  if (!isLabelColor(color)) return { error: "Color inválido" };
+  const [created] = await db
+    .insert(taskLabels)
+    .values({ workspaceId, name: name.trim(), color })
+    .returning({ id: taskLabels.id, name: taskLabels.name, color: taskLabels.color });
+  revalidate(accountId);
+  return { label: { id: created.id, name: created.name, color: created.color } };
+}
+
+/** Verifica que la tarea pertenezca a la cuenta autorizada. */
+async function assertTaskInAccount(taskId: string, accountId: string): Promise<boolean> {
+  const [t] = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(and(eq(tasks.id, taskId), eq(tasks.accountId, accountId)))
+    .limit(1);
+  return !!t;
+}
+
+export async function assignLabel(
+  taskId: string,
+  accountId: string,
+  labelId: string
+): Promise<{ error?: string }> {
+  const { workspaceId } = await authorize(accountId);
+  if (!(await assertTaskInAccount(taskId, accountId)))
+    return { error: "Tarea no encontrada" };
+  // La etiqueta debe pertenecer al workspace de la cuenta.
+  const [lbl] = await db
+    .select({ id: taskLabels.id })
+    .from(taskLabels)
+    .where(and(eq(taskLabels.id, labelId), eq(taskLabels.workspaceId, workspaceId)))
+    .limit(1);
+  if (!lbl) return { error: "Etiqueta no encontrada" };
+  await db
+    .insert(taskLabelAssignments)
+    .values({ taskId, labelId })
+    .onConflictDoNothing();
+  revalidate(accountId);
+  return {};
+}
+
+export async function unassignLabel(
+  taskId: string,
+  accountId: string,
+  labelId: string
+): Promise<{ error?: string }> {
+  await authorize(accountId);
+  if (!(await assertTaskInAccount(taskId, accountId)))
+    return { error: "Tarea no encontrada" };
+  await db
+    .delete(taskLabelAssignments)
+    .where(
+      and(
+        eq(taskLabelAssignments.taskId, taskId),
+        eq(taskLabelAssignments.labelId, labelId)
+      )
+    );
   revalidate(accountId);
   return {};
 }

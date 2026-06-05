@@ -21,9 +21,17 @@ import {
   PRIORITY_CONFIG,
   type TareaColumnKey,
 } from "@/lib/tareas/columns";
-import type { KanbanTask } from "@/lib/queries/tareas";
+import type { KanbanTask, TaskLabel } from "@/lib/queries/tareas";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
-import { moveTask, createKanbanTask, updateTaskFields, deleteKanbanTask } from "@/app/actions/tareas";
+import {
+  moveTask,
+  createKanbanTask,
+  updateTaskFields,
+  deleteKanbanTask,
+  createLabel,
+  assignLabel,
+  unassignLabel,
+} from "@/app/actions/tareas";
 import { TaskCard } from "./task-card";
 import { TaskDrawer } from "./task-drawer";
 
@@ -31,6 +39,7 @@ interface KanbanBoardProps {
   accountId: string;
   initialTasks: KanbanTask[];
   members: WorkspaceMemberWithUser[];
+  labels: TaskLabel[];
 }
 
 type Cols = Record<TareaColumnKey, KanbanTask[]>;
@@ -208,15 +217,18 @@ function Column({ columnKey, tasks, members, onOpen, onCreate }: ColumnProps) {
 
 // ── Board ────────────────────────────────────────────────────────────────────
 
-export function KanbanBoard({ accountId, initialTasks, members }: KanbanBoardProps) {
+export function KanbanBoard({ accountId, initialTasks, members, labels }: KanbanBoardProps) {
   const [tasks, setTasks] = useState<KanbanTask[]>(initialTasks);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [labelCatalog, setLabelCatalog] = useState<TaskLabel[]>(labels);
 
   // Re-sync con el servidor cuando cambian los datos iniciales (navegación / carga).
   useEffect(() => {
     setTasks(initialTasks);
   }, [initialTasks]);
+
+  useEffect(() => setLabelCatalog(labels), [labels]);
 
   const cols = useMemo(() => groupByColumn(tasks), [tasks]);
   const selectedTask = tasks.find((t) => t.id === selectedId) ?? null;
@@ -304,6 +316,42 @@ export function KanbanBoard({ accountId, initialTasks, members }: KanbanBoardPro
     );
   }
 
+  function assignTaskLabel(taskId: string, label: TaskLabel): void {
+    const prevTasks = tasks;
+    setTasks((cur) =>
+      cur.map((t) =>
+        t.id === taskId && !t.labels.some((l) => l.id === label.id)
+          ? { ...t, labels: [...t.labels, label] }
+          : t
+      )
+    );
+    applyServer(prevTasks, () => assignLabel(taskId, accountId, label.id), "No se pudo asignar la etiqueta.");
+  }
+
+  function unassignTaskLabel(taskId: string, labelId: string): void {
+    const prevTasks = tasks;
+    setTasks((cur) =>
+      cur.map((t) =>
+        t.id === taskId ? { ...t, labels: t.labels.filter((l) => l.id !== labelId) } : t
+      )
+    );
+    applyServer(prevTasks, () => unassignLabel(taskId, accountId, labelId), "No se pudo quitar la etiqueta.");
+  }
+
+  function createAndAssignLabel(taskId: string, name: string, color: string): void {
+    createLabel(accountId, name, color)
+      .then((res) => {
+        if (res.error || !res.label) {
+          setError(res.error ?? "No se pudo crear la etiqueta.");
+          return;
+        }
+        const label = res.label;
+        setLabelCatalog((cur) => [...cur, label].sort((a, b) => a.name.localeCompare(b.name)));
+        assignTaskLabel(taskId, label);
+      })
+      .catch(() => setError("No se pudo crear la etiqueta."));
+  }
+
   function createTask(
     column: TareaColumnKey,
     input: NewTaskInput
@@ -338,6 +386,7 @@ export function KanbanBoard({ accountId, initialTasks, members }: KanbanBoardPro
       transcriptFileName: null,
       assigneeName: m ? m.displayName : null,
       mentionCount: 0,
+      labels: [],
     };
     setTasks((cur) => [...cur, optimistic]);
     createKanbanTask(
@@ -395,9 +444,13 @@ export function KanbanBoard({ accountId, initialTasks, members }: KanbanBoardPro
       <TaskDrawer
         task={selectedTask}
         members={members}
+        labelCatalog={labelCatalog}
         onUpdate={(fields) => {
           if (selectedId) updateTask(selectedId, fields);
         }}
+        onAssignLabel={(label) => { if (selectedId) assignTaskLabel(selectedId, label); }}
+        onUnassignLabel={(labelId) => { if (selectedId) unassignTaskLabel(selectedId, labelId); }}
+        onCreateLabel={(name, color) => { if (selectedId) createAndAssignLabel(selectedId, name, color); }}
         onDelete={() => {
           if (selectedId) {
             deleteTask(selectedId);

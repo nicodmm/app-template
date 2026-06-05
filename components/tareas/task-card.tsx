@@ -11,6 +11,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { PRIORITY_CONFIG } from "@/lib/tareas/columns";
+import { labelChipClass } from "@/lib/tareas/labels";
 import type { KanbanTask } from "@/lib/queries/tareas";
 
 interface TaskCardProps {
@@ -74,6 +75,18 @@ export function TaskCard({ task, onOpen }: TaskCardProps) {
           onClick={() => onOpen(task)}
           className="flex-1 min-w-0 text-left"
         >
+          {task.labels.length > 0 && (
+            <div className="mb-1 flex flex-wrap gap-1">
+              {task.labels.map((l) => (
+                <span
+                  key={l.id}
+                  className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${labelChipClass(l.color)}`}
+                >
+                  {l.name}
+                </span>
+              ))}
+            </div>
+          )}
           <p className="line-clamp-2 leading-snug font-medium">{task.title || task.description}</p>
 
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

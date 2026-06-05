@@ -1,4 +1,4 @@
-import { getAccountKanbanTasks } from "@/lib/queries/tareas";
+import { getAccountKanbanTasks, listAccountTaskLabels } from "@/lib/queries/tareas";
 import { KanbanBoard } from "@/components/tareas/kanban-board";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
 
@@ -8,7 +8,10 @@ interface Props {
 }
 
 export async function TasksSection({ accountId, members }: Props) {
-  const boardTasks = await getAccountKanbanTasks(accountId);
+  const [boardTasks, labels] = await Promise.all([
+    getAccountKanbanTasks(accountId),
+    listAccountTaskLabels(accountId),
+  ]);
   const total = boardTasks.length;
   const done = boardTasks.filter((t) => t.column === "listas").length;
 
@@ -28,6 +31,7 @@ export async function TasksSection({ accountId, members }: Props) {
         accountId={accountId}
         initialTasks={boardTasks}
         members={members}
+        labels={labels}
       />
     </section>
   );
