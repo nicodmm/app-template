@@ -56,14 +56,14 @@ export async function moveTask(
 export async function createKanbanTask(
   accountId: string,
   column: string,
-  description: string,
+  title: string,
   priority: number,
   assigneeId: string | null,
   dueDate: string | null
 ): Promise<{ id?: string; error?: string }> {
   const { workspaceId, userId } = await authorize(accountId);
   if (!isColumn(column)) return { error: "Columna inválida" };
-  if (!description.trim()) return { error: "La descripción es requerida" };
+  if (!title.trim()) return { error: "El título es requerido" };
 
   const [{ maxOrder }] = await db
     .select({ maxOrder: sql<number>`coalesce(max(${tasks.sortOrder}), 0)` })
@@ -77,7 +77,8 @@ export async function createKanbanTask(
       workspaceId,
       createdBy: userId,
       assigneeId: assigneeId || null,
-      description: description.trim(),
+      title: title.trim(),
+      description: "",
       priority,
       status: column,
       source: "manual",
@@ -93,6 +94,7 @@ export async function updateTaskFields(
   taskId: string,
   accountId: string,
   fields: {
+    title?: string;
     description?: string;
     priority?: number;
     assigneeId?: string | null;
@@ -102,6 +104,7 @@ export async function updateTaskFields(
 ): Promise<{ error?: string }> {
   const { workspaceId } = await authorize(accountId);
   const patch: Partial<typeof tasks.$inferInsert> = { updatedAt: new Date() };
+  if (fields.title !== undefined) patch.title = fields.title.trim() || null;
   if (fields.description !== undefined) {
     if (!fields.description.trim()) return { error: "La descripción es requerida" };
     patch.description = fields.description.trim();

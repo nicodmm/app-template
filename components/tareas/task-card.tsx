@@ -74,7 +74,7 @@ export function TaskCard({ task, onOpen }: TaskCardProps) {
           onClick={() => onOpen(task)}
           className="flex-1 min-w-0 text-left"
         >
-          <p className="line-clamp-2 leading-snug">{task.description}</p>
+          <p className="line-clamp-2 leading-snug font-medium">{task.title || task.description}</p>
 
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <span

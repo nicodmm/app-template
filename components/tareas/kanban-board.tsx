@@ -50,7 +50,7 @@ function findColumnOf(id: string, cols: Cols): TareaColumnKey | null {
 }
 
 type NewTaskInput = {
-  description: string;
+  title: string;
   priority: number;
   assigneeId: string | null;
   dueDate: string | null;
@@ -65,15 +65,15 @@ interface NewTaskFormProps {
 }
 
 function NewTaskForm({ members, onCreate, onDone }: NewTaskFormProps) {
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState("");
   const [priority, setPriority] = useState(3);
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState("");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!description.trim()) return;
-    onCreate({ description, priority, assigneeId, dueDate: dueDate || null });
+    if (!title.trim()) return;
+    onCreate({ title, priority, assigneeId, dueDate: dueDate || null });
     onDone();
   }
 
@@ -82,13 +82,13 @@ function NewTaskForm({ members, onCreate, onDone }: NewTaskFormProps) {
       onSubmit={handleSubmit}
       className="rounded-lg border border-primary/30 bg-primary/5 p-2 space-y-2"
     >
-      <textarea
+      <input
+        type="text"
         autoFocus
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Descripción de la tarea..."
-        rows={2}
-        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Título de la tarea..."
+        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
       <select
         value={priority}
@@ -129,7 +129,7 @@ function NewTaskForm({ members, onCreate, onDone }: NewTaskFormProps) {
         </button>
         <button
           type="submit"
-          disabled={!description.trim()}
+          disabled={!title.trim()}
           className="flex-1 rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
           Agregar
@@ -309,7 +309,7 @@ export function KanbanBoard({ accountId, initialTasks, members }: KanbanBoardPro
     input: NewTaskInput
   ): void {
     const prevTasks = tasks;
-    const tempId = `temp-${column}-${tasks.length}-${input.description.slice(0, 8)}`;
+    const tempId = `temp-${column}-${tasks.length}-${input.title.slice(0, 8)}`;
     const m = input.assigneeId ? members.find((mm) => mm.userId === input.assigneeId) : null;
     const optimistic: KanbanTask = {
       id: tempId,
@@ -319,7 +319,8 @@ export function KanbanBoard({ accountId, initialTasks, members }: KanbanBoardPro
       contextDocumentId: null,
       createdBy: null,
       assigneeId: input.assigneeId,
-      description: input.description.trim(),
+      title: input.title.trim(),
+      description: "",
       status: column,
       source: "manual",
       sourceExcerpt: null,
@@ -342,7 +343,7 @@ export function KanbanBoard({ accountId, initialTasks, members }: KanbanBoardPro
     createKanbanTask(
       accountId,
       column,
-      input.description,
+      input.title,
       input.priority,
       input.assigneeId,
       input.dueDate

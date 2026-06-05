@@ -22,13 +22,7 @@ import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
 interface TaskDrawerProps {
   task: KanbanTask | null;
   members: WorkspaceMemberWithUser[];
-  onUpdate: (fields: {
-    description?: string;
-    priority?: number;
-    assigneeId?: string | null;
-    dueDate?: string | null;
-    isPublic?: boolean;
-  }) => void;
+  onUpdate: (fields: { title?: string; description?: string; priority?: number; assigneeId?: string | null; dueDate?: string | null; isPublic?: boolean }) => void;
   onDelete: () => void;
   onClose: () => void;
 }
@@ -51,11 +45,13 @@ function formatMeetingDate(
 }
 
 export function TaskDrawer({ task, members, onUpdate, onDelete, onClose }: TaskDrawerProps) {
+  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
 
   useEffect(() => {
+    setTitle(task?.title ?? "");
     setDescription(task?.description ?? "");
-  }, [task?.id, task?.description]);
+  }, [task?.id, task?.title, task?.description]);
 
   if (task === null) return null;
 
@@ -95,6 +91,23 @@ export function TaskDrawer({ task, members, onUpdate, onDelete, onClose }: TaskD
         </div>
 
         <div className="space-y-5 p-4">
+          {/* Title */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              Título
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={() => {
+                if (title.trim() !== (task.title ?? "")) onUpdate({ title });
+              }}
+              placeholder="Título de la tarea"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+
           {/* Description */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
