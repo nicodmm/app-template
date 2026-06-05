@@ -1,8 +1,10 @@
 "use server";
 
 import { db } from "@/lib/drizzle/db";
-import { tasks } from "@/lib/drizzle/schema";
+import { tasks, taskLabels, taskLabelAssignments } from "@/lib/drizzle/schema";
 import { and, eq, sql } from "drizzle-orm";
+import { isLabelColor } from "@/lib/tareas/labels";
+import type { TaskLabel } from "@/lib/queries/tareas";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId } from "@/lib/queries/workspace";
 import { canAccessAccountTasks } from "@/lib/queries/task-access";
@@ -130,6 +132,54 @@ export async function deleteKanbanTask(
   await db
     .delete(tasks)
     .where(and(eq(tasks.id, taskId), eq(tasks.workspaceId, workspaceId), eq(tasks.accountId, accountId)));
+  revalidate(accountId);
+  return {};
+}
+
+export async function createLabel(
+  accountId: string,
+  name: string,
+  color: string
+): Promise<{ label?: TaskLabel; error?: string }> {
+  const { workspaceId } = await authorize(accountId);
+  if (!name.trim()) return { error: "El nombre es requerido" };
+  if (!isLabelColor(color)) return { error: "Color inválido" };
+  const [created] = await db
+    .insert(taskLabels)
+    .values({ workspaceId, name: name.trim(), color })
+    .returning({ id: taskLabels.id, name: taskLabels.name, color: taskLabels.color });
+  revalidate(accountId);
+  return { label: { id: created.id, name: created.name, color: created.color } };
+}
+
+export async function assignLabel(
+  taskId: string,
+  accountId: string,
+  labelId: string
+): Promise<{ error?: string }> {
+  await authorize(accountId);
+  await db
+    .insert(taskLabelAssignments)
+    .values({ taskId, labelId })
+    .onConflictDoNothing();
+  revalidate(accountId);
+  return {};
+}
+
+export async function unassignLabel(
+  taskId: string,
+  accountId: string,
+  labelId: string
+): Promise<{ error?: string }> {
+  await authorize(accountId);
+  await db
+    .delete(taskLabelAssignments)
+    .where(
+      and(
+        eq(taskLabelAssignments.taskId, taskId),
+        eq(taskLabelAssignments.labelId, labelId)
+      )
+    );
   revalidate(accountId);
   return {};
 }

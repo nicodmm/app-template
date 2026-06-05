@@ -5,7 +5,7 @@ import { requireUserId, getCurrentUserId } from "@/lib/auth";
 import { getWorkspaceWithMember, getWorkspaceMembers } from "@/lib/queries/workspace";
 import { getAccountById } from "@/lib/queries/accounts";
 import { canAccessAccountTasks } from "@/lib/queries/task-access";
-import { getAccountKanbanTasks } from "@/lib/queries/tareas";
+import { getAccountKanbanTasks, listAccountTaskLabels } from "@/lib/queries/tareas";
 import { KanbanBoard } from "@/components/tareas/kanban-board";
 
 interface PageProps {
@@ -27,9 +27,10 @@ export default async function TareasAccountPage({ params }: PageProps) {
   const account = await getAccountById(accountId, workspace.id, { userId, role: member.role });
   if (!account) notFound();
 
-  const [boardTasks, members] = await Promise.all([
+  const [boardTasks, members, labels] = await Promise.all([
     getAccountKanbanTasks(accountId),
     getWorkspaceMembers(workspace.id),
+    listAccountTaskLabels(accountId),
   ]);
 
   return (
@@ -45,7 +46,7 @@ export default async function TareasAccountPage({ params }: PageProps) {
         <h1 className="text-2xl font-semibold">{account.name}</h1>
         <p className="text-sm text-muted-foreground mt-1">Tablero de tareas</p>
       </div>
-      <KanbanBoard accountId={accountId} initialTasks={boardTasks} members={members} />
+      <KanbanBoard accountId={accountId} initialTasks={boardTasks} members={members} labels={labels} />
     </div>
   );
 }
