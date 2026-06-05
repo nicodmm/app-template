@@ -260,6 +260,13 @@
       "when": 1780620728930,
       "tag": "0036_unusual_karen_page",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1780624905273,
+      "tag": "0037_yielding_namora",
+      "breakpoints": true
     }
   ]
 }

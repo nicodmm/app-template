@@ -44,3 +44,5 @@ export * from "./task_comments";
 export * from "./task_comment_mentions";
 export * from "./task_attachments";
 export * from "./notifications";
+export * from "./task_labels";
+export * from "./task_label_assignments";
