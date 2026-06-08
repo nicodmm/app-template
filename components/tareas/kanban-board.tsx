@@ -26,6 +26,7 @@ import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
 import {
   moveTask,
   createKanbanTask,
+  createSubtask,
   updateTaskFields,
   deleteKanbanTask,
   createLabel,
@@ -47,8 +48,27 @@ type Cols = Record<TareaColumnKey, KanbanTask[]>;
 function groupByColumn(taskList: KanbanTask[]): Cols {
   const cols = {} as Cols;
   for (const key of TAREA_COLUMN_KEYS) cols[key] = [];
-  for (const t of taskList) cols[t.column].push(t);
+  // Solo las tareas top-level se muestran como tarjetas; las subtareas viven
+  // dentro del drawer de su padre.
+  for (const t of taskList) if (!t.parentTaskId) cols[t.column].push(t);
   return cols;
+}
+
+export interface SubtaskStat {
+  total: number;
+  done: number;
+}
+
+function computeSubtaskStats(taskList: KanbanTask[]): Map<string, SubtaskStat> {
+  const m = new Map<string, SubtaskStat>();
+  for (const t of taskList) {
+    if (!t.parentTaskId) continue;
+    const s = m.get(t.parentTaskId) ?? { total: 0, done: 0 };
+    s.total += 1;
+    if (t.column === "listas") s.done += 1;
+    m.set(t.parentTaskId, s);
+  }
+  return m;
 }
 
 function findColumnOf(id: string, cols: Cols): TareaColumnKey | null {
@@ -154,11 +174,12 @@ interface ColumnProps {
   columnKey: TareaColumnKey;
   tasks: KanbanTask[];
   members: WorkspaceMemberWithUser[];
+  subtaskStats: Map<string, SubtaskStat>;
   onOpen: (task: KanbanTask) => void;
   onCreate: (column: TareaColumnKey, input: NewTaskInput) => void;
 }
 
-function Column({ columnKey, tasks, members, onOpen, onCreate }: ColumnProps) {
+function Column({ columnKey, tasks, members, subtaskStats, onOpen, onCreate }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: columnKey });
   const [showForm, setShowForm] = useState(false);
 
@@ -202,7 +223,12 @@ function Column({ columnKey, tasks, members, onOpen, onCreate }: ColumnProps) {
           }`}
         >
           {tasks.map((t) => (
-            <TaskCard key={t.id} task={t} onOpen={onOpen} />
+            <TaskCard
+              key={t.id}
+              task={t}
+              subtaskStat={subtaskStats.get(t.id) ?? null}
+              onOpen={onOpen}
+            />
           ))}
           {tasks.length === 0 && !showForm && (
             <p className="px-1 py-3 text-center text-[11px] text-muted-foreground/60">
@@ -231,7 +257,13 @@ export function KanbanBoard({ accountId, initialTasks, members, labels }: Kanban
   useEffect(() => setLabelCatalog(labels), [labels]);
 
   const cols = useMemo(() => groupByColumn(tasks), [tasks]);
+  const subtaskStats = useMemo(() => computeSubtaskStats(tasks), [tasks]);
   const selectedTask = tasks.find((t) => t.id === selectedId) ?? null;
+  const selectedSubtasks = useMemo(
+    () =>
+      selectedId ? tasks.filter((t) => t.parentTaskId === selectedId) : [],
+    [tasks, selectedId]
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -300,6 +332,76 @@ export function KanbanBoard({ accountId, initialTasks, members, labels }: Kanban
       () => moveTask(taskId, accountId, to, insertAt),
       "No se pudo mover la tarea."
     );
+  }
+
+  // Mueve una tarea a una columna sin reordenar (lo usan las subtareas para
+  // marcar hecho/pendiente: backlog ↔ listas). No depende de `cols`, así que
+  // funciona aunque la tarea no se dibuje como tarjeta en el board.
+  function setTaskColumn(taskId: string, to: TareaColumnKey): void {
+    const prevTasks = tasks;
+    setTasks((cur) =>
+      cur.map((t) =>
+        t.id === taskId ? { ...t, column: to, status: to } : t
+      )
+    );
+    applyServer(
+      prevTasks,
+      () => moveTask(taskId, accountId, to, 0),
+      "No se pudo mover la tarea."
+    );
+  }
+
+  function addSubtask(parentTaskId: string, title: string): void {
+    if (!title.trim()) return;
+    const prevTasks = tasks;
+    const tempId = `temp-sub-${parentTaskId}-${title.slice(0, 8)}-${tasks.length}`;
+    const optimistic: KanbanTask = {
+      id: tempId,
+      accountId,
+      workspaceId: "",
+      transcriptId: null,
+      contextDocumentId: null,
+      createdBy: null,
+      assigneeId: null,
+      parentTaskId,
+      title: title.trim(),
+      description: "",
+      status: "backlog",
+      source: "manual",
+      sourceExcerpt: null,
+      sourceContext: null,
+      priority: 3,
+      isPublic: false,
+      dueDate: null,
+      sortOrder: 0,
+      completedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      column: "backlog",
+      meetingDate: null,
+      meetingCreatedAt: null,
+      transcriptFileName: null,
+      assigneeName: null,
+      mentionCount: 0,
+      labels: [],
+    };
+    setTasks((cur) => [...cur, optimistic]);
+    createSubtask(accountId, parentTaskId, title)
+      .then((res) => {
+        if (res.error || !res.id) {
+          setTasks(prevTasks);
+          setError(res.error ?? "No se pudo crear la subtarea.");
+          return;
+        }
+        const realId = res.id;
+        setTasks((cur) =>
+          cur.map((t) => (t.id === tempId ? { ...t, id: realId } : t))
+        );
+      })
+      .catch(() => {
+        setTasks(prevTasks);
+        setError("No se pudo crear la subtarea.");
+      });
   }
 
   function updateTask(
@@ -386,6 +488,7 @@ export function KanbanBoard({ accountId, initialTasks, members, labels }: Kanban
       contextDocumentId: null,
       createdBy: null,
       assigneeId: input.assigneeId,
+      parentTaskId: null,
       title: input.title.trim(),
       description: "",
       status: column,
@@ -453,6 +556,7 @@ export function KanbanBoard({ accountId, initialTasks, members, labels }: Kanban
               columnKey={column.key}
               tasks={cols[column.key]}
               members={members}
+              subtaskStats={subtaskStats}
               onOpen={(t) => setSelectedId(t.id)}
               onCreate={createTask}
             />
@@ -464,6 +568,14 @@ export function KanbanBoard({ accountId, initialTasks, members, labels }: Kanban
         task={selectedTask}
         members={members}
         labelCatalog={labelCatalog}
+        subtasks={selectedSubtasks}
+        onOpenTask={(id) => setSelectedId(id)}
+        onCreateSubtask={(title) => {
+          if (selectedId) addSubtask(selectedId, title);
+        }}
+        onToggleSubtask={(subtaskId, done) =>
+          setTaskColumn(subtaskId, done ? "listas" : "backlog")
+        }
         onUpdate={(fields) => {
           if (selectedId) updateTask(selectedId, fields);
         }}

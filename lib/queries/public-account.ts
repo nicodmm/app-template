@@ -21,7 +21,7 @@ import {
   selectionSearches,
   selectionCandidates,
 } from "@/lib/drizzle/schema";
-import { and, desc, eq, gte, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, ne } from "drizzle-orm";
 import { coerceShareConfig, type ShareConfig } from "@/lib/share/share-config";
 
 /**
@@ -560,7 +560,9 @@ async function loadTasksWithContext(accountId: string) {
     })
     .from(tasks)
     .leftJoin(transcripts, eq(transcripts.id, tasks.transcriptId))
-    .where(eq(tasks.accountId, accountId))
+    // Solo tareas top-level: las subtareas no se muestran como tarjetas sueltas
+    // en la vista pública (su detalle es Fase 7).
+    .where(and(eq(tasks.accountId, accountId), isNull(tasks.parentTaskId)))
     .orderBy(desc(tasks.createdAt))
     .limit(80);
 
