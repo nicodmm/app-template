@@ -6,11 +6,14 @@ import {
   taskMeetingMentions,
   taskLabels,
   taskLabelAssignments,
+  taskComments,
+  taskCommentMentions,
+  taskAttachments,
   accounts,
 } from "@/lib/drizzle/schema";
-import { eq, asc, sql, inArray } from "drizzle-orm";
+import { eq, asc, desc, sql, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import type { Task } from "@/lib/drizzle/schema";
+import type { Task, TaskAttachment } from "@/lib/drizzle/schema";
 import { normalizeColumn, type TareaColumnKey } from "@/lib/tareas/columns";
 
 export interface TaskLabel {
@@ -26,8 +29,24 @@ export type KanbanTask = Task & {
   transcriptFileName: string | null;
   assigneeName: string | null;
   mentionCount: number;
+  commentCount: number;
+  attachmentCount: number;
   labels: TaskLabel[];
 };
+
+export interface TaskCommentView {
+  id: string;
+  body: string;
+  authorId: string | null;
+  authorName: string | null;
+  createdAt: Date;
+  mentionedUserIds: string[];
+}
+
+export interface TaskThread {
+  comments: TaskCommentView[];
+  attachments: TaskAttachment[];
+}
 
 export async function getAccountKanbanTasks(
   accountId: string
@@ -44,6 +63,14 @@ export async function getAccountKanbanTasks(
       mentionCount: sql<number>`(
         select count(*) from ${taskMeetingMentions}
         where ${taskMeetingMentions.taskId} = ${tasks.id}
+      )`,
+      commentCount: sql<number>`(
+        select count(*) from ${taskComments}
+        where ${taskComments.taskId} = ${tasks.id}
+      )`,
+      attachmentCount: sql<number>`(
+        select count(*) from ${taskAttachments}
+        where ${taskAttachments.taskId} = ${tasks.id}
       )`,
     })
     .from(tasks)
@@ -82,8 +109,63 @@ export async function getAccountKanbanTasks(
     transcriptFileName: r.transcriptFileName ?? null,
     assigneeName: r.assigneeName ?? null,
     mentionCount: Number(r.mentionCount ?? 0),
+    commentCount: Number(r.commentCount ?? 0),
+    attachmentCount: Number(r.attachmentCount ?? 0),
     labels: labelsByTask.get(r.task.id) ?? [],
   }));
+}
+
+/** Comentarios (con autor + menciones) y adjuntos de una tarea. */
+export async function getTaskThread(taskId: string): Promise<TaskThread> {
+  const commentRows = await db
+    .select({
+      id: taskComments.id,
+      body: taskComments.body,
+      authorId: taskComments.authorId,
+      authorName: users.fullName,
+      createdAt: taskComments.createdAt,
+    })
+    .from(taskComments)
+    .leftJoin(users, eq(users.id, taskComments.authorId))
+    .where(eq(taskComments.taskId, taskId))
+    .orderBy(asc(taskComments.createdAt));
+
+  const commentIds = commentRows.map((c) => c.id);
+  const mentionRows =
+    commentIds.length > 0
+      ? await db
+          .select({
+            commentId: taskCommentMentions.commentId,
+            mentionedUserId: taskCommentMentions.mentionedUserId,
+          })
+          .from(taskCommentMentions)
+          .where(inArray(taskCommentMentions.commentId, commentIds))
+      : [];
+
+  const mentionsByComment = new Map<string, string[]>();
+  for (const m of mentionRows) {
+    const arr = mentionsByComment.get(m.commentId) ?? [];
+    arr.push(m.mentionedUserId);
+    mentionsByComment.set(m.commentId, arr);
+  }
+
+  const attachments = await db
+    .select()
+    .from(taskAttachments)
+    .where(eq(taskAttachments.taskId, taskId))
+    .orderBy(desc(taskAttachments.createdAt));
+
+  return {
+    comments: commentRows.map((c) => ({
+      id: c.id,
+      body: c.body,
+      authorId: c.authorId,
+      authorName: c.authorName ?? null,
+      createdAt: c.createdAt,
+      mentionedUserIds: mentionsByComment.get(c.id) ?? [],
+    })),
+    attachments,
+  };
 }
 
 export async function listAccountTaskLabels(

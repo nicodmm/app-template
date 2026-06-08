@@ -4,10 +4,11 @@ import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
 
 interface Props {
   accountId: string;
+  currentUserId: string | null;
   members: WorkspaceMemberWithUser[];
 }
 
-export async function TasksSection({ accountId, members }: Props) {
+export async function TasksSection({ accountId, currentUserId, members }: Props) {
   const [boardTasks, labels] = await Promise.all([
     getAccountKanbanTasks(accountId),
     listAccountTaskLabels(accountId),
@@ -29,6 +30,7 @@ export async function TasksSection({ accountId, members }: Props) {
       </div>
       <KanbanBoard
         accountId={accountId}
+        currentUserId={currentUserId}
         initialTasks={boardTasks}
         members={members}
         labels={labels}

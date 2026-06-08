@@ -10,6 +10,8 @@ import {
   Eye,
   EyeOff,
   ListChecks,
+  MessageSquare,
+  Paperclip,
 } from "lucide-react";
 import { PRIORITY_CONFIG } from "@/lib/tareas/columns";
 import { labelChipClass } from "@/lib/tareas/labels";
@@ -130,6 +132,20 @@ export function TaskCard({ task, subtaskStat, onOpen }: TaskCardProps) {
               >
                 <ListChecks size={11} />
                 {subtaskStat.done}/{subtaskStat.total}
+              </span>
+            )}
+
+            {task.commentCount > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground">
+                <MessageSquare size={11} />
+                {task.commentCount}
+              </span>
+            )}
+
+            {task.attachmentCount > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground">
+                <Paperclip size={11} />
+                {task.attachmentCount}
               </span>
             )}
 

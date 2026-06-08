@@ -38,6 +38,7 @@ import { TaskDrawer } from "./task-drawer";
 
 interface KanbanBoardProps {
   accountId: string;
+  currentUserId: string | null;
   initialTasks: KanbanTask[];
   members: WorkspaceMemberWithUser[];
   labels: TaskLabel[];
@@ -303,7 +304,7 @@ function Column({ columnKey, tasks, members, subtaskStats, onOpen, onCreate }: C
 
 // ── Board ────────────────────────────────────────────────────────────────────
 
-export function KanbanBoard({ accountId, initialTasks, members, labels }: KanbanBoardProps) {
+export function KanbanBoard({ accountId, currentUserId, initialTasks, members, labels }: KanbanBoardProps) {
   const [tasks, setTasks] = useState<KanbanTask[]>(initialTasks);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -462,6 +463,8 @@ export function KanbanBoard({ accountId, initialTasks, members, labels }: Kanban
       transcriptFileName: null,
       assigneeName: null,
       mentionCount: 0,
+      commentCount: 0,
+      attachmentCount: 0,
       labels: [],
     };
     setTasks((cur) => [...cur, optimistic]);
@@ -587,6 +590,8 @@ export function KanbanBoard({ accountId, initialTasks, members, labels }: Kanban
       transcriptFileName: null,
       assigneeName: m ? m.displayName : null,
       mentionCount: 0,
+      commentCount: 0,
+      attachmentCount: 0,
       labels: [],
     };
     setTasks((cur) => [...cur, optimistic]);
@@ -761,6 +766,8 @@ export function KanbanBoard({ accountId, initialTasks, members, labels }: Kanban
 
       <TaskDrawer
         task={selectedTask}
+        accountId={accountId}
+        currentUserId={currentUserId}
         members={members}
         labelCatalog={labelCatalog}
         subtasks={selectedSubtasks}

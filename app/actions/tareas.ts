@@ -1,13 +1,32 @@
 "use server";
 
 import { db } from "@/lib/drizzle/db";
-import { tasks, taskLabels, taskLabelAssignments } from "@/lib/drizzle/schema";
-import { and, eq, sql } from "drizzle-orm";
+import {
+  tasks,
+  taskLabels,
+  taskLabelAssignments,
+  taskComments,
+  taskCommentMentions,
+  taskAttachments,
+  notifications,
+  users,
+  workspaceMembers,
+} from "@/lib/drizzle/schema";
+import { and, eq, sql, inArray } from "drizzle-orm";
 import { isLabelColor } from "@/lib/tareas/labels";
-import type { TaskLabel } from "@/lib/queries/tareas";
+import type {
+  TaskLabel,
+  TaskThread,
+  TaskCommentView,
+} from "@/lib/queries/tareas";
+import { getTaskThread } from "@/lib/queries/tareas";
+import type { TaskAttachment } from "@/lib/drizzle/schema";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId } from "@/lib/queries/workspace";
-import { canAccessAccountTasks } from "@/lib/queries/task-access";
+import {
+  canAccessAccountTasks,
+  getTaskAccessibleAccountIds,
+} from "@/lib/queries/task-access";
 import {
   TAREA_COLUMN_KEYS,
   isDoneColumn,
@@ -230,6 +249,160 @@ export async function unassignLabel(
         eq(taskLabelAssignments.labelId, labelId)
       )
     );
+  revalidate(accountId);
+  return {};
+}
+
+// ── Comentarios + @menciones + adjuntos (Fase 4) ─────────────────────────────
+
+/** Carga el hilo (comentarios + adjuntos) de una tarea, con access-check. */
+export async function loadTaskThread(
+  taskId: string,
+  accountId: string
+): Promise<{ thread?: TaskThread; error?: string }> {
+  await authorize(accountId);
+  if (!(await assertTaskInAccount(taskId, accountId)))
+    return { error: "Tarea no encontrada" };
+  return { thread: await getTaskThread(taskId) };
+}
+
+export async function addComment(
+  taskId: string,
+  accountId: string,
+  body: string,
+  mentionedUserIds: string[]
+): Promise<{ comment?: TaskCommentView; error?: string }> {
+  const { workspaceId, userId } = await authorize(accountId);
+  if (!(await assertTaskInAccount(taskId, accountId)))
+    return { error: "Tarea no encontrada" };
+  const text = body.trim();
+  if (!text) return { error: "El comentario está vacío" };
+
+  const [comment] = await db
+    .insert(taskComments)
+    .values({ taskId, workspaceId, authorId: userId, body: text })
+    .returning({ id: taskComments.id, createdAt: taskComments.createdAt });
+
+  // Validar menciones: deben ser miembros del workspace y no el propio autor.
+  let validMentions: string[] = [];
+  if (mentionedUserIds.length > 0) {
+    const unique = [...new Set(mentionedUserIds)].filter((id) => id !== userId);
+    if (unique.length > 0) {
+      const members = await db
+        .select({ userId: workspaceMembers.userId })
+        .from(workspaceMembers)
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, workspaceId),
+            inArray(workspaceMembers.userId, unique)
+          )
+        );
+      validMentions = members.map((m) => m.userId);
+    }
+  }
+
+  if (validMentions.length > 0) {
+    await db.insert(taskCommentMentions).values(
+      validMentions.map((mentionedUserId) => ({
+        commentId: comment.id,
+        mentionedUserId,
+      }))
+    );
+
+    // Notificación por mención (Fase 5 consume estas filas).
+    const [author] = await db
+      .select({ name: users.fullName })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    const actorName = author?.name ?? "Alguien";
+    const snippet = text.length > 80 ? `${text.slice(0, 80)}…` : text;
+    await db.insert(notifications).values(
+      validMentions.map((mentionedUser) => ({
+        workspaceId,
+        userId: mentionedUser,
+        type: "mention",
+        taskId,
+        accountId,
+        actorId: userId,
+        commentId: comment.id,
+        body: `${actorName} te mencionó: "${snippet}"`,
+      }))
+    );
+  }
+
+  revalidate(accountId);
+  return {
+    comment: {
+      id: comment.id,
+      body: text,
+      authorId: userId,
+      authorName: null, // el cliente ya conoce su propio nombre vía members
+      createdAt: comment.createdAt,
+      mentionedUserIds: validMentions,
+    },
+  };
+}
+
+export async function deleteComment(
+  commentId: string,
+  accountId: string
+): Promise<{ error?: string }> {
+  const { workspaceId, userId } = await authorize(accountId);
+  const [row] = await db
+    .select({ authorId: taskComments.authorId, accountId: tasks.accountId })
+    .from(taskComments)
+    .innerJoin(tasks, eq(tasks.id, taskComments.taskId))
+    .where(eq(taskComments.id, commentId))
+    .limit(1);
+  if (!row || row.accountId !== accountId)
+    return { error: "Comentario no encontrado" };
+
+  const access = await getTaskAccessibleAccountIds(userId, workspaceId);
+  if (row.authorId !== userId && !access.all)
+    return { error: "No autorizado" };
+
+  await db.delete(taskComments).where(eq(taskComments.id, commentId));
+  revalidate(accountId);
+  return {};
+}
+
+export async function addAttachment(
+  taskId: string,
+  accountId: string,
+  label: string,
+  url: string
+): Promise<{ attachment?: TaskAttachment; error?: string }> {
+  const { userId } = await authorize(accountId);
+  if (!(await assertTaskInAccount(taskId, accountId)))
+    return { error: "Tarea no encontrada" };
+  const cleanUrl = url.trim();
+  const cleanLabel = label.trim() || cleanUrl;
+  if (!/^https?:\/\//i.test(cleanUrl))
+    return { error: "El link debe empezar con http(s)://" };
+
+  const [attachment] = await db
+    .insert(taskAttachments)
+    .values({ taskId, label: cleanLabel, url: cleanUrl, createdBy: userId })
+    .returning();
+  revalidate(accountId);
+  return { attachment };
+}
+
+export async function deleteAttachment(
+  attachmentId: string,
+  accountId: string
+): Promise<{ error?: string }> {
+  await authorize(accountId);
+  const [row] = await db
+    .select({ accountId: tasks.accountId })
+    .from(taskAttachments)
+    .innerJoin(tasks, eq(tasks.id, taskAttachments.taskId))
+    .where(eq(taskAttachments.id, attachmentId))
+    .limit(1);
+  if (!row || row.accountId !== accountId)
+    return { error: "Adjunto no encontrado" };
+  await db.delete(taskAttachments).where(eq(taskAttachments.id, attachmentId));
   revalidate(accountId);
   return {};
 }

@@ -46,7 +46,7 @@ export default async function TareasAccountPage({ params }: PageProps) {
         <h1 className="text-2xl font-semibold">{account.name}</h1>
         <p className="text-sm text-muted-foreground mt-1">Tablero de tareas</p>
       </div>
-      <KanbanBoard accountId={accountId} initialTasks={boardTasks} members={members} labels={labels} />
+      <KanbanBoard accountId={accountId} currentUserId={userId} initialTasks={boardTasks} members={members} labels={labels} />
     </div>
   );
 }
