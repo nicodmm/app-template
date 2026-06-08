@@ -283,6 +283,25 @@ export function KanbanBoard({ accountId, initialTasks, members, labels }: Kanban
     );
   }
 
+  function moveTaskToColumn(taskId: string, to: TareaColumnKey): void {
+    const from = findColumnOf(taskId, cols);
+    if (!from || from === to) return;
+
+    const prevTasks = tasks;
+    const next = { ...cols, [from]: [...cols[from]], [to]: [...cols[to]] };
+    const moving = next[from].find((t) => t.id === taskId);
+    if (!moving) return;
+    next[from] = next[from].filter((t) => t.id !== taskId);
+    const insertAt = next[to].length;
+    next[to].push({ ...moving, column: to });
+    setTasks(TAREA_COLUMN_KEYS.flatMap((k) => next[k]));
+    applyServer(
+      prevTasks,
+      () => moveTask(taskId, accountId, to, insertAt),
+      "No se pudo mover la tarea."
+    );
+  }
+
   function updateTask(
     taskId: string,
     fields: Parameters<typeof updateTaskFields>[2]
@@ -447,6 +466,9 @@ export function KanbanBoard({ accountId, initialTasks, members, labels }: Kanban
         labelCatalog={labelCatalog}
         onUpdate={(fields) => {
           if (selectedId) updateTask(selectedId, fields);
+        }}
+        onMove={(to) => {
+          if (selectedId) moveTaskToColumn(selectedId, to);
         }}
         onAssignLabel={(label) => { if (selectedId) assignTaskLabel(selectedId, label); }}
         onUnassignLabel={(labelId) => { if (selectedId) unassignTaskLabel(selectedId, labelId); }}

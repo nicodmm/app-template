@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import {
   PRIORITY_CONFIG,
-  columnLabel,
+  TAREA_COLUMNS,
+  type TareaColumnKey,
 } from "@/lib/tareas/columns";
 import { labelChipClass, labelDotClass, LABEL_COLORS, type LabelColorKey } from "@/lib/tareas/labels";
 import type { KanbanTask, TaskLabel } from "@/lib/queries/tareas";
@@ -26,6 +27,7 @@ interface TaskDrawerProps {
   members: WorkspaceMemberWithUser[];
   labelCatalog: TaskLabel[];
   onUpdate: (fields: { title?: string; description?: string; priority?: number; assigneeId?: string | null; dueDate?: string | null; isPublic?: boolean }) => void;
+  onMove: (column: TareaColumnKey) => void;
   onAssignLabel: (label: TaskLabel) => void;
   onUnassignLabel: (labelId: string) => void;
   onCreateLabel: (name: string, color: string) => void;
@@ -55,6 +57,7 @@ export function TaskDrawer({
   members,
   labelCatalog,
   onUpdate,
+  onMove,
   onAssignLabel,
   onUnassignLabel,
   onCreateLabel,
@@ -97,7 +100,18 @@ export function TaskDrawer({
             >
               {priority.label}
             </span>
-            {columnLabel(task.column)}
+            <select
+              value={task.column}
+              onChange={(e) => onMove(e.target.value as TareaColumnKey)}
+              aria-label="Etapa"
+              className="rounded-md border border-input bg-background px-1.5 py-1 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {TAREA_COLUMNS.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
           </span>
           <button
             type="button"
