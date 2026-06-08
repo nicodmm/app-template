@@ -15,10 +15,11 @@ import type {
 } from "@/lib/queries/tareas";
 import type { TaskAttachment } from "@/lib/drizzle/schema";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
+import type { TaskScope } from "@/lib/tareas/scope";
 
 interface TaskCommentsProps {
   taskId: string;
-  accountId: string;
+  scope: TaskScope;
   members: WorkspaceMemberWithUser[];
   currentUserId: string | null;
 }
@@ -36,7 +37,7 @@ function formatWhen(d: Date): string {
 
 export function TaskComments({
   taskId,
-  accountId,
+  scope,
   members,
   currentUserId,
 }: TaskCommentsProps) {
@@ -58,7 +59,7 @@ export function TaskComments({
   useEffect(() => {
     let active = true;
     setLoading(true);
-    loadTaskThread(taskId, accountId)
+    loadTaskThread(taskId, scope)
       .then((res) => {
         if (!active) return;
         if (res.error || !res.thread) {
@@ -72,7 +73,7 @@ export function TaskComments({
     return () => {
       active = false;
     };
-  }, [taskId, accountId]);
+  }, [taskId, scope]);
 
   function nameFor(userId: string | null): string {
     if (userId && userId === currentUserId) return "Vos";
@@ -110,7 +111,7 @@ export function TaskComments({
     if (!text || sending) return;
     setSending(true);
     const mentioned = resolveMentions(text);
-    addComment(taskId, accountId, text, mentioned)
+    addComment(taskId, scope, text, mentioned)
       .then((res) => {
         if (res.error || !res.comment) {
           setError(res.error ?? "No se pudo comentar.");
@@ -137,7 +138,7 @@ export function TaskComments({
         ? { ...cur, comments: cur.comments.filter((c) => c.id !== comment.id) }
         : cur
     );
-    deleteComment(comment.id, accountId)
+    deleteComment(comment.id, scope)
       .then((res) => {
         if (res.error) {
           setThread(prev);
@@ -153,7 +154,7 @@ export function TaskComments({
   function handleAddAttachment(e: React.FormEvent): void {
     e.preventDefault();
     if (!attUrl.trim()) return;
-    addAttachment(taskId, accountId, attLabel, attUrl)
+    addAttachment(taskId, scope, attLabel, attUrl)
       .then((res) => {
         if (res.error || !res.attachment) {
           setError(res.error ?? "No se pudo agregar el adjunto.");
@@ -179,7 +180,7 @@ export function TaskComments({
         ? { ...cur, attachments: cur.attachments.filter((a) => a.id !== att.id) }
         : cur
     );
-    deleteAttachment(att.id, accountId)
+    deleteAttachment(att.id, scope)
       .then((res) => {
         if (res.error) {
           setThread(prev);

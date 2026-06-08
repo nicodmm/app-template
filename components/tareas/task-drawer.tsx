@@ -26,10 +26,13 @@ import {
 import { labelChipClass, labelDotClass, LABEL_COLORS, type LabelColorKey } from "@/lib/tareas/labels";
 import type { KanbanTask, TaskLabel } from "@/lib/queries/tareas";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
+import type { TaskScope } from "@/lib/tareas/scope";
 
 interface TaskDrawerProps {
   task: KanbanTask | null;
-  accountId: string;
+  scope: TaskScope;
+  moveTargets: { accounts: { id: string; name: string }[]; projects: { id: string; name: string }[] };
+  onMoveScope: (toScope: TaskScope) => void;
   currentUserId: string | null;
   members: WorkspaceMemberWithUser[];
   labelCatalog: TaskLabel[];
@@ -65,7 +68,9 @@ function formatMeetingDate(
 
 export function TaskDrawer({
   task,
-  accountId,
+  scope,
+  moveTargets,
+  onMoveScope,
   currentUserId,
   members,
   labelCatalog,
@@ -242,6 +247,53 @@ export function TaskDrawer({
               ))}
             </select>
           </div>
+
+          {/* Contenedor (mover entre cuenta / proyecto / suelta) */}
+          {!task.parentTaskId && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                Contenedor
+              </label>
+              <select
+                value={
+                  scope.kind === "account"
+                    ? `account:${scope.accountId}`
+                    : scope.kind === "project"
+                    ? `project:${scope.projectId}`
+                    : "loose"
+                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "loose") onMoveScope({ kind: "loose" });
+                  else if (v.startsWith("account:"))
+                    onMoveScope({ kind: "account", accountId: v.slice(8) });
+                  else if (v.startsWith("project:"))
+                    onMoveScope({ kind: "project", projectId: v.slice(8) });
+                }}
+                className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="loose">Mis tareas (suelta)</option>
+                {moveTargets.projects.length > 0 && (
+                  <optgroup label="Proyectos">
+                    {moveTargets.projects.map((p) => (
+                      <option key={p.id} value={`project:${p.id}`}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {moveTargets.accounts.length > 0 && (
+                  <optgroup label="Cuentas">
+                    {moveTargets.accounts.map((a) => (
+                      <option key={a.id} value={`account:${a.id}`}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+          )}
 
           {/* Public toggle */}
           <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2.5">
@@ -514,7 +566,7 @@ export function TaskDrawer({
             <TaskComments
               key={task.id}
               taskId={task.id}
-              accountId={accountId}
+              scope={scope}
               members={members}
               currentUserId={currentUserId}
             />
