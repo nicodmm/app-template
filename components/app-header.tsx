@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { GlobalSearch } from "@/components/global-search";
+import { NotificationsBell } from "@/components/notifications-bell";
 
 export function AppHeader({
   userEmail,
@@ -33,6 +34,7 @@ export function AppHeader({
 
       <div className="flex items-center gap-2">
         <GlobalSearch />
+        <NotificationsBell />
 
       <div className="relative">
         <button
