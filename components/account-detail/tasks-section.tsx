@@ -1,4 +1,13 @@
-import { getAccountKanbanTasks, listAccountTaskLabels } from "@/lib/queries/tareas";
+import {
+  getAccountKanbanTasks,
+  listAccountTaskLabels,
+  getScopeMoveTargets,
+} from "@/lib/queries/tareas";
+import {
+  getTaskAccessibleAccountIds,
+  getAccessibleProjectIds,
+} from "@/lib/queries/task-access";
+import { getWorkspaceByUserId } from "@/lib/queries/workspace";
 import { KanbanBoard } from "@/components/tareas/kanban-board";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
 
@@ -13,6 +22,25 @@ export async function TasksSection({ accountId, currentUserId, members }: Props)
     getAccountKanbanTasks(accountId),
     listAccountTaskLabels(accountId),
   ]);
+
+  let moveTargets: { accounts: { id: string; name: string }[]; projects: { id: string; name: string }[] } = {
+    accounts: [],
+    projects: [],
+  };
+  if (currentUserId) {
+    const workspace = await getWorkspaceByUserId(currentUserId);
+    if (workspace) {
+      const [{ accountIds }, projectIds] = await Promise.all([
+        getTaskAccessibleAccountIds(currentUserId, workspace.id),
+        getAccessibleProjectIds(currentUserId, workspace.id),
+      ]);
+      moveTargets = await getScopeMoveTargets(
+        accountIds.filter((id) => id !== accountId),
+        projectIds
+      );
+    }
+  }
+
   const total = boardTasks.length;
   const done = boardTasks.filter((t) => t.column === "listas").length;
 
@@ -29,11 +57,12 @@ export async function TasksSection({ accountId, currentUserId, members }: Props)
         </h2>
       </div>
       <KanbanBoard
-        accountId={accountId}
+        scope={{ kind: "account", accountId }}
         currentUserId={currentUserId}
         initialTasks={boardTasks}
         members={members}
         labels={labels}
+        moveTargets={moveTargets}
       />
     </section>
   );
