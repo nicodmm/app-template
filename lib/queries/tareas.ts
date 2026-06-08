@@ -10,8 +10,11 @@ import {
   taskCommentMentions,
   taskAttachments,
   accounts,
+  taskProjects,
+  taskProjectMembers,
 } from "@/lib/drizzle/schema";
-import { eq, and, asc, desc, sql, inArray, isNull } from "drizzle-orm";
+import { eq, and, asc, desc, sql, inArray, isNull, or } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Task, TaskAttachment } from "@/lib/drizzle/schema";
 import { normalizeColumn, type TareaColumnKey } from "@/lib/tareas/columns";
@@ -48,9 +51,7 @@ export interface TaskThread {
   attachments: TaskAttachment[];
 }
 
-export async function getAccountKanbanTasks(
-  accountId: string
-): Promise<KanbanTask[]> {
+async function kanbanTasksByWhere(where: SQL): Promise<KanbanTask[]> {
   const assigneeUser = alias(users, "assignee_user");
 
   const rows = await db
@@ -76,7 +77,7 @@ export async function getAccountKanbanTasks(
     .from(tasks)
     .leftJoin(transcripts, eq(tasks.transcriptId, transcripts.id))
     .leftJoin(assigneeUser, eq(tasks.assigneeId, assigneeUser.id))
-    .where(eq(tasks.accountId, accountId))
+    .where(where)
     .orderBy(asc(tasks.sortOrder), asc(tasks.priority));
 
   const taskIds = rows.map((r) => r.task.id);
@@ -115,10 +116,39 @@ export async function getAccountKanbanTasks(
   }));
 }
 
+export async function getAccountKanbanTasks(
+  accountId: string
+): Promise<KanbanTask[]> {
+  return kanbanTasksByWhere(eq(tasks.accountId, accountId));
+}
+
+export async function getProjectKanbanTasks(
+  projectId: string
+): Promise<KanbanTask[]> {
+  return kanbanTasksByWhere(eq(tasks.projectId, projectId));
+}
+
+/** Tareas sueltas (sin cuenta ni proyecto) visibles por el usuario. */
+export async function getLooseKanbanTasks(
+  userId: string,
+  workspaceId: string
+): Promise<KanbanTask[]> {
+  const where = and(
+    eq(tasks.workspaceId, workspaceId),
+    isNull(tasks.accountId),
+    isNull(tasks.projectId),
+    or(eq(tasks.createdBy, userId), eq(tasks.assigneeId, userId))
+  ) as SQL;
+  return kanbanTasksByWhere(where);
+}
+
+export type ContainerKind = "account" | "project" | "loose";
+
 export interface GlobalTask {
   id: string;
-  accountId: string;
-  accountName: string;
+  containerKind: ContainerKind;
+  containerId: string | null; // null para loose
+  containerName: string; // nombre de cuenta/proyecto o "Mis tareas"
   title: string | null;
   description: string;
   column: TareaColumnKey;
@@ -130,18 +160,39 @@ export interface GlobalTask {
   mentionCount: number;
 }
 
-/** Tareas top-level de todas las cuentas accesibles, para la vista global. */
-export async function getGlobalTasks(
-  accountIds: string[]
-): Promise<GlobalTask[]> {
-  if (accountIds.length === 0) return [];
+/**
+ * Todas las tareas top-level accesibles para la vista global: cuentas accesibles
+ * + proyectos donde es miembro + sus tareas sueltas. Una sola query con leftJoins.
+ */
+export async function getGlobalTasks(params: {
+  userId: string;
+  workspaceId: string;
+  accountIds: string[];
+  projectIds: string[];
+}): Promise<GlobalTask[]> {
+  const { userId, workspaceId, accountIds, projectIds } = params;
   const assigneeUser = alias(users, "assignee_user_global");
+
+  const conditions: SQL[] = [];
+  if (accountIds.length > 0)
+    conditions.push(inArray(tasks.accountId, accountIds) as SQL);
+  if (projectIds.length > 0)
+    conditions.push(inArray(tasks.projectId, projectIds) as SQL);
+  conditions.push(
+    and(
+      isNull(tasks.accountId),
+      isNull(tasks.projectId),
+      or(eq(tasks.createdBy, userId), eq(tasks.assigneeId, userId))
+    ) as SQL
+  );
 
   const rows = await db
     .select({
       id: tasks.id,
       accountId: tasks.accountId,
+      projectId: tasks.projectId,
       accountName: accounts.name,
+      projectName: taskProjects.name,
       title: tasks.title,
       description: tasks.description,
       status: tasks.status,
@@ -156,25 +207,45 @@ export async function getGlobalTasks(
       )`,
     })
     .from(tasks)
-    .innerJoin(accounts, eq(accounts.id, tasks.accountId))
+    .leftJoin(accounts, eq(accounts.id, tasks.accountId))
+    .leftJoin(taskProjects, eq(taskProjects.id, tasks.projectId))
     .leftJoin(assigneeUser, eq(tasks.assigneeId, assigneeUser.id))
-    .where(and(inArray(tasks.accountId, accountIds), isNull(tasks.parentTaskId)))
+    .where(
+      and(
+        eq(tasks.workspaceId, workspaceId),
+        isNull(tasks.parentTaskId),
+        or(...conditions)
+      )
+    )
     .orderBy(asc(tasks.sortOrder), asc(tasks.priority));
 
-  return rows.map((r) => ({
-    id: r.id,
-    accountId: r.accountId,
-    accountName: r.accountName,
-    title: r.title,
-    description: r.description,
-    column: normalizeColumn(r.status),
-    priority: r.priority,
-    dueDate: r.dueDate ?? null,
-    isPublic: r.isPublic,
-    assigneeId: r.assigneeId,
-    assigneeName: r.assigneeName ?? null,
-    mentionCount: Number(r.mentionCount ?? 0),
-  }));
+  return rows.map((r) => {
+    const kind: ContainerKind = r.accountId
+      ? "account"
+      : r.projectId
+      ? "project"
+      : "loose";
+    return {
+      id: r.id,
+      containerKind: kind,
+      containerId: r.accountId ?? r.projectId ?? null,
+      containerName:
+        kind === "account"
+          ? r.accountName ?? "Cuenta"
+          : kind === "project"
+          ? r.projectName ?? "Proyecto"
+          : "Mis tareas",
+      title: r.title,
+      description: r.description,
+      column: normalizeColumn(r.status),
+      priority: r.priority,
+      dueDate: r.dueDate ?? null,
+      isPublic: r.isPublic,
+      assigneeId: r.assigneeId,
+      assigneeName: r.assigneeName ?? null,
+      mentionCount: Number(r.mentionCount ?? 0),
+    };
+  });
 }
 
 /** Comentarios (con autor + menciones) y adjuntos de una tarea. */
@@ -245,4 +316,85 @@ export async function listAccountTaskLabels(
     .where(eq(taskLabels.workspaceId, acc.workspaceId))
     .orderBy(asc(taskLabels.name));
   return rows.map((r) => ({ id: r.id, name: r.name, color: r.color }));
+}
+
+export async function listWorkspaceTaskLabels(
+  workspaceId: string
+): Promise<TaskLabel[]> {
+  const rows = await db
+    .select({ id: taskLabels.id, name: taskLabels.name, color: taskLabels.color })
+    .from(taskLabels)
+    .where(eq(taskLabels.workspaceId, workspaceId))
+    .orderBy(asc(taskLabels.name));
+  return rows.map((r) => ({ id: r.id, name: r.name, color: r.color }));
+}
+
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  color: string | null;
+  taskCount: number;
+}
+
+/** Proyectos donde el usuario es miembro (no archivados) + conteo de tareas top-level. */
+export async function getUserProjects(
+  userId: string,
+  workspaceId: string
+): Promise<ProjectSummary[]> {
+  const rows = await db
+    .select({
+      id: taskProjects.id,
+      name: taskProjects.name,
+      color: taskProjects.color,
+      taskCount: sql<number>`(
+        select count(*) from ${tasks}
+        where ${tasks.projectId} = ${taskProjects.id}
+          and ${tasks.parentTaskId} is null
+      )`,
+    })
+    .from(taskProjectMembers)
+    .innerJoin(taskProjects, eq(taskProjects.id, taskProjectMembers.projectId))
+    .where(
+      and(
+        eq(taskProjectMembers.userId, userId),
+        eq(taskProjects.workspaceId, workspaceId),
+        isNull(taskProjects.archivedAt)
+      )
+    )
+    .orderBy(asc(taskProjects.name));
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    color: r.color ?? null,
+    taskCount: Number(r.taskCount ?? 0),
+  }));
+}
+
+export interface ScopeMoveTargets {
+  accounts: { id: string; name: string }[];
+  projects: { id: string; name: string }[];
+}
+
+/** Destinos a los que el usuario puede MOVER una tarea (cuentas + proyectos accesibles). */
+export async function getScopeMoveTargets(
+  accountIds: string[],
+  projectIds: string[]
+): Promise<ScopeMoveTargets> {
+  const [accountRows, projectRows] = await Promise.all([
+    accountIds.length > 0
+      ? db
+          .select({ id: accounts.id, name: accounts.name })
+          .from(accounts)
+          .where(inArray(accounts.id, accountIds))
+          .orderBy(accounts.name)
+      : Promise.resolve([]),
+    projectIds.length > 0
+      ? db
+          .select({ id: taskProjects.id, name: taskProjects.name })
+          .from(taskProjects)
+          .where(inArray(taskProjects.id, projectIds))
+          .orderBy(taskProjects.name)
+      : Promise.resolve([]),
+  ]);
+  return { accounts: accountRows, projects: projectRows };
 }
