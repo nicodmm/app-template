@@ -479,7 +479,7 @@ export default async function AccountDetailPage({
               />
             }
           >
-            <TasksSection accountId={accountId} members={members} />
+            <TasksSection accountId={accountId} currentUserId={userId} members={members} />
           </Suspense>
         )}
 

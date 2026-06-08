@@ -11,13 +11,13 @@ import {
   Quote,
   Info,
   Repeat,
-  MessageSquare,
   ChevronLeft,
   ListChecks,
   Square,
   CheckSquare,
   UserCircle2,
 } from "lucide-react";
+import { TaskComments } from "./task-comments";
 import {
   PRIORITY_CONFIG,
   TAREA_COLUMNS,
@@ -29,6 +29,8 @@ import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
 
 interface TaskDrawerProps {
   task: KanbanTask | null;
+  accountId: string;
+  currentUserId: string | null;
   members: WorkspaceMemberWithUser[];
   labelCatalog: TaskLabel[];
   subtasks: KanbanTask[];
@@ -63,6 +65,8 @@ function formatMeetingDate(
 
 export function TaskDrawer({
   task,
+  accountId,
+  currentUserId,
   members,
   labelCatalog,
   subtasks,
@@ -505,10 +509,15 @@ export function TaskDrawer({
             </div>
           )}
 
-          {/* Comments & attachments placeholder */}
-          <div className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 px-3 py-4 text-xs text-muted-foreground">
-            <MessageSquare size={14} />
-            Comentarios y adjuntos — próximamente
+          {/* Comments & attachments */}
+          <div className="border-t border-border pt-4">
+            <TaskComments
+              key={task.id}
+              taskId={task.id}
+              accountId={accountId}
+              members={members}
+              currentUserId={currentUserId}
+            />
           </div>
 
           {/* Delete */}
