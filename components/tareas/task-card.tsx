@@ -9,6 +9,7 @@ import {
   Repeat,
   Eye,
   EyeOff,
+  ListChecks,
 } from "lucide-react";
 import { PRIORITY_CONFIG } from "@/lib/tareas/columns";
 import { labelChipClass } from "@/lib/tareas/labels";
@@ -16,6 +17,7 @@ import type { KanbanTask } from "@/lib/queries/tareas";
 
 interface TaskCardProps {
   task: KanbanTask;
+  subtaskStat?: { total: number; done: number } | null;
   onOpen: (task: KanbanTask) => void;
 }
 
@@ -35,7 +37,7 @@ function formatDue(due: string): string {
   return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" });
 }
 
-export function TaskCard({ task, onOpen }: TaskCardProps) {
+export function TaskCard({ task, subtaskStat, onOpen }: TaskCardProps) {
   const {
     attributes,
     listeners,
@@ -115,6 +117,19 @@ export function TaskCard({ task, onOpen }: TaskCardProps) {
             {task.mentionCount > 1 && (
               <span className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground">
                 <Repeat size={11} />×{task.mentionCount}
+              </span>
+            )}
+
+            {subtaskStat && subtaskStat.total > 0 && (
+              <span
+                className={`inline-flex items-center gap-0.5 text-[11px] ${
+                  subtaskStat.done === subtaskStat.total
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-muted-foreground"
+                }`}
+              >
+                <ListChecks size={11} />
+                {subtaskStat.done}/{subtaskStat.total}
               </span>
             )}
 

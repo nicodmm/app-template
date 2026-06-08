@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, index, boolean, date } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, integer, index, boolean, date, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { accounts } from "./accounts";
 import { workspaces } from "./workspaces";
 import { transcripts } from "./transcripts";
@@ -28,6 +28,10 @@ export const tasks = pgTable(
     assigneeId: uuid("assignee_id").references(() => users.id, {
       onDelete: "set null",
     }),
+    parentTaskId: uuid("parent_task_id").references(
+      (): AnyPgColumn => tasks.id,
+      { onDelete: "cascade" }
+    ),
     title: text("title"),
     description: text("description").notNull(),
     status: text("status").notNull().default("pending"),
@@ -44,6 +48,7 @@ export const tasks = pgTable(
   },
   (table) => [
     index("tasks_account_status_idx").on(table.accountId, table.status),
+    index("tasks_parent_idx").on(table.parentTaskId),
     index("tasks_workspace_idx").on(table.workspaceId),
     index("tasks_transcript_idx").on(table.transcriptId),
     index("tasks_context_document_idx").on(table.contextDocumentId),

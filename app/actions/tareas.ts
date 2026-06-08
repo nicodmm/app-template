@@ -92,6 +92,35 @@ export async function createKanbanTask(
   return { id: created.id };
 }
 
+export async function createSubtask(
+  accountId: string,
+  parentTaskId: string,
+  title: string
+): Promise<{ id?: string; error?: string }> {
+  const { workspaceId, userId } = await authorize(accountId);
+  if (!title.trim()) return { error: "El título es requerido" };
+  if (!(await assertTaskInAccount(parentTaskId, accountId)))
+    return { error: "Tarea padre no encontrada" };
+
+  const [created] = await db
+    .insert(tasks)
+    .values({
+      accountId,
+      workspaceId,
+      createdBy: userId,
+      parentTaskId,
+      title: title.trim(),
+      description: "",
+      priority: 3,
+      status: "backlog",
+      source: "manual",
+      sortOrder: 0,
+    })
+    .returning({ id: tasks.id });
+  revalidate(accountId);
+  return { id: created.id };
+}
+
 export async function updateTaskFields(
   taskId: string,
   accountId: string,

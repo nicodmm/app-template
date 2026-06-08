@@ -12,6 +12,11 @@ import {
   Info,
   Repeat,
   MessageSquare,
+  ChevronLeft,
+  ListChecks,
+  Square,
+  CheckSquare,
+  UserCircle2,
 } from "lucide-react";
 import {
   PRIORITY_CONFIG,
@@ -26,6 +31,10 @@ interface TaskDrawerProps {
   task: KanbanTask | null;
   members: WorkspaceMemberWithUser[];
   labelCatalog: TaskLabel[];
+  subtasks: KanbanTask[];
+  onOpenTask: (taskId: string) => void;
+  onCreateSubtask: (title: string) => void;
+  onToggleSubtask: (subtaskId: string, done: boolean) => void;
   onUpdate: (fields: { title?: string; description?: string; priority?: number; assigneeId?: string | null; dueDate?: string | null; isPublic?: boolean }) => void;
   onMove: (column: TareaColumnKey) => void;
   onAssignLabel: (label: TaskLabel) => void;
@@ -56,6 +65,10 @@ export function TaskDrawer({
   task,
   members,
   labelCatalog,
+  subtasks,
+  onOpenTask,
+  onCreateSubtask,
+  onToggleSubtask,
   onUpdate,
   onMove,
   onAssignLabel,
@@ -69,6 +82,7 @@ export function TaskDrawer({
   const [labelPanelOpen, setLabelPanelOpen] = useState(false);
   const [newLabelName, setNewLabelName] = useState("");
   const [newLabelColor, setNewLabelColor] = useState<LabelColorKey>(LABEL_COLORS[0].key);
+  const [newSubtask, setNewSubtask] = useState("");
 
   useEffect(() => {
     setTitle(task?.title ?? "");
@@ -82,6 +96,13 @@ export function TaskDrawer({
     onDelete();
   }
 
+  function handleAddSubtask(e: React.FormEvent): void {
+    e.preventDefault();
+    if (!newSubtask.trim()) return;
+    onCreateSubtask(newSubtask);
+    setNewSubtask("");
+  }
+
   const priority = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG[3];
 
   return (
@@ -93,6 +114,15 @@ export function TaskDrawer({
         className="absolute inset-0 bg-foreground/20 backdrop-blur-[2px]"
       />
       <div className="absolute right-0 top-0 h-full w-full sm:max-w-2xl overflow-y-auto border-l border-border bg-card shadow-xl">
+        {task.parentTaskId && (
+          <button
+            type="button"
+            onClick={() => onOpenTask(task.parentTaskId as string)}
+            className="flex w-full items-center gap-1 border-b border-border bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronLeft size={13} /> Volver a la tarea padre
+          </button>
+        )}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-4 py-3">
           <span className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <span
@@ -339,6 +369,90 @@ export function TaskDrawer({
               </div>
             )}
           </div>
+
+          {/* Subtasks (solo en tareas top-level) */}
+          {!task.parentTaskId && (
+            <div className="space-y-2">
+              <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                <ListChecks size={12} /> Subtareas
+                {subtasks.length > 0 && (
+                  <span className="text-muted-foreground/70">
+                    · {subtasks.filter((s) => s.column === "listas").length}/
+                    {subtasks.length}
+                  </span>
+                )}
+              </label>
+
+              {subtasks.length > 0 && (
+                <ul className="space-y-1">
+                  {subtasks.map((s) => {
+                    const done = s.column === "listas";
+                    return (
+                      <li
+                        key={s.id}
+                        className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onToggleSubtask(s.id, !done)}
+                          aria-label={done ? "Marcar pendiente" : "Marcar hecha"}
+                          className={
+                            done
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-muted-foreground hover:text-foreground transition-colors"
+                          }
+                        >
+                          {done ? (
+                            <CheckSquare size={15} />
+                          ) : (
+                            <Square size={15} />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onOpenTask(s.id)}
+                          className="flex-1 min-w-0 text-left text-xs"
+                        >
+                          <span
+                            className={`block truncate ${
+                              done
+                                ? "text-muted-foreground line-through"
+                                : "text-foreground"
+                            }`}
+                          >
+                            {s.title || s.description}
+                          </span>
+                        </button>
+                        {s.assigneeName && (
+                          <span className="inline-flex shrink-0 items-center gap-0.5 text-[11px] text-muted-foreground">
+                            <UserCircle2 size={11} />
+                            {s.assigneeName}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              <form onSubmit={handleAddSubtask} className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={newSubtask}
+                  onChange={(e) => setNewSubtask(e.target.value)}
+                  placeholder="Nueva subtarea..."
+                  className="flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <button
+                  type="submit"
+                  disabled={!newSubtask.trim()}
+                  className="inline-flex shrink-0 items-center gap-0.5 rounded-md border border-border px-2 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50 transition-colors"
+                >
+                  <Plus size={12} /> Agregar
+                </button>
+              </form>
+            </div>
+          )}
 
           {/* Meeting origin */}
           {(task.mentionCount > 0 ||
