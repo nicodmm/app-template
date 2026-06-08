@@ -152,7 +152,20 @@ export async function updateTaskFields(
     isPublic?: boolean;
   }
 ): Promise<{ error?: string }> {
-  const { workspaceId } = await authorize(accountId);
+  const { workspaceId, userId } = await authorize(accountId);
+
+  // Estado previo (para detectar cambio real de responsable → notificar).
+  const [before] = await db
+    .select({
+      assigneeId: tasks.assigneeId,
+      title: tasks.title,
+      description: tasks.description,
+    })
+    .from(tasks)
+    .where(and(eq(tasks.id, taskId), eq(tasks.accountId, accountId)))
+    .limit(1);
+  if (!before) return { error: "Tarea no encontrada" };
+
   const patch: Partial<typeof tasks.$inferInsert> = { updatedAt: new Date() };
   if (fields.title !== undefined) patch.title = fields.title.trim() || null;
   if (fields.description !== undefined) {
@@ -168,6 +181,33 @@ export async function updateTaskFields(
     .update(tasks)
     .set(patch)
     .where(and(eq(tasks.id, taskId), eq(tasks.workspaceId, workspaceId), eq(tasks.accountId, accountId)));
+
+  // Notificación de asignación: solo si el responsable cambió a otra persona
+  // distinta del que hace la acción.
+  const newAssignee = fields.assigneeId;
+  if (
+    newAssignee &&
+    newAssignee !== before.assigneeId &&
+    newAssignee !== userId
+  ) {
+    const [actor] = await db
+      .select({ name: users.fullName })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    const label = before.title || before.description || "una tarea";
+    const snippet = label.length > 80 ? `${label.slice(0, 80)}…` : label;
+    await db.insert(notifications).values({
+      workspaceId,
+      userId: newAssignee,
+      type: "assignment",
+      taskId,
+      accountId,
+      actorId: userId,
+      body: `${actor?.name ?? "Alguien"} te asignó: "${snippet}"`,
+    });
+  }
+
   revalidate(accountId);
   return {};
 }

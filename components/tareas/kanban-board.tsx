@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   DndContext,
   PointerSensor,
@@ -318,6 +319,18 @@ export function KanbanBoard({ accountId, currentUserId, initialTasks, members, l
   }, [initialTasks]);
 
   useEffect(() => setLabelCatalog(labels), [labels]);
+
+  // Auto-abrir el drawer cuando se llega con ?task=<id> (desde notificaciones).
+  const searchParams = useSearchParams();
+  const consumedTaskParam = useRef(false);
+  useEffect(() => {
+    if (consumedTaskParam.current) return;
+    const tid = searchParams.get("task");
+    if (tid && tasks.some((t) => t.id === tid)) {
+      setSelectedId(tid);
+      consumedTaskParam.current = true;
+    }
+  }, [searchParams, tasks]);
 
   const cols = useMemo(() => groupByColumn(tasks), [tasks]);
   const hasFilters = filtersActive(filters);
