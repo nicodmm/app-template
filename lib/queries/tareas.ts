@@ -11,7 +11,7 @@ import {
   taskAttachments,
   accounts,
 } from "@/lib/drizzle/schema";
-import { eq, asc, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, asc, desc, sql, inArray, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Task, TaskAttachment } from "@/lib/drizzle/schema";
 import { normalizeColumn, type TareaColumnKey } from "@/lib/tareas/columns";
@@ -112,6 +112,68 @@ export async function getAccountKanbanTasks(
     commentCount: Number(r.commentCount ?? 0),
     attachmentCount: Number(r.attachmentCount ?? 0),
     labels: labelsByTask.get(r.task.id) ?? [],
+  }));
+}
+
+export interface GlobalTask {
+  id: string;
+  accountId: string;
+  accountName: string;
+  title: string | null;
+  description: string;
+  column: TareaColumnKey;
+  priority: number;
+  dueDate: string | null;
+  isPublic: boolean;
+  assigneeId: string | null;
+  assigneeName: string | null;
+  mentionCount: number;
+}
+
+/** Tareas top-level de todas las cuentas accesibles, para la vista global. */
+export async function getGlobalTasks(
+  accountIds: string[]
+): Promise<GlobalTask[]> {
+  if (accountIds.length === 0) return [];
+  const assigneeUser = alias(users, "assignee_user_global");
+
+  const rows = await db
+    .select({
+      id: tasks.id,
+      accountId: tasks.accountId,
+      accountName: accounts.name,
+      title: tasks.title,
+      description: tasks.description,
+      status: tasks.status,
+      priority: tasks.priority,
+      dueDate: tasks.dueDate,
+      isPublic: tasks.isPublic,
+      assigneeId: tasks.assigneeId,
+      assigneeName: assigneeUser.fullName,
+      mentionCount: sql<number>`(
+        select count(*) from ${taskMeetingMentions}
+        where ${taskMeetingMentions.taskId} = ${tasks.id}
+      )`,
+    })
+    .from(tasks)
+    .innerJoin(accounts, eq(accounts.id, tasks.accountId))
+    .leftJoin(assigneeUser, eq(tasks.assigneeId, assigneeUser.id))
+    .where(and(inArray(tasks.accountId, accountIds), isNull(tasks.parentTaskId)))
+    .orderBy(asc(tasks.sortOrder), asc(tasks.priority));
+
+  return rows.map((r) => ({
+    id: r.id,
+    accountId: r.accountId,
+    accountName: r.accountName,
+    title: r.title,
+    description: r.description,
+    column: normalizeColumn(r.status),
+    priority: r.priority,
+    dueDate: r.dueDate ?? null,
+    isPublic: r.isPublic,
+    assigneeId: r.assigneeId,
+    assigneeName: r.assigneeName ?? null,
+    mentionCount: Number(r.mentionCount ?? 0),
   }));
 }
 
