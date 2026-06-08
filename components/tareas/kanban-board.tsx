@@ -13,7 +13,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Plus } from "lucide-react";
+import { Plus, Search, X, SlidersHorizontal } from "lucide-react";
 import {
   TAREA_COLUMNS,
   TAREA_COLUMN_KEYS,
@@ -69,6 +69,66 @@ function computeSubtaskStats(taskList: KanbanTask[]): Map<string, SubtaskStat> {
     m.set(t.parentTaskId, s);
   }
   return m;
+}
+
+type DueFilter = "" | "overdue" | "soon" | "none";
+
+interface TaskFilters {
+  search: string;
+  assignee: string; // "" = todos, "unassigned" = sin asignar, o userId
+  labelId: string; // "" = todas
+  priority: string; // "" = todas, o número como string
+  due: DueFilter;
+  onlyPublic: boolean;
+}
+
+const EMPTY_FILTERS: TaskFilters = {
+  search: "",
+  assignee: "",
+  labelId: "",
+  priority: "",
+  due: "",
+  onlyPublic: false,
+};
+
+function dueBucket(due: string | null): DueFilter {
+  if (!due) return "none";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(due + "T00:00:00");
+  const days = Math.round((d.getTime() - today.getTime()) / 86400000);
+  if (days < 0) return "overdue";
+  if (days <= 7) return "soon";
+  return "";
+}
+
+function matchesFilters(task: KanbanTask, f: TaskFilters): boolean {
+  if (f.search.trim()) {
+    const q = f.search.trim().toLowerCase();
+    const hay = `${task.title ?? ""} ${task.description ?? ""}`.toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  if (f.assignee === "unassigned") {
+    if (task.assigneeId) return false;
+  } else if (f.assignee && task.assigneeId !== f.assignee) {
+    return false;
+  }
+  if (f.labelId && !task.labels.some((l) => l.id === f.labelId)) return false;
+  if (f.priority && task.priority !== Number(f.priority)) return false;
+  if (f.due && dueBucket(task.dueDate) !== f.due) return false;
+  if (f.onlyPublic && !task.isPublic) return false;
+  return true;
+}
+
+function filtersActive(f: TaskFilters): boolean {
+  return (
+    f.search.trim() !== "" ||
+    f.assignee !== "" ||
+    f.labelId !== "" ||
+    f.priority !== "" ||
+    f.due !== "" ||
+    f.onlyPublic
+  );
 }
 
 function findColumnOf(id: string, cols: Cols): TareaColumnKey | null {
@@ -248,6 +308,8 @@ export function KanbanBoard({ accountId, initialTasks, members, labels }: Kanban
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [labelCatalog, setLabelCatalog] = useState<TaskLabel[]>(labels);
+  const [filters, setFilters] = useState<TaskFilters>(EMPTY_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Re-sync con el servidor cuando cambian los datos iniciales (navegación / carga).
   useEffect(() => {
@@ -257,6 +319,15 @@ export function KanbanBoard({ accountId, initialTasks, members, labels }: Kanban
   useEffect(() => setLabelCatalog(labels), [labels]);
 
   const cols = useMemo(() => groupByColumn(tasks), [tasks]);
+  const hasFilters = filtersActive(filters);
+  const filteredCols = useMemo(() => {
+    if (!hasFilters) return cols;
+    const out = {} as Cols;
+    for (const key of TAREA_COLUMN_KEYS) {
+      out[key] = cols[key].filter((t) => matchesFilters(t, filters));
+    }
+    return out;
+  }, [cols, filters, hasFilters]);
   const subtaskStats = useMemo(() => computeSubtaskStats(tasks), [tasks]);
   const selectedTask = tasks.find((t) => t.id === selectedId) ?? null;
   const selectedSubtasks = useMemo(
@@ -306,13 +377,21 @@ export function KanbanBoard({ accountId, initialTasks, members, labels }: Kanban
     const overIndex = next[to].findIndex((t) => t.id === overId);
     const insertAt = overIndex >= 0 ? overIndex : next[to].length;
     next[to].splice(insertAt, 0, { ...moving, column: to });
-    const flat = TAREA_COLUMN_KEYS.flatMap((k) => next[k]);
-    setTasks(flat);
+    setTasks(rebuildTasks(next));
     applyServer(
       prevTasks,
       () => moveTask(activeId, accountId, to, insertAt),
       "No se pudo mover la tarea."
     );
+  }
+
+  // Reconstruye la lista plana de tareas desde las columnas (solo top-level),
+  // preservando las subtareas que no se agrupan en columnas.
+  function rebuildTasks(next: Cols): KanbanTask[] {
+    return [
+      ...TAREA_COLUMN_KEYS.flatMap((k) => next[k]),
+      ...tasks.filter((t) => t.parentTaskId),
+    ];
   }
 
   function moveTaskToColumn(taskId: string, to: TareaColumnKey): void {
@@ -326,7 +405,7 @@ export function KanbanBoard({ accountId, initialTasks, members, labels }: Kanban
     next[from] = next[from].filter((t) => t.id !== taskId);
     const insertAt = next[to].length;
     next[to].push({ ...moving, column: to });
-    setTasks(TAREA_COLUMN_KEYS.flatMap((k) => next[k]));
+    setTasks(rebuildTasks(next));
     applyServer(
       prevTasks,
       () => moveTask(taskId, accountId, to, insertAt),
@@ -548,13 +627,129 @@ export function KanbanBoard({ accountId, initialTasks, members, labels }: Kanban
           </button>
         </div>
       )}
+      {/* Filtros + búsqueda (client-side) */}
+      <div className="mb-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search
+              size={14}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, search: e.target.value }))
+              }
+              placeholder="Buscar por título o descripción..."
+              className="w-full rounded-md border border-input bg-background py-1.5 pl-8 pr-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              hasFilters
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : "border-border hover:bg-accent"
+            }`}
+          >
+            <SlidersHorizontal size={13} /> Filtros
+          </button>
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={() => setFilters(EMPTY_FILTERS)}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent transition-colors"
+            >
+              <X size={13} /> Limpiar
+            </button>
+          )}
+        </div>
+
+        {filtersOpen && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 p-2.5">
+            <select
+              value={filters.assignee}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, assignee: e.target.value }))
+              }
+              className="rounded-md border border-input bg-background px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">Responsable: todos</option>
+              <option value="unassigned">Sin asignar</option>
+              {members.map((m) => (
+                <option key={m.userId} value={m.userId}>
+                  {m.displayName}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.labelId}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, labelId: e.target.value }))
+              }
+              className="rounded-md border border-input bg-background px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">Etiqueta: todas</option>
+              {labelCatalog.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.priority}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, priority: e.target.value }))
+              }
+              className="rounded-md border border-input bg-background px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">Prioridad: todas</option>
+              {Object.entries(PRIORITY_CONFIG).map(([p, { label }]) => (
+                <option key={p} value={p}>
+                  {label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.due}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, due: e.target.value as DueFilter }))
+              }
+              className="rounded-md border border-input bg-background px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">Vencimiento: cualquiera</option>
+              <option value="overdue">Vencidas</option>
+              <option value="soon">Próximos 7 días</option>
+              <option value="none">Sin fecha</option>
+            </select>
+
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-2 py-1.5 text-xs">
+              <input
+                type="checkbox"
+                checked={filters.onlyPublic}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, onlyPublic: e.target.checked }))
+                }
+                className="h-3.5 w-3.5 rounded border-input"
+              />
+              Solo públicas
+            </label>
+          </div>
+        )}
+      </div>
+
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="flex gap-3 overflow-x-auto pb-2">
           {TAREA_COLUMNS.map((column) => (
             <Column
               key={column.key}
               columnKey={column.key}
-              tasks={cols[column.key]}
+              tasks={filteredCols[column.key]}
               members={members}
               subtaskStats={subtaskStats}
               onOpen={(t) => setSelectedId(t.id)}
