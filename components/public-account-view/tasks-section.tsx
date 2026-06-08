@@ -1,16 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  CalendarDays,
-  ChevronDown,
-  ChevronRight,
-  Quote,
-  Info,
-  Check,
-} from "lucide-react";
+import { CalendarDays, Quote, Info, Check } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { cn } from "@/lib/utils";
+import {
+  TAREA_COLUMNS,
+  normalizeColumn,
+  type TareaColumnKey,
+} from "@/lib/tareas/columns";
 
 interface PublicTask {
   id: string;
@@ -46,183 +44,71 @@ const PRIORITY_CLS: Record<number, string> = {
   5: "bg-muted text-muted-foreground",
 };
 
-function formatDate(d: Date | null): string {
-  if (!d) return "Sin fecha";
-  return new Date(d).toLocaleDateString("es-AR", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-interface Group {
-  key: string;
-  label: string;
-  dateKey: string;
-  tasks: PublicTask[];
-}
-
-type Tab = "pending" | "completed";
-
-function buildGroups(tasks: PublicTask[]): Group[] {
-  const map = new Map<string, Group>();
-  for (const t of tasks) {
-    const key = t.transcriptId ?? "__manual__";
-    if (!map.has(key)) {
-      const label =
-        key === "__manual__"
-          ? "Coordinación con tu equipo"
-          : `Reunión ${formatDate(t.meetingDate)}`;
-      const dateKey = (t.meetingDate ?? t.createdAt).toISOString().slice(0, 10);
-      map.set(key, { key, label, dateKey, tasks: [] });
-    }
-    map.get(key)!.tasks.push(t);
-  }
-  return [...map.values()].sort((a, b) => {
-    if (a.key === "__manual__") return 1;
-    if (b.key === "__manual__") return -1;
-    return b.dateKey.localeCompare(a.dateKey);
-  });
-}
-
 export function TasksSection({ rows }: Props) {
-  const [tab, setTab] = useState<Tab>("pending");
+  // Agrupa por columna (etapa) usando la normalización de lectura.
+  const byColumn = useMemo(() => {
+    const map = {} as Record<TareaColumnKey, PublicTask[]>;
+    for (const c of TAREA_COLUMNS) map[c.key] = [];
+    for (const t of rows) map[normalizeColumn(t.status)].push(t);
+    return map;
+  }, [rows]);
 
-  const pending = useMemo(
-    () =>
-      rows.filter(
-        (t) => t.status !== "completed" && t.status !== "listas"
-      ),
-    [rows]
-  );
-  const completed = useMemo(
-    () =>
-      [
-        ...rows.filter(
-          (t) => t.status === "completed" || t.status === "listas"
-        ),
-      ].sort(
-        (a, b) =>
-          (b.completedAt?.getTime() ?? 0) - (a.completedAt?.getTime() ?? 0)
-      ),
-    [rows]
-  );
+  // Solo columnas con al menos una tarea pública.
+  const visibleColumns = TAREA_COLUMNS.filter((c) => byColumn[c.key].length > 0);
 
   if (rows.length === 0) {
     return (
       <GlassCard className="p-6">
         <h2 className="font-semibold mb-3">Tareas</h2>
         <p className="text-sm text-muted-foreground">
-          Tu equipo está al día — no hay tareas registradas todavía.
+          Tu equipo está al día — no hay tareas para mostrar todavía.
         </p>
       </GlassCard>
     );
   }
 
-  const visible = tab === "pending" ? pending : completed;
-  const groups = buildGroups(visible);
-
   return (
     <GlassCard className="p-6">
-      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-        <h2 className="font-semibold">Tareas</h2>
-        <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit">
-          {(
-            [
-              { k: "pending", label: "En curso", count: pending.length },
-              { k: "completed", label: "Completadas", count: completed.length },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.k}
-              type="button"
-              onClick={() => setTab(t.k)}
-              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                tab === t.k
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t.label}
-              <span
-                className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                  tab === t.k
-                    ? "bg-primary/10 text-primary"
-                    : "bg-muted-foreground/10"
-                }`}
-              >
-                {t.count}
+      <h2 className="font-semibold mb-4">Tareas</h2>
+      <div className="flex gap-3 overflow-x-auto pb-1">
+        {visibleColumns.map((c) => (
+          <div key={c.key} className="w-64 shrink-0">
+            <div className="flex items-center gap-2 px-1 pb-2">
+              <span className="text-xs font-semibold text-foreground">
+                {c.label}
               </span>
-            </button>
-          ))}
-        </div>
+              <span className="inline-flex items-center rounded-full bg-muted-foreground/10 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                {byColumn[c.key].length}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {byColumn[c.key].map((t) => (
+                <TaskCard key={t.id} task={t} />
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
-      {visible.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-2">
-          {tab === "pending"
-            ? "No hay tareas en curso ahora mismo."
-            : "Todavía no hay tareas completadas."}
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {groups.map((g) => (
-            <TaskGroup key={g.key} group={g} defaultOpen={true} />
-          ))}
-        </div>
-      )}
     </GlassCard>
   );
 }
 
-function TaskGroup({
-  group,
-  defaultOpen,
-}: {
-  group: Group;
-  defaultOpen: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="rounded-lg [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)] overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        <CalendarDays size={11} />
-        <span>{group.label}</span>
-        <span className="ml-auto text-muted-foreground/60">
-          {group.tasks.length} tarea{group.tasks.length !== 1 ? "s" : ""}
-        </span>
-      </button>
-      {open && (
-        <div className="px-3 pb-2 divide-y divide-[var(--glass-tile-border)]">
-          {group.tasks.map((t) => (
-            <TaskRow key={t.id} task={t} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TaskRow({ task }: { task: PublicTask }) {
+function TaskCard({ task }: { task: PublicTask }) {
   const [expanded, setExpanded] = useState(false);
   const priority = PRIORITY_LABEL[task.priority] ?? "Media";
   const priorityCls = PRIORITY_CLS[task.priority] ?? PRIORITY_CLS[3];
-  const hasContext = task.sourceExcerpt || task.sourceContext;
-  const isCompleted =
-    task.status === "completed" || task.status === "listas";
+  const hasContext = Boolean(task.sourceExcerpt || task.sourceContext);
+  const isCompleted = task.status === "completed" || task.status === "listas";
+
   return (
-    <div className="py-2.5">
-      <div className="flex items-start gap-3">
+    <div className="rounded-lg p-2.5 [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)]">
+      <div className="flex items-start gap-2">
         {isCompleted ? (
           <div className="mt-0.5 shrink-0 w-4 h-4 rounded-full bg-emerald-500 border border-emerald-500 text-white flex items-center justify-center">
             <Check size={11} strokeWidth={3} />
           </div>
         ) : (
-          <div className="mt-1 shrink-0 w-3.5 h-3.5 rounded-full border border-muted-foreground/40" />
+          <div className="mt-0.5 shrink-0 w-3.5 h-3.5 rounded-full border border-muted-foreground/40" />
         )}
         <div className="flex-1 min-w-0">
           <button
@@ -236,7 +122,7 @@ function TaskRow({ task }: { task: PublicTask }) {
           >
             {task.description}
           </button>
-          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             <span
               className={cn(
                 "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
@@ -255,7 +141,6 @@ function TaskRow({ task }: { task: PublicTask }) {
             {isCompleted && task.completedAt && (
               <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400">
                 <Check size={9} />
-                Completada el{" "}
                 {new Date(task.completedAt).toLocaleDateString("es-AR", {
                   day: "numeric",
                   month: "short",
@@ -266,7 +151,7 @@ function TaskRow({ task }: { task: PublicTask }) {
         </div>
       </div>
       {expanded && hasContext && (
-        <div className="mt-2 ml-7 rounded-md p-2.5 [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] text-xs space-y-2">
+        <div className="mt-2 rounded-md p-2.5 [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] text-xs space-y-2">
           {task.sourceExcerpt && (
             <div className="flex gap-2">
               <Quote

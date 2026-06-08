@@ -560,9 +560,14 @@ async function loadTasksWithContext(accountId: string) {
     })
     .from(tasks)
     .leftJoin(transcripts, eq(transcripts.id, tasks.transcriptId))
-    // Solo tareas top-level: las subtareas no se muestran como tarjetas sueltas
-    // en la vista pública (su detalle es Fase 7).
-    .where(and(eq(tasks.accountId, accountId), isNull(tasks.parentTaskId)))
+    // Solo tareas públicas y top-level (las subtareas no se muestran sueltas).
+    .where(
+      and(
+        eq(tasks.accountId, accountId),
+        eq(tasks.isPublic, true),
+        isNull(tasks.parentTaskId)
+      )
+    )
     .orderBy(desc(tasks.createdAt))
     .limit(80);
 
