@@ -3,8 +3,11 @@ import {
   accounts,
   accountConsultants,
   workspaceMembers,
+  taskProjects,
+  taskProjectMembers,
 } from "@/lib/drizzle/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
+import type { TaskScope } from "@/lib/tareas/scope";
 
 export interface TaskAccess {
   /** True si el usuario ve TODAS las cuentas del workspace (owner/admin). */
@@ -77,4 +80,67 @@ export async function canAccessAccountTasks(
     workspaceId
   );
   return all || accountIds.includes(accountId);
+}
+
+/**
+ * Proyectos internos visibles para el usuario: aquellos donde es miembro
+ * (`task_project_members`). SIN bypass de admin — privado es privado.
+ * Excluye archivados.
+ */
+export async function getAccessibleProjectIds(
+  userId: string,
+  workspaceId: string
+): Promise<string[]> {
+  const rows = await db
+    .select({ id: taskProjects.id })
+    .from(taskProjectMembers)
+    .innerJoin(taskProjects, eq(taskProjects.id, taskProjectMembers.projectId))
+    .where(
+      and(
+        eq(taskProjectMembers.userId, userId),
+        eq(taskProjects.workspaceId, workspaceId),
+        isNull(taskProjects.archivedAt)
+      )
+    );
+  return rows.map((r) => r.id);
+}
+
+/** ¿El usuario es miembro de este proyecto (no archivado)? */
+export async function canAccessProject(
+  userId: string,
+  workspaceId: string,
+  projectId: string
+): Promise<boolean> {
+  const [row] = await db
+    .select({ projectId: taskProjectMembers.projectId })
+    .from(taskProjectMembers)
+    .innerJoin(taskProjects, eq(taskProjects.id, taskProjectMembers.projectId))
+    .where(
+      and(
+        eq(taskProjectMembers.projectId, projectId),
+        eq(taskProjectMembers.userId, userId),
+        eq(taskProjects.workspaceId, workspaceId),
+        isNull(taskProjects.archivedAt)
+      )
+    )
+    .limit(1);
+  return !!row;
+}
+
+/**
+ * Verifica acceso para CREAR/operar en un scope dado (sin tarea previa).
+ * - account → reglas de cuenta
+ * - project → membresía
+ * - loose   → basta estar logueado (el creador será el dueño)
+ */
+export async function assertScopeAccess(
+  userId: string,
+  workspaceId: string,
+  scope: TaskScope
+): Promise<boolean> {
+  if (scope.kind === "account")
+    return canAccessAccountTasks(userId, workspaceId, scope.accountId);
+  if (scope.kind === "project")
+    return canAccessProject(userId, workspaceId, scope.projectId);
+  return true; // loose
 }

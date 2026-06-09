@@ -22,10 +22,11 @@ import {
 } from "@/lib/tareas/columns";
 import type { GlobalTask } from "@/lib/queries/tareas";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
+import { scopeBoardPath } from "@/lib/tareas/scope";
 
 interface GlobalTasksViewProps {
   tasks: GlobalTask[];
-  accounts: { id: string; name: string }[];
+  containers: { kind: "account" | "project" | "loose"; id: string | null; name: string }[];
   members: WorkspaceMemberWithUser[];
 }
 
@@ -56,18 +57,18 @@ function formatDue(due: string): string {
   });
 }
 
-type SortKey = "account" | "task" | "assignee" | "column" | "due" | "priority";
+type SortKey = "container" | "task" | "assignee" | "column" | "due" | "priority";
 
 export function GlobalTasksView({
   tasks,
-  accounts,
+  containers,
   members,
 }: GlobalTasksViewProps) {
   const [view, setView] = useState<"board" | "list">("board");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [search, setSearch] = useState("");
-  const [account, setAccount] = useState("");
+  const [container, setContainer] = useState("");
   const [assignee, setAssignee] = useState("");
   const [priority, setPriority] = useState("");
   const [column, setColumn] = useState("");
@@ -75,12 +76,12 @@ export function GlobalTasksView({
   const [onlyPublic, setOnlyPublic] = useState(false);
   const [onlyRecurrent, setOnlyRecurrent] = useState(false);
 
-  const [sortKey, setSortKey] = useState<SortKey>("account");
+  const [sortKey, setSortKey] = useState<SortKey>("container");
   const [sortAsc, setSortAsc] = useState(true);
 
   const hasFilters =
     search.trim() !== "" ||
-    account !== "" ||
+    container !== "" ||
     assignee !== "" ||
     priority !== "" ||
     column !== "" ||
@@ -90,7 +91,7 @@ export function GlobalTasksView({
 
   function clearFilters(): void {
     setSearch("");
-    setAccount("");
+    setContainer("");
     setAssignee("");
     setPriority("");
     setColumn("");
@@ -103,10 +104,16 @@ export function GlobalTasksView({
     return tasks.filter((t) => {
       if (search.trim()) {
         const q = search.trim().toLowerCase();
-        const hay = `${t.title ?? ""} ${t.description} ${t.accountName}`.toLowerCase();
+        const hay = `${t.title ?? ""} ${t.description} ${t.containerName}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
-      if (account && t.accountId !== account) return false;
+      if (container) {
+        const key =
+          t.containerKind === "loose"
+            ? "loose"
+            : `${t.containerKind}:${t.containerId}`;
+        if (key !== container) return false;
+      }
       if (assignee === "unassigned") {
         if (t.assigneeId) return false;
       } else if (assignee && t.assigneeId !== assignee) {
@@ -122,7 +129,7 @@ export function GlobalTasksView({
   }, [
     tasks,
     search,
-    account,
+    container,
     assignee,
     priority,
     column,
@@ -145,9 +152,9 @@ export function GlobalTasksView({
       let av: string | number = "";
       let bv: string | number = "";
       switch (sortKey) {
-        case "account":
-          av = a.accountName.toLowerCase();
-          bv = b.accountName.toLowerCase();
+        case "container":
+          av = a.containerName.toLowerCase();
+          bv = b.containerName.toLowerCase();
           break;
         case "task":
           av = (a.title || a.description).toLowerCase();
@@ -186,7 +193,13 @@ export function GlobalTasksView({
   }
 
   function taskHref(t: GlobalTask): string {
-    return `/app/tareas/${t.accountId}?task=${t.id}`;
+    const scope =
+      t.containerKind === "account"
+        ? ({ kind: "account", accountId: t.containerId as string } as const)
+        : t.containerKind === "project"
+        ? ({ kind: "project", projectId: t.containerId as string } as const)
+        : ({ kind: "loose" } as const);
+    return `${scopeBoardPath(scope)}?task=${t.id}`;
   }
 
   return (
@@ -251,14 +264,17 @@ export function GlobalTasksView({
       {filtersOpen && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 p-2.5">
           <select
-            value={account}
-            onChange={(e) => setAccount(e.target.value)}
+            value={container}
+            onChange={(e) => setContainer(e.target.value)}
             className="rounded-md border border-input bg-background px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <option value="">Cuenta: todas</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
+            <option value="">Contenedor: todos</option>
+            {containers.map((c) => (
+              <option
+                key={c.kind === "loose" ? "loose" : `${c.kind}:${c.id}`}
+                value={c.kind === "loose" ? "loose" : `${c.kind}:${c.id}`}
+              >
+                {c.name}
               </option>
             ))}
           </select>
@@ -360,7 +376,7 @@ export function GlobalTasksView({
                       className="block rounded-lg border border-border bg-card p-2.5 text-sm shadow-sm hover:border-primary/40 transition-colors"
                     >
                       <span className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80">
-                        {t.accountName}
+                        {t.containerName}
                       </span>
                       <p className="line-clamp-2 font-medium leading-snug">
                         {t.title || t.description}
@@ -416,7 +432,7 @@ export function GlobalTasksView({
               <tr>
                 {(
                   [
-                    ["account", "Cuenta"],
+                    ["container", "Contenedor"],
                     ["task", "Tarea"],
                     ["assignee", "Responsable"],
                     ["column", "Columna"],
@@ -446,7 +462,7 @@ export function GlobalTasksView({
                     className="border-t border-border hover:bg-accent/30 transition-colors"
                   >
                     <td className="px-3 py-2 text-muted-foreground">
-                      {t.accountName}
+                      {t.containerName}
                     </td>
                     <td className="px-3 py-2">
                       <Link

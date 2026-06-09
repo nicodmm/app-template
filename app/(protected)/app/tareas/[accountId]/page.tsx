@@ -4,8 +4,16 @@ import { notFound, redirect } from "next/navigation";
 import { requireUserId, getCurrentUserId } from "@/lib/auth";
 import { getWorkspaceWithMember, getWorkspaceMembers } from "@/lib/queries/workspace";
 import { getAccountById } from "@/lib/queries/accounts";
-import { canAccessAccountTasks } from "@/lib/queries/task-access";
-import { getAccountKanbanTasks, listAccountTaskLabels } from "@/lib/queries/tareas";
+import {
+  canAccessAccountTasks,
+  getTaskAccessibleAccountIds,
+  getAccessibleProjectIds,
+} from "@/lib/queries/task-access";
+import {
+  getAccountKanbanTasks,
+  listAccountTaskLabels,
+  getScopeMoveTargets,
+} from "@/lib/queries/tareas";
 import { KanbanBoard } from "@/components/tareas/kanban-board";
 
 interface PageProps {
@@ -33,6 +41,15 @@ export default async function TareasAccountPage({ params }: PageProps) {
     listAccountTaskLabels(accountId),
   ]);
 
+  const [{ accountIds }, projectIds] = await Promise.all([
+    getTaskAccessibleAccountIds(userId, workspace.id),
+    getAccessibleProjectIds(userId, workspace.id),
+  ]);
+  const moveTargets = await getScopeMoveTargets(
+    accountIds.filter((id) => id !== accountId),
+    projectIds
+  );
+
   return (
     <div className="p-4 md:p-6 space-y-4">
       <Link
@@ -46,7 +63,14 @@ export default async function TareasAccountPage({ params }: PageProps) {
         <h1 className="text-2xl font-semibold">{account.name}</h1>
         <p className="text-sm text-muted-foreground mt-1">Tablero de tareas</p>
       </div>
-      <KanbanBoard accountId={accountId} currentUserId={userId} initialTasks={boardTasks} members={members} labels={labels} />
+      <KanbanBoard
+        scope={{ kind: "account", accountId }}
+        currentUserId={userId}
+        initialTasks={boardTasks}
+        members={members}
+        labels={labels}
+        moveTargets={moveTargets}
+      />
     </div>
   );
 }

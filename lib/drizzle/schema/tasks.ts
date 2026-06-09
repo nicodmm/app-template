@@ -1,5 +1,6 @@
 import { pgTable, text, timestamp, uuid, integer, index, boolean, date, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { accounts } from "./accounts";
+import { taskProjects } from "./task_projects";
 import { workspaces } from "./workspaces";
 import { transcripts } from "./transcripts";
 import { contextDocuments } from "./context_documents";
@@ -9,9 +10,12 @@ export const tasks = pgTable(
   "tasks",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    accountId: uuid("account_id")
-      .notNull()
-      .references(() => accounts.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id").references(() => accounts.id, {
+      onDelete: "cascade",
+    }),
+    projectId: uuid("project_id").references(() => taskProjects.id, {
+      onDelete: "cascade",
+    }),
     workspaceId: uuid("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
@@ -49,6 +53,7 @@ export const tasks = pgTable(
   (table) => [
     index("tasks_account_status_idx").on(table.accountId, table.status),
     index("tasks_parent_idx").on(table.parentTaskId),
+    index("tasks_project_idx").on(table.projectId),
     index("tasks_workspace_idx").on(table.workspaceId),
     index("tasks_transcript_idx").on(table.transcriptId),
     index("tasks_context_document_idx").on(table.contextDocumentId),

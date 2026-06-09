@@ -23,6 +23,8 @@ import {
   type TareaColumnKey,
 } from "@/lib/tareas/columns";
 import type { KanbanTask, TaskLabel } from "@/lib/queries/tareas";
+import type { TaskScope } from "@/lib/tareas/scope";
+import { moveTaskToScope } from "@/app/actions/task-projects";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
 import {
   moveTask,
@@ -38,11 +40,12 @@ import { TaskCard } from "./task-card";
 import { TaskDrawer } from "./task-drawer";
 
 interface KanbanBoardProps {
-  accountId: string;
+  scope: TaskScope;
   currentUserId: string | null;
   initialTasks: KanbanTask[];
   members: WorkspaceMemberWithUser[];
   labels: TaskLabel[];
+  moveTargets: { accounts: { id: string; name: string }[]; projects: { id: string; name: string }[] };
 }
 
 type Cols = Record<TareaColumnKey, KanbanTask[]>;
@@ -305,7 +308,7 @@ function Column({ columnKey, tasks, members, subtaskStats, onOpen, onCreate }: C
 
 // ── Board ────────────────────────────────────────────────────────────────────
 
-export function KanbanBoard({ accountId, currentUserId, initialTasks, members, labels }: KanbanBoardProps) {
+export function KanbanBoard({ scope, currentUserId, initialTasks, members, labels, moveTargets }: KanbanBoardProps) {
   const [tasks, setTasks] = useState<KanbanTask[]>(initialTasks);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -394,7 +397,7 @@ export function KanbanBoard({ accountId, currentUserId, initialTasks, members, l
     setTasks(rebuildTasks(next));
     applyServer(
       prevTasks,
-      () => moveTask(activeId, accountId, to, insertAt),
+      () => moveTask(activeId, scope, to, insertAt),
       "No se pudo mover la tarea."
     );
   }
@@ -422,7 +425,7 @@ export function KanbanBoard({ accountId, currentUserId, initialTasks, members, l
     setTasks(rebuildTasks(next));
     applyServer(
       prevTasks,
-      () => moveTask(taskId, accountId, to, insertAt),
+      () => moveTask(taskId, scope, to, insertAt),
       "No se pudo mover la tarea."
     );
   }
@@ -439,7 +442,7 @@ export function KanbanBoard({ accountId, currentUserId, initialTasks, members, l
     );
     applyServer(
       prevTasks,
-      () => moveTask(taskId, accountId, to, 0),
+      () => moveTask(taskId, scope, to, 0),
       "No se pudo mover la tarea."
     );
   }
@@ -450,7 +453,8 @@ export function KanbanBoard({ accountId, currentUserId, initialTasks, members, l
     const tempId = `temp-sub-${parentTaskId}-${title.slice(0, 8)}-${tasks.length}`;
     const optimistic: KanbanTask = {
       id: tempId,
-      accountId,
+      accountId: scope.kind === "account" ? scope.accountId : null,
+      projectId: scope.kind === "project" ? scope.projectId : null,
       workspaceId: "",
       transcriptId: null,
       contextDocumentId: null,
@@ -481,7 +485,7 @@ export function KanbanBoard({ accountId, currentUserId, initialTasks, members, l
       labels: [],
     };
     setTasks((cur) => [...cur, optimistic]);
-    createSubtask(accountId, parentTaskId, title)
+    createSubtask(scope, parentTaskId, title)
       .then((res) => {
         if (res.error || !res.id) {
           setTasks(prevTasks);
@@ -517,7 +521,7 @@ export function KanbanBoard({ accountId, currentUserId, initialTasks, members, l
     );
     applyServer(
       prevTasks,
-      () => updateTaskFields(taskId, accountId, fields),
+      () => updateTaskFields(taskId, scope, fields),
       "No se pudo guardar el cambio."
     );
   }
@@ -527,9 +531,29 @@ export function KanbanBoard({ accountId, currentUserId, initialTasks, members, l
     setTasks((cur) => cur.filter((t) => t.id !== taskId));
     applyServer(
       prevTasks,
-      () => deleteKanbanTask(taskId, accountId),
+      () => deleteKanbanTask(taskId, scope),
       "No se pudo eliminar la tarea."
     );
+  }
+
+  function moveScope(toScope: TaskScope): void {
+    if (!selectedId) return;
+    const id = selectedId;
+    const prevTasks = tasks;
+    // La tarea sale de este board (cambió de contenedor).
+    setTasks((cur) => cur.filter((t) => t.id !== id && t.parentTaskId !== id));
+    setSelectedId(null);
+    moveTaskToScope(id, toScope)
+      .then((res) => {
+        if (res?.error) {
+          setTasks(prevTasks);
+          setError(res.error);
+        }
+      })
+      .catch(() => {
+        setTasks(prevTasks);
+        setError("No se pudo mover la tarea de contenedor.");
+      });
   }
 
   function assignTaskLabel(taskId: string, label: TaskLabel): void {
@@ -541,7 +565,7 @@ export function KanbanBoard({ accountId, currentUserId, initialTasks, members, l
           : t
       )
     );
-    applyServer(prevTasks, () => assignLabel(taskId, accountId, label.id), "No se pudo asignar la etiqueta.");
+    applyServer(prevTasks, () => assignLabel(taskId, scope, label.id), "No se pudo asignar la etiqueta.");
   }
 
   function unassignTaskLabel(taskId: string, labelId: string): void {
@@ -551,11 +575,11 @@ export function KanbanBoard({ accountId, currentUserId, initialTasks, members, l
         t.id === taskId ? { ...t, labels: t.labels.filter((l) => l.id !== labelId) } : t
       )
     );
-    applyServer(prevTasks, () => unassignLabel(taskId, accountId, labelId), "No se pudo quitar la etiqueta.");
+    applyServer(prevTasks, () => unassignLabel(taskId, scope, labelId), "No se pudo quitar la etiqueta.");
   }
 
   function createAndAssignLabel(taskId: string, name: string, color: string): void {
-    createLabel(accountId, name, color)
+    createLabel(scope, name, color)
       .then((res) => {
         if (res.error || !res.label) {
           setError(res.error ?? "No se pudo crear la etiqueta.");
@@ -577,7 +601,8 @@ export function KanbanBoard({ accountId, currentUserId, initialTasks, members, l
     const m = input.assigneeId ? members.find((mm) => mm.userId === input.assigneeId) : null;
     const optimistic: KanbanTask = {
       id: tempId,
-      accountId,
+      accountId: scope.kind === "account" ? scope.accountId : null,
+      projectId: scope.kind === "project" ? scope.projectId : null,
       workspaceId: "",
       transcriptId: null,
       contextDocumentId: null,
@@ -609,7 +634,7 @@ export function KanbanBoard({ accountId, currentUserId, initialTasks, members, l
     };
     setTasks((cur) => [...cur, optimistic]);
     createKanbanTask(
-      accountId,
+      scope,
       column,
       input.title,
       input.priority,
@@ -779,7 +804,9 @@ export function KanbanBoard({ accountId, currentUserId, initialTasks, members, l
 
       <TaskDrawer
         task={selectedTask}
-        accountId={accountId}
+        scope={scope}
+        moveTargets={moveTargets}
+        onMoveScope={moveScope}
         currentUserId={currentUserId}
         members={members}
         labelCatalog={labelCatalog}

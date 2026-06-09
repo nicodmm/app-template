@@ -12,7 +12,7 @@ import {
   users,
   workspaceMembers,
 } from "@/lib/drizzle/schema";
-import { and, eq, sql, inArray } from "drizzle-orm";
+import { and, eq, sql, inArray, isNull } from "drizzle-orm";
 import { isLabelColor } from "@/lib/tareas/labels";
 import type {
   TaskLabel,
@@ -25,8 +25,11 @@ import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId } from "@/lib/queries/workspace";
 import {
   canAccessAccountTasks,
-  getTaskAccessibleAccountIds,
+  canAccessProject,
+  assertScopeAccess,
 } from "@/lib/queries/task-access";
+import type { TaskScope } from "@/lib/tareas/scope";
+import { scopeBoardPath } from "@/lib/tareas/scope";
 import {
   TAREA_COLUMN_KEYS,
   isDoneColumn,
@@ -34,19 +37,75 @@ import {
 } from "@/lib/tareas/columns";
 import { revalidatePath } from "next/cache";
 
-async function authorize(accountId: string): Promise<{ workspaceId: string; userId: string }> {
+/** Autoriza para CREAR en un scope (sin tarea previa). */
+async function authorizeScope(
+  scope: TaskScope
+): Promise<{ workspaceId: string; userId: string }> {
   const userId = await requireUserId();
   const workspace = await getWorkspaceByUserId(userId);
   if (!workspace) throw new Error("Workspace no encontrado");
-  const ok = await canAccessAccountTasks(userId, workspace.id, accountId);
-  if (!ok) throw new Error("Sin acceso a las tareas de esta cuenta");
+  const ok = await assertScopeAccess(userId, workspace.id, scope);
+  if (!ok) throw new Error("Sin acceso a este contenedor");
   return { workspaceId: workspace.id, userId };
 }
 
-function revalidate(accountId: string): void {
-  revalidatePath(`/app/tareas/${accountId}`);
+interface StoredTask {
+  id: string;
+  workspaceId: string;
+  accountId: string | null;
+  projectId: string | null;
+  createdBy: string | null;
+  assigneeId: string | null;
+}
+
+/** Carga la tarea y verifica acceso contra su scope ALMACENADO. */
+async function authorizeTask(
+  taskId: string
+): Promise<{ workspaceId: string; userId: string; task: StoredTask }> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) throw new Error("Workspace no encontrado");
+  const [task] = await db
+    .select({
+      id: tasks.id,
+      workspaceId: tasks.workspaceId,
+      accountId: tasks.accountId,
+      projectId: tasks.projectId,
+      createdBy: tasks.createdBy,
+      assigneeId: tasks.assigneeId,
+    })
+    .from(tasks)
+    .where(and(eq(tasks.id, taskId), eq(tasks.workspaceId, workspace.id)))
+    .limit(1);
+  if (!task) throw new Error("Tarea no encontrada");
+
+  let ok = false;
+  if (task.accountId)
+    ok = await canAccessAccountTasks(userId, workspace.id, task.accountId);
+  else if (task.projectId)
+    ok = await canAccessProject(userId, workspace.id, task.projectId);
+  else ok = task.createdBy === userId || task.assigneeId === userId;
+  if (!ok) throw new Error("Sin acceso a esta tarea");
+
+  return { workspaceId: workspace.id, userId, task };
+}
+
+function revalidate(scope: TaskScope): void {
+  revalidatePath(scopeBoardPath(scope));
   revalidatePath("/app/tareas");
-  revalidatePath(`/app/accounts/${accountId}`);
+  if (scope.kind === "account")
+    revalidatePath(`/app/accounts/${scope.accountId}`);
+}
+
+/** Condición Drizzle "esta tarea pertenece a este scope" (para max sortOrder). */
+function scopeColumnFilter(scope: TaskScope, userId: string) {
+  if (scope.kind === "account") return eq(tasks.accountId, scope.accountId);
+  if (scope.kind === "project") return eq(tasks.projectId, scope.projectId);
+  return and(
+    isNull(tasks.accountId),
+    isNull(tasks.projectId),
+    eq(tasks.createdBy, userId)
+  );
 }
 
 function isColumn(value: string): value is TareaColumnKey {
@@ -55,11 +114,11 @@ function isColumn(value: string): value is TareaColumnKey {
 
 export async function moveTask(
   taskId: string,
-  accountId: string,
+  scope: TaskScope,
   toColumn: string,
   newSortOrder: number
 ): Promise<{ error?: string }> {
-  const { workspaceId } = await authorize(accountId);
+  const { workspaceId } = await authorizeTask(taskId);
   if (!isColumn(toColumn)) return { error: "Columna inválida" };
   await db
     .update(tasks)
@@ -69,32 +128,33 @@ export async function moveTask(
       completedAt: isDoneColumn(toColumn) ? new Date() : null,
       updatedAt: new Date(),
     })
-    .where(and(eq(tasks.id, taskId), eq(tasks.workspaceId, workspaceId), eq(tasks.accountId, accountId)));
-  revalidate(accountId);
+    .where(and(eq(tasks.id, taskId), eq(tasks.workspaceId, workspaceId)));
+  revalidate(scope);
   return {};
 }
 
 export async function createKanbanTask(
-  accountId: string,
+  scope: TaskScope,
   column: string,
   title: string,
   priority: number,
   assigneeId: string | null,
   dueDate: string | null
 ): Promise<{ id?: string; error?: string }> {
-  const { workspaceId, userId } = await authorize(accountId);
+  const { workspaceId, userId } = await authorizeScope(scope);
   if (!isColumn(column)) return { error: "Columna inválida" };
   if (!title.trim()) return { error: "El título es requerido" };
 
   const [{ maxOrder }] = await db
     .select({ maxOrder: sql<number>`coalesce(max(${tasks.sortOrder}), 0)` })
     .from(tasks)
-    .where(and(eq(tasks.accountId, accountId), eq(tasks.status, column)));
+    .where(and(scopeColumnFilter(scope, userId), eq(tasks.status, column)));
 
   const [created] = await db
     .insert(tasks)
     .values({
-      accountId,
+      accountId: scope.kind === "account" ? scope.accountId : null,
+      projectId: scope.kind === "project" ? scope.projectId : null,
       workspaceId,
       createdBy: userId,
       assigneeId: assigneeId || null,
@@ -107,24 +167,24 @@ export async function createKanbanTask(
       dueDate: dueDate || null,
     })
     .returning({ id: tasks.id });
-  revalidate(accountId);
+  revalidate(scope);
   return { id: created.id };
 }
 
 export async function createSubtask(
-  accountId: string,
+  scope: TaskScope,
   parentTaskId: string,
   title: string
 ): Promise<{ id?: string; error?: string }> {
-  const { workspaceId, userId } = await authorize(accountId);
   if (!title.trim()) return { error: "El título es requerido" };
-  if (!(await assertTaskInAccount(parentTaskId, accountId)))
-    return { error: "Tarea padre no encontrada" };
+  const { workspaceId, userId, task: parent } =
+    await authorizeTask(parentTaskId);
 
   const [created] = await db
     .insert(tasks)
     .values({
-      accountId,
+      accountId: parent.accountId,
+      projectId: parent.projectId,
       workspaceId,
       createdBy: userId,
       parentTaskId,
@@ -136,13 +196,13 @@ export async function createSubtask(
       sortOrder: 0,
     })
     .returning({ id: tasks.id });
-  revalidate(accountId);
+  revalidate(scope);
   return { id: created.id };
 }
 
 export async function updateTaskFields(
   taskId: string,
-  accountId: string,
+  scope: TaskScope,
   fields: {
     title?: string;
     description?: string;
@@ -152,9 +212,8 @@ export async function updateTaskFields(
     isPublic?: boolean;
   }
 ): Promise<{ error?: string }> {
-  const { workspaceId, userId } = await authorize(accountId);
+  const { workspaceId, userId, task } = await authorizeTask(taskId);
 
-  // Estado previo (para detectar cambio real de responsable → notificar).
   const [before] = await db
     .select({
       assigneeId: tasks.assigneeId,
@@ -162,28 +221,28 @@ export async function updateTaskFields(
       description: tasks.description,
     })
     .from(tasks)
-    .where(and(eq(tasks.id, taskId), eq(tasks.accountId, accountId)))
+    .where(eq(tasks.id, taskId))
     .limit(1);
   if (!before) return { error: "Tarea no encontrada" };
 
   const patch: Partial<typeof tasks.$inferInsert> = { updatedAt: new Date() };
   if (fields.title !== undefined) patch.title = fields.title.trim() || null;
   if (fields.description !== undefined) {
-    if (!fields.description.trim()) return { error: "La descripción es requerida" };
+    if (!fields.description.trim())
+      return { error: "La descripción es requerida" };
     patch.description = fields.description.trim();
   }
   if (fields.priority !== undefined) patch.priority = fields.priority;
-  if (fields.assigneeId !== undefined) patch.assigneeId = fields.assigneeId || null;
+  if (fields.assigneeId !== undefined)
+    patch.assigneeId = fields.assigneeId || null;
   if (fields.dueDate !== undefined) patch.dueDate = fields.dueDate || null;
   if (fields.isPublic !== undefined) patch.isPublic = fields.isPublic;
 
   await db
     .update(tasks)
     .set(patch)
-    .where(and(eq(tasks.id, taskId), eq(tasks.workspaceId, workspaceId), eq(tasks.accountId, accountId)));
+    .where(and(eq(tasks.id, taskId), eq(tasks.workspaceId, workspaceId)));
 
-  // Notificación de asignación: solo si el responsable cambió a otra persona
-  // distinta del que hace la acción.
   const newAssignee = fields.assigneeId;
   if (
     newAssignee &&
@@ -202,85 +261,76 @@ export async function updateTaskFields(
       userId: newAssignee,
       type: "assignment",
       taskId,
-      accountId,
+      accountId: task.accountId,
       actorId: userId,
       body: `${actor?.name ?? "Alguien"} te asignó: "${snippet}"`,
     });
   }
 
-  revalidate(accountId);
+  revalidate(scope);
   return {};
 }
 
 export async function deleteKanbanTask(
   taskId: string,
-  accountId: string
+  scope: TaskScope
 ): Promise<{ error?: string }> {
-  const { workspaceId } = await authorize(accountId);
+  const { workspaceId } = await authorizeTask(taskId);
   await db
     .delete(tasks)
-    .where(and(eq(tasks.id, taskId), eq(tasks.workspaceId, workspaceId), eq(tasks.accountId, accountId)));
-  revalidate(accountId);
+    .where(and(eq(tasks.id, taskId), eq(tasks.workspaceId, workspaceId)));
+  revalidate(scope);
   return {};
 }
 
 export async function createLabel(
-  accountId: string,
+  scope: TaskScope,
   name: string,
   color: string
 ): Promise<{ label?: TaskLabel; error?: string }> {
-  const { workspaceId } = await authorize(accountId);
+  const { workspaceId } = await authorizeScope(scope);
   if (!name.trim()) return { error: "El nombre es requerido" };
   if (!isLabelColor(color)) return { error: "Color inválido" };
   const [created] = await db
     .insert(taskLabels)
     .values({ workspaceId, name: name.trim(), color })
-    .returning({ id: taskLabels.id, name: taskLabels.name, color: taskLabels.color });
-  revalidate(accountId);
+    .returning({
+      id: taskLabels.id,
+      name: taskLabels.name,
+      color: taskLabels.color,
+    });
+  revalidate(scope);
   return { label: { id: created.id, name: created.name, color: created.color } };
-}
-
-/** Verifica que la tarea pertenezca a la cuenta autorizada. */
-async function assertTaskInAccount(taskId: string, accountId: string): Promise<boolean> {
-  const [t] = await db
-    .select({ id: tasks.id })
-    .from(tasks)
-    .where(and(eq(tasks.id, taskId), eq(tasks.accountId, accountId)))
-    .limit(1);
-  return !!t;
 }
 
 export async function assignLabel(
   taskId: string,
-  accountId: string,
+  scope: TaskScope,
   labelId: string
 ): Promise<{ error?: string }> {
-  const { workspaceId } = await authorize(accountId);
-  if (!(await assertTaskInAccount(taskId, accountId)))
-    return { error: "Tarea no encontrada" };
-  // La etiqueta debe pertenecer al workspace de la cuenta.
+  const { workspaceId } = await authorizeTask(taskId);
   const [lbl] = await db
     .select({ id: taskLabels.id })
     .from(taskLabels)
-    .where(and(eq(taskLabels.id, labelId), eq(taskLabels.workspaceId, workspaceId)))
+    .where(
+      and(eq(taskLabels.id, labelId), eq(taskLabels.workspaceId, workspaceId))
+    )
     .limit(1);
   if (!lbl) return { error: "Etiqueta no encontrada" };
   await db
     .insert(taskLabelAssignments)
     .values({ taskId, labelId })
     .onConflictDoNothing();
-  revalidate(accountId);
+  revalidate(scope);
   return {};
 }
 
 export async function unassignLabel(
   taskId: string,
-  accountId: string,
+  scope: TaskScope,
   labelId: string
 ): Promise<{ error?: string }> {
-  await authorize(accountId);
-  if (!(await assertTaskInAccount(taskId, accountId)))
-    return { error: "Tarea no encontrada" };
+  await authorizeTask(taskId);
   await db
     .delete(taskLabelAssignments)
     .where(
@@ -289,7 +339,7 @@ export async function unassignLabel(
         eq(taskLabelAssignments.labelId, labelId)
       )
     );
-  revalidate(accountId);
+  revalidate(scope);
   return {};
 }
 
@@ -298,23 +348,20 @@ export async function unassignLabel(
 /** Carga el hilo (comentarios + adjuntos) de una tarea, con access-check. */
 export async function loadTaskThread(
   taskId: string,
-  accountId: string
+  scope: TaskScope
 ): Promise<{ thread?: TaskThread; error?: string }> {
-  await authorize(accountId);
-  if (!(await assertTaskInAccount(taskId, accountId)))
-    return { error: "Tarea no encontrada" };
+  await authorizeTask(taskId);
+  void scope;
   return { thread: await getTaskThread(taskId) };
 }
 
 export async function addComment(
   taskId: string,
-  accountId: string,
+  scope: TaskScope,
   body: string,
   mentionedUserIds: string[]
 ): Promise<{ comment?: TaskCommentView; error?: string }> {
-  const { workspaceId, userId } = await authorize(accountId);
-  if (!(await assertTaskInAccount(taskId, accountId)))
-    return { error: "Tarea no encontrada" };
+  const { workspaceId, userId, task } = await authorizeTask(taskId);
   const text = body.trim();
   if (!text) return { error: "El comentario está vacío" };
 
@@ -363,7 +410,7 @@ export async function addComment(
         userId: mentionedUser,
         type: "mention",
         taskId,
-        accountId,
+        accountId: task.accountId,
         actorId: userId,
         commentId: comment.id,
         body: `${actorName} te mencionó: "${snippet}"`,
@@ -371,7 +418,7 @@ export async function addComment(
     );
   }
 
-  revalidate(accountId);
+  revalidate(scope);
   return {
     comment: {
       id: comment.id,
@@ -386,63 +433,56 @@ export async function addComment(
 
 export async function deleteComment(
   commentId: string,
-  accountId: string
+  scope: TaskScope
 ): Promise<{ error?: string }> {
-  const { workspaceId, userId } = await authorize(accountId);
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) return { error: "Workspace no encontrado" };
   const [row] = await db
-    .select({ authorId: taskComments.authorId, accountId: tasks.accountId })
+    .select({ authorId: taskComments.authorId, taskId: taskComments.taskId })
     .from(taskComments)
-    .innerJoin(tasks, eq(tasks.id, taskComments.taskId))
     .where(eq(taskComments.id, commentId))
     .limit(1);
-  if (!row || row.accountId !== accountId)
-    return { error: "Comentario no encontrado" };
-
-  const access = await getTaskAccessibleAccountIds(userId, workspaceId);
-  if (row.authorId !== userId && !access.all)
-    return { error: "No autorizado" };
-
+  if (!row) return { error: "Comentario no encontrado" };
+  // Verifica acceso a la tarea dueña del comentario.
+  await authorizeTask(row.taskId);
+  if (row.authorId !== userId) return { error: "No autorizado" };
   await db.delete(taskComments).where(eq(taskComments.id, commentId));
-  revalidate(accountId);
+  revalidate(scope);
   return {};
 }
 
 export async function addAttachment(
   taskId: string,
-  accountId: string,
+  scope: TaskScope,
   label: string,
   url: string
 ): Promise<{ attachment?: TaskAttachment; error?: string }> {
-  const { userId } = await authorize(accountId);
-  if (!(await assertTaskInAccount(taskId, accountId)))
-    return { error: "Tarea no encontrada" };
+  const { userId } = await authorizeTask(taskId);
   const cleanUrl = url.trim();
   const cleanLabel = label.trim() || cleanUrl;
   if (!/^https?:\/\//i.test(cleanUrl))
     return { error: "El link debe empezar con http(s)://" };
-
   const [attachment] = await db
     .insert(taskAttachments)
     .values({ taskId, label: cleanLabel, url: cleanUrl, createdBy: userId })
     .returning();
-  revalidate(accountId);
+  revalidate(scope);
   return { attachment };
 }
 
 export async function deleteAttachment(
   attachmentId: string,
-  accountId: string
+  scope: TaskScope
 ): Promise<{ error?: string }> {
-  await authorize(accountId);
   const [row] = await db
-    .select({ accountId: tasks.accountId })
+    .select({ taskId: taskAttachments.taskId })
     .from(taskAttachments)
-    .innerJoin(tasks, eq(tasks.id, taskAttachments.taskId))
     .where(eq(taskAttachments.id, attachmentId))
     .limit(1);
-  if (!row || row.accountId !== accountId)
-    return { error: "Adjunto no encontrado" };
+  if (!row) return { error: "Adjunto no encontrado" };
+  await authorizeTask(row.taskId);
   await db.delete(taskAttachments).where(eq(taskAttachments.id, attachmentId));
-  revalidate(accountId);
+  revalidate(scope);
   return {};
 }
