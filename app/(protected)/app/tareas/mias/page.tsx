@@ -42,9 +42,9 @@ export default async function TareasMiasPage() {
         Tareas
       </Link>
       <div>
-        <h1 className="text-2xl font-semibold">Mis tareas</h1>
+        <h1 className="text-2xl font-semibold">Tareas Sueltas</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Tareas sueltas (no pertenecen a una cuenta ni proyecto).
+          No pertenecen a una cuenta ni proyecto.
         </p>
       </div>
       <KanbanBoard

@@ -148,7 +148,7 @@ export interface GlobalTask {
   id: string;
   containerKind: ContainerKind;
   containerId: string | null; // null para loose
-  containerName: string; // nombre de cuenta/proyecto o "Mis tareas"
+  containerName: string; // nombre de cuenta/proyecto o "Tareas Sueltas"
   title: string | null;
   description: string;
   column: TareaColumnKey;
@@ -234,7 +234,7 @@ export async function getGlobalTasks(params: {
           ? r.accountName ?? "Cuenta"
           : kind === "project"
           ? r.projectName ?? "Proyecto"
-          : "Mis tareas",
+          : "Tareas Sueltas",
       title: r.title,
       description: r.description,
       column: normalizeColumn(r.status),
@@ -366,6 +366,37 @@ export async function getUserProjects(
     id: r.id,
     name: r.name,
     color: r.color ?? null,
+    taskCount: Number(r.taskCount ?? 0),
+  }));
+}
+
+export interface AccountSummary {
+  id: string;
+  name: string;
+  taskCount: number;
+}
+
+/** Cuentas accesibles + conteo de tareas top-level (se muestran como proyectos). */
+export async function getAccountSummaries(
+  accountIds: string[]
+): Promise<AccountSummary[]> {
+  if (accountIds.length === 0) return [];
+  const rows = await db
+    .select({
+      id: accounts.id,
+      name: accounts.name,
+      taskCount: sql<number>`(
+        select count(*) from ${tasks}
+        where ${tasks.accountId} = ${accounts.id}
+          and ${tasks.parentTaskId} is null
+      )`,
+    })
+    .from(accounts)
+    .where(inArray(accounts.id, accountIds))
+    .orderBy(asc(accounts.name));
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
     taskCount: Number(r.taskCount ?? 0),
   }));
 }
