@@ -45,6 +45,7 @@ import { HealthSection } from "@/components/account-detail/health-section";
 import { SectionSkeleton } from "@/components/account-detail/section-skeleton";
 import { SelectionSection } from "@/components/account-detail/selection-section";
 import { AccountConsultantsInline } from "@/components/account-detail/account-consultants-inline";
+import { AccountInvoiceCountry } from "@/components/account-detail/account-invoice-country";
 import { AccountTermsField } from "@/components/account-detail/account-terms-field";
 import { accountFinance, accountConsultants, users as usersTable } from "@/lib/drizzle/schema";
 
@@ -112,7 +113,10 @@ export default async function AccountDetailPage({
           .innerJoin(usersTable, eq(accountConsultants.userId, usersTable.id))
           .where(eq(accountConsultants.accountId, accountId)),
         db
-          .select({ termsRawText: accountFinance.termsRawText })
+          .select({
+            termsRawText: accountFinance.termsRawText,
+            invoiceCountry: accountFinance.invoiceCountry,
+          })
           .from(accountFinance)
           .where(eq(accountFinance.accountId, accountId))
           .limit(1),
@@ -122,8 +126,16 @@ export default async function AccountDetailPage({
     id: r.id,
     displayName: r.fullName ?? r.email,
   }));
-  const termsText =
-    (financeRow as { termsRawText: string | null }[])[0]?.termsRawText ?? null;
+  const financeRowTyped = financeRow as {
+    termsRawText: string | null;
+    invoiceCountry: string | null;
+  }[];
+  const termsText = financeRowTyped[0]?.termsRawText ?? null;
+  const rawInvoiceCountry = financeRowTyped[0]?.invoiceCountry ?? null;
+  const invoiceCountry: "AR" | "US" | null =
+    rawInvoiceCountry === "AR" || rawInvoiceCountry === "US"
+      ? rawInvoiceCountry
+      : null;
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -400,6 +412,10 @@ export default async function AccountDetailPage({
                   Ver finanzas de la cuenta →
                 </Link>
               </div>
+              <AccountInvoiceCountry
+                accountId={accountId}
+                initialCountry={invoiceCountry}
+              />
               <AccountConsultantsInline
                 accountId={accountId}
                 consultants={financeConsultants}

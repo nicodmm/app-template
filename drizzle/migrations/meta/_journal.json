@@ -281,6 +281,13 @@
       "when": 1780961944694,
       "tag": "0039_yellow_jamie_braddock",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1780976843485,
+      "tag": "0040_magical_king_bedlam",
+      "breakpoints": true
     }
   ]
 }

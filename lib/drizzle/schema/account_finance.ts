@@ -31,6 +31,7 @@ export const accountFinance = pgTable(
     proposalStoragePath: text("proposal_storage_path"),
     proposalUrl: text("proposal_url"),
     proposalFileName: text("proposal_file_name"),
+    invoiceCountry: text("invoice_country"),
     termsRawText: text("terms_raw_text"),
     termsStatus: text("terms_status").notNull().default("none"),
     termsError: text("terms_error"),
