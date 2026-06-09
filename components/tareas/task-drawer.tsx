@@ -255,15 +255,10 @@ export function TaskDrawer({
                 Contenedor
               </label>
               <select
-                value={
-                  scope.kind === "account"
-                    ? `account:${scope.accountId}`
-                    : scope.kind === "project"
-                    ? `project:${scope.projectId}`
-                    : "loose"
-                }
+                value=""
                 onChange={(e) => {
                   const v = e.target.value;
+                  if (!v) return;
                   if (v === "loose") onMoveScope({ kind: "loose" });
                   else if (v.startsWith("account:"))
                     onMoveScope({ kind: "account", accountId: v.slice(8) });
@@ -272,7 +267,10 @@ export function TaskDrawer({
                 }}
                 className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <option value="loose">Mis tareas (suelta)</option>
+                <option value="">Mover a otro contenedor…</option>
+                {scope.kind !== "loose" && (
+                  <option value="loose">Mis tareas (suelta)</option>
+                )}
                 {moveTargets.projects.length > 0 && (
                   <optgroup label="Proyectos">
                     {moveTargets.projects.map((p) => (

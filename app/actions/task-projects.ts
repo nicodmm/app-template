@@ -250,6 +250,7 @@ export async function moveTaskToScope(
     .set({
       accountId: toScope.kind === "account" ? toScope.accountId : null,
       projectId: toScope.kind === "project" ? toScope.projectId : null,
+      ...(toScope.kind === "loose" ? { createdBy: userId } : {}),
       updatedAt: new Date(),
     })
     .where(and(eq(tasks.id, taskId), eq(tasks.workspaceId, workspaceId)));
@@ -260,6 +261,7 @@ export async function moveTaskToScope(
     .set({
       accountId: toScope.kind === "account" ? toScope.accountId : null,
       projectId: toScope.kind === "project" ? toScope.projectId : null,
+      ...(toScope.kind === "loose" ? { createdBy: userId } : {}),
       updatedAt: new Date(),
     })
     .where(
