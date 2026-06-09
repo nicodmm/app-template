@@ -9,7 +9,9 @@ import {
   TrendingUp,
   FolderOpen,
   ExternalLink,
+  DollarSign,
 } from "lucide-react";
+import { CollapsibleSection } from "@/components/collapsible-section";
 import { requireUserId } from "@/lib/auth";
 import {
   getWorkspaceWithMember,
@@ -176,33 +178,6 @@ export default async function AccountDetailPage({
           />
         </div>
       </div>
-
-      <AccountShareSection
-        accountId={accountId}
-        existing={existingShareLink}
-      />
-
-      {/* Términos de contratación + consultores — solo finance admins/owners/admins.
-          La operación financiera completa vive en /app/finanzas/[accountId]. */}
-      {canFinance && (
-        <GlassCard className="p-6 mb-6 space-y-5">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-semibold">Términos de contratación y pagos</h2>
-            <Link
-              href={`/app/finanzas/${accountId}`}
-              className="text-xs text-primary hover:underline"
-            >
-              Ver finanzas de la cuenta →
-            </Link>
-          </div>
-          <AccountConsultantsInline
-            accountId={accountId}
-            consultants={financeConsultants}
-            members={members}
-          />
-          <AccountTermsField accountId={accountId} initialText={termsText} />
-        </GlassCard>
-      )}
 
       {/* Edit form */}
       {isEditing && (
@@ -406,6 +381,35 @@ export default async function AccountDetailPage({
           )}
         </GlassCard>
       )}
+
+      {/* Operación interna: vista pública + términos, compacto y lado a lado.
+          Se baja del tope para no tapar la visión principal de la cuenta. */}
+      <div className="grid gap-4 sm:grid-cols-2 mb-6">
+        <AccountShareSection accountId={accountId} existing={existingShareLink} />
+        {canFinance && (
+          <CollapsibleSection
+            title="Términos de contratación y pagos"
+            icon={<DollarSign size={16} aria-hidden />}
+          >
+            <div className="space-y-5">
+              <div className="flex justify-end">
+                <Link
+                  href={`/app/finanzas/${accountId}`}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Ver finanzas de la cuenta →
+                </Link>
+              </div>
+              <AccountConsultantsInline
+                accountId={accountId}
+                consultants={financeConsultants}
+                members={members}
+              />
+              <AccountTermsField accountId={accountId} initialText={termsText} />
+            </div>
+          </CollapsibleSection>
+        )}
+      </div>
 
       {/* Paid Media mini-card */}
       {isModuleEnabled(account.enabledModules, "paid_media") && (
