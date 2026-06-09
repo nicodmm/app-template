@@ -5,7 +5,7 @@ import {
   getCrmMiniCardKpis,
   type CurrencyBucket,
 } from "@/lib/queries/crm";
-import { GlassCard } from "@/components/ui/glass-card";
+import { CollapsibleSection } from "@/components/collapsible-section";
 
 interface CrmMiniCardProps {
   workspaceId: string;
@@ -49,11 +49,11 @@ export async function CrmMiniCard({ workspaceId, accountId }: CrmMiniCardProps) 
 
   if (state.state === "no_connection") {
     return (
-      <GlassCard className="p-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Target size={16} className="text-muted-foreground" />
-          <h2 className="font-semibold">CRM</h2>
-        </div>
+      <CollapsibleSection
+        title="CRM"
+        icon={<Target size={16} aria-hidden />}
+        summary="sin conexión"
+      >
         <p className="text-sm text-muted-foreground mb-3">
           Conectá Pipedrive para ver oportunidades, propuestas y valor del pipeline de esta cuenta.
         </p>
@@ -63,78 +63,81 @@ export async function CrmMiniCard({ workspaceId, accountId }: CrmMiniCardProps) 
         >
           Conectar Pipedrive
         </Link>
-      </GlassCard>
+      </CollapsibleSection>
     );
   }
 
   if (state.state === "not_configured") {
     return (
-      <GlassCard className="p-6 space-y-3">
-        <div className="flex items-center gap-2">
-          <Target size={16} className="text-muted-foreground" />
-          <h2 className="font-semibold">CRM</h2>
+      <CollapsibleSection
+        title="CRM"
+        icon={<Target size={16} aria-hidden />}
+        summary="sin configurar"
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Completá el mapping de pipelines y stages para empezar a ver datos.
+          </p>
+          <Link
+            href={`/app/accounts/${accountId}/crm/setup`}
+            className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium transition-colors backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] hover:bg-white/40 dark:hover:bg-white/10"
+          >
+            Configurar CRM
+          </Link>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Completá el mapping de pipelines y stages para empezar a ver datos.
-        </p>
-        <Link
-          href={`/app/accounts/${accountId}/crm/setup`}
-          className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium transition-colors backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] hover:bg-white/40 dark:hover:bg-white/10"
-        >
-          Configurar CRM
-        </Link>
-      </GlassCard>
+      </CollapsibleSection>
     );
   }
 
   const kpis = await getCrmMiniCardKpis(state.connection.id);
 
   return (
-    <GlassCard className="p-6 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Target size={16} className="text-muted-foreground" />
-          <h2 className="font-semibold">CRM</h2>
-          <span className="text-xs text-muted-foreground">· pipeline actual</span>
+    <CollapsibleSection
+      title="CRM"
+      icon={<Target size={16} aria-hidden />}
+      summary="pipeline actual"
+    >
+      <div className="space-y-3">
+        <div className="flex justify-end">
+          <Link
+            href={`/app/accounts/${accountId}/crm`}
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            Ver todo <ArrowRight size={11} aria-hidden />
+          </Link>
         </div>
-        <Link
-          href={`/app/accounts/${accountId}/crm`}
-          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-        >
-          Ver todo <ArrowRight size={11} aria-hidden />
-        </Link>
-      </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className={TILE_CLASS}>
-          <p className="text-xs text-muted-foreground mb-1">Oportunidades</p>
-          <p className="text-lg font-semibold font-mono tabular-nums">{kpis.oportunidades}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className={TILE_CLASS}>
+            <p className="text-xs text-muted-foreground mb-1">Oportunidades</p>
+            <p className="text-lg font-semibold font-mono tabular-nums">{kpis.oportunidades}</p>
+          </div>
+          <div className={TILE_CLASS}>
+            <p className="text-xs text-muted-foreground mb-1">Propuestas</p>
+            <p className="text-lg font-semibold font-mono tabular-nums">{kpis.propuestas}</p>
+          </div>
+          <div className={TILE_CLASS}>
+            <p className="text-xs text-muted-foreground mb-1">Valor pipeline</p>
+            <p className="text-lg font-semibold font-mono tabular-nums">
+              {dominantCurrencyLabel(kpis.valuePipeline)}
+            </p>
+          </div>
+          <div className={TILE_CLASS}>
+            <p className="text-xs text-muted-foreground mb-1">Ganados 30d</p>
+            <p className="text-lg font-semibold font-mono tabular-nums">{kpis.wonLast30d}</p>
+          </div>
         </div>
-        <div className={TILE_CLASS}>
-          <p className="text-xs text-muted-foreground mb-1">Propuestas</p>
-          <p className="text-lg font-semibold font-mono tabular-nums">{kpis.propuestas}</p>
-        </div>
-        <div className={TILE_CLASS}>
-          <p className="text-xs text-muted-foreground mb-1">Valor pipeline</p>
-          <p className="text-lg font-semibold font-mono tabular-nums">
-            {dominantCurrencyLabel(kpis.valuePipeline)}
-          </p>
-        </div>
-        <div className={TILE_CLASS}>
-          <p className="text-xs text-muted-foreground mb-1">Ganados 30d</p>
-          <p className="text-lg font-semibold font-mono tabular-nums">{kpis.wonLast30d}</p>
-        </div>
-      </div>
 
-      <p className="text-xs text-muted-foreground">
-        Sync {timeAgo(kpis.lastSyncedAt)} ·{" "}
-        <Link
-          href={`/app/accounts/${accountId}/crm/setup`}
-          className="underline underline-offset-2 hover:text-foreground"
-        >
-          Configurar
-        </Link>
-      </p>
-    </GlassCard>
+        <p className="text-xs text-muted-foreground">
+          Sync {timeAgo(kpis.lastSyncedAt)} ·{" "}
+          <Link
+            href={`/app/accounts/${accountId}/crm/setup`}
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            Configurar
+          </Link>
+        </p>
+      </div>
+    </CollapsibleSection>
   );
 }
