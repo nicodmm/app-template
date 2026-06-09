@@ -5,10 +5,10 @@ import {
   financeEngagementPeriods,
   billingRecords,
 } from "@/lib/drizzle/schema";
-import { getFxRate } from "@/lib/queries/finance";
+import { getFxRate, getFxRatesMap } from "@/lib/queries/finance";
 import {
   isActiveInMonth,
-  convertToArs,
+  periodBillableArs,
   type BillingRule,
 } from "@/lib/finance/compute";
 
@@ -85,6 +85,18 @@ export async function runMonthlyBilling(
     .from(financeEngagementPeriods)
     .where(inArray(financeEngagementPeriods.engagementId, billableIds));
 
+  // FX map from the earliest period anchor up to the target month, so mep_ipc
+  // can compound IPC from each period's first month to this month.
+  let earliest = { year, month };
+  for (const p of periods) {
+    const py = parseInt(p.fromDate.slice(0, 4), 10);
+    const pm = parseInt(p.fromDate.slice(5, 7), 10);
+    if (py * 12 + (pm - 1) < earliest.year * 12 + (earliest.month - 1)) {
+      earliest = { year: py, month: pm };
+    }
+  }
+  const fxByMonth = await getFxRatesMap(workspaceId, earliest, { year, month });
+
   let created = 0;
   let updated = 0;
 
@@ -98,13 +110,15 @@ export async function runMonthlyBilling(
 
     const fee = Number(activePeriod.fee);
     const currency = activePeriod.currency;
-    const amountArs = convertToArs(
+    const amountArs = periodBillableArs({
       fee,
       currency,
-      engagement.billingRule as BillingRule,
-      fx?.mepRate ?? null,
-      fx?.ipcCoefficient ?? null
-    );
+      rule: engagement.billingRule as BillingRule,
+      fromDate: activePeriod.fromDate,
+      targetYear: year,
+      targetMonth: month,
+      fxByMonth,
+    });
 
     const [existing] = await db
       .select({ id: billingRecords.id })
