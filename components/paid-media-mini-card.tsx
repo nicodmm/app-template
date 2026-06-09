@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BarChart3, ArrowRight } from "lucide-react";
 import { getPaidMediaState, getKpisWithComparison } from "@/lib/queries/paid-media";
 import { getPaidMediaLabels } from "@/lib/meta/labels";
-import { GlassCard } from "@/components/ui/glass-card";
+import { CollapsibleSection } from "@/components/collapsible-section";
 import { PaidMediaKpiCard } from "./paid-media-kpi-card";
 import { PaidMediaReconnectBanner } from "./paid-media-reconnect-banner";
 
@@ -39,11 +39,11 @@ export async function PaidMediaMiniCard({ workspaceId, accountId }: PaidMediaMin
 
   if (state.state === "no_connection") {
     return (
-      <GlassCard className="p-6">
-        <div className="flex items-center gap-2 mb-3">
-          <BarChart3 size={16} className="text-muted-foreground" />
-          <h2 className="font-semibold">Paid Media</h2>
-        </div>
+      <CollapsibleSection
+        title="Paid Media"
+        icon={<BarChart3 size={16} aria-hidden />}
+        summary="sin conexión"
+      >
         <p className="text-sm text-muted-foreground mb-3">
           Conectá Meta Ads para ver el performance de las campañas de esta cuenta.
         </p>
@@ -53,26 +53,28 @@ export async function PaidMediaMiniCard({ workspaceId, accountId }: PaidMediaMin
         >
           Conectar Meta Ads
         </Link>
-      </GlassCard>
+      </CollapsibleSection>
     );
   }
 
   if (state.state === "no_mapping") {
     return (
-      <GlassCard className="p-6 space-y-3">
-        {state.connectionStatus === "expired" && <PaidMediaReconnectBanner />}
-        <div className="flex items-center gap-2">
-          <BarChart3 size={16} className="text-muted-foreground" />
-          <h2 className="font-semibold">Paid Media</h2>
+      <CollapsibleSection
+        title="Paid Media"
+        icon={<BarChart3 size={16} aria-hidden />}
+        summary="sin vincular"
+      >
+        <div className="space-y-3">
+          {state.connectionStatus === "expired" && <PaidMediaReconnectBanner />}
+          <p className="text-sm text-muted-foreground">Vinculá un ad account a esta cuenta.</p>
+          <Link
+            href="/app/settings/integrations"
+            className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium transition-colors backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] hover:bg-white/40 dark:hover:bg-white/10"
+          >
+            Ir a integraciones
+          </Link>
         </div>
-        <p className="text-sm text-muted-foreground">Vinculá un ad account a esta cuenta.</p>
-        <Link
-          href="/app/settings/integrations"
-          className="inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium transition-colors backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] hover:bg-white/40 dark:hover:bg-white/10"
-        >
-          Ir a integraciones
-        </Link>
-      </GlassCard>
+      </CollapsibleSection>
     );
   }
 
@@ -82,59 +84,60 @@ export async function PaidMediaMiniCard({ workspaceId, accountId }: PaidMediaMin
   const labels = getPaidMediaLabels(state.adAccount.isEcommerce);
 
   return (
-    <GlassCard className="p-6 space-y-3">
-      {state.connectionStatus === "expired" && <PaidMediaReconnectBanner />}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <BarChart3 size={16} className="text-muted-foreground" />
-          <h2 className="font-semibold">Paid Media</h2>
-          <span className="text-xs text-muted-foreground">· últimos 7 días</span>
+    <CollapsibleSection
+      title="Paid Media"
+      icon={<BarChart3 size={16} aria-hidden />}
+      summary="últimos 7 días"
+    >
+      <div className="space-y-3">
+        {state.connectionStatus === "expired" && <PaidMediaReconnectBanner />}
+        <div className="flex justify-end">
+          <Link
+            href={`/app/accounts/${accountId}/paid-media`}
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            Ver todo <ArrowRight size={11} aria-hidden />
+          </Link>
         </div>
-        <Link
-          href={`/app/accounts/${accountId}/paid-media`}
-          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-        >
-          Ver todo <ArrowRight size={11} aria-hidden />
-        </Link>
-      </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <PaidMediaKpiCard
-          label={labels.spend}
-          value={formatMoney(current.spend, state.adAccount.currency)}
-          delta={deltas.spend}
-        />
-        <PaidMediaKpiCard
-          label={state.adAccount.isEcommerce ? "ROAS" : "CPA"}
-          value={
-            state.adAccount.isEcommerce
-              ? current.roas != null
-                ? current.roas.toFixed(2) + "x"
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <PaidMediaKpiCard
+            label={labels.spend}
+            value={formatMoney(current.spend, state.adAccount.currency)}
+            delta={deltas.spend}
+          />
+          <PaidMediaKpiCard
+            label={state.adAccount.isEcommerce ? "ROAS" : "CPA"}
+            value={
+              state.adAccount.isEcommerce
+                ? current.roas != null
+                  ? current.roas.toFixed(2) + "x"
+                  : "—"
+                : current.conversions > 0
+                ? formatMoney(Math.round(current.cpa * 100), state.adAccount.currency)
                 : "—"
-              : current.conversions > 0
-              ? formatMoney(Math.round(current.cpa * 100), state.adAccount.currency)
-              : "—"
-          }
-          delta={state.adAccount.isEcommerce ? deltas.roas : deltas.cpa}
-          invertColors={!state.adAccount.isEcommerce}
-        />
-        <PaidMediaKpiCard label="CTR" value={`${current.ctr.toFixed(2)}%`} delta={deltas.ctr} />
-        <PaidMediaKpiCard
-          label={labels.conversions}
-          value={current.conversions.toString()}
-          delta={deltas.conversions}
-        />
-      </div>
+            }
+            delta={state.adAccount.isEcommerce ? deltas.roas : deltas.cpa}
+            invertColors={!state.adAccount.isEcommerce}
+          />
+          <PaidMediaKpiCard label="CTR" value={`${current.ctr.toFixed(2)}%`} delta={deltas.ctr} />
+          <PaidMediaKpiCard
+            label={labels.conversions}
+            value={current.conversions.toString()}
+            delta={deltas.conversions}
+          />
+        </div>
 
-      <p className="text-xs text-muted-foreground">
-        Sync {timeAgo(state.adAccount.lastSyncedAt)} ·{" "}
-        <Link
-          href="/app/settings/integrations"
-          className="underline underline-offset-2 hover:text-foreground"
-        >
-          Configurar
-        </Link>
-      </p>
-    </GlassCard>
+        <p className="text-xs text-muted-foreground">
+          Sync {timeAgo(state.adAccount.lastSyncedAt)} ·{" "}
+          <Link
+            href="/app/settings/integrations"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            Configurar
+          </Link>
+        </p>
+      </div>
+    </CollapsibleSection>
   );
 }

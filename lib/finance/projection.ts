@@ -5,10 +5,10 @@ import {
   financeEngagements,
   financeEngagementPeriods,
 } from "@/lib/drizzle/schema";
-import { getFxRate } from "@/lib/queries/finance";
+import { getFxRatesMap } from "@/lib/queries/finance";
 import {
   isActiveInMonth,
-  convertToArs,
+  periodBillableArs,
   round2,
   monthBounds,
   type BillingRule,
@@ -68,6 +68,19 @@ export async function projectAccountBilling(
     .limit(1);
   const endDate = acct?.endDate ?? null;
 
+  // FX map from the earliest period anchor through the last projected month, so
+  // mep_ipc can compound IPC from each period's first month.
+  const lastMonth = addMonth(fromYear, fromMonth, months - 1);
+  let earliest = { year: fromYear, month: fromMonth };
+  for (const p of periods) {
+    const py = parseInt(p.fromDate.slice(0, 4), 10);
+    const pm = parseInt(p.fromDate.slice(5, 7), 10);
+    if (py * 12 + (pm - 1) < earliest.year * 12 + (earliest.month - 1)) {
+      earliest = { year: py, month: pm };
+    }
+  }
+  const fxByMonth = await getFxRatesMap(workspaceId, earliest, lastMonth);
+
   const out: ProjectionMonth[] = [];
   for (let i = 0; i < months; i++) {
     const { year, month } = addMonth(fromYear, fromMonth, i);
@@ -78,9 +91,7 @@ export async function projectAccountBilling(
       continue;
     }
 
-    const fx = await getFxRate(workspaceId, year, month);
-    const mep = fx?.mepRate ?? null;
-    const ipc = fx?.ipcCoefficient ?? null;
+    const mep = fxByMonth.get(`${year}-${month}`)?.mepRate ?? null;
 
     let ars = 0;
     let usd = 0;
@@ -92,13 +103,15 @@ export async function projectAccountBilling(
       );
       if (!p) continue;
       const fee = Number(p.fee);
-      const arsAmt = convertToArs(
+      const arsAmt = periodBillableArs({
         fee,
-        p.currency,
-        e.billingRule as BillingRule,
-        mep,
-        ipc
-      );
+        currency: p.currency,
+        rule: e.billingRule as BillingRule,
+        fromDate: p.fromDate,
+        targetYear: year,
+        targetMonth: month,
+        fxByMonth,
+      });
       if (arsAmt != null) ars += arsAmt;
       usd += p.currency === "USD" ? fee : mep && mep > 0 ? fee / mep : 0;
     }

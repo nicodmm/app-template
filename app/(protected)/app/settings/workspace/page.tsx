@@ -12,6 +12,7 @@ import { WorkspaceSettingsClient } from "@/components/workspace-settings-client"
 import { WorkspaceDriveSection } from "@/components/workspace-drive-section";
 import { WorkspaceServicesSection } from "@/components/workspace-services-section";
 import { WorkspaceAgencyContextSection } from "@/components/workspace-agency-context-section";
+import { WorkspaceLogoUpload } from "@/components/settings/workspace-logo-upload";
 import { isGoogleOAuthConfigured } from "@/lib/google/oauth";
 
 interface PageProps {
@@ -62,6 +63,13 @@ export default async function WorkspaceSettingsPage({
           pendingInvites={pendingInvites}
           appUrl={appUrl}
         />
+
+        <section id="logo" className="scroll-mt-6">
+          <WorkspaceLogoUpload
+            initialLogoUrl={workspace.logoUrl}
+            canManage={canManage}
+          />
+        </section>
 
         <section id="services" className="scroll-mt-6">
           <WorkspaceServicesSection

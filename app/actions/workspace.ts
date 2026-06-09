@@ -12,6 +12,10 @@ import {
 } from "@/lib/drizzle/schema";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspace";
+import {
+  createAdminClient,
+  WORKSPACE_LOGOS_BUCKET,
+} from "@/lib/supabase/admin";
 
 const ALLOWED_INVITE_ROLES = new Set(["admin", "member"]);
 const ALLOWED_MEMBER_ROLES = new Set(["owner", "admin", "member"]);
@@ -308,6 +312,92 @@ export async function setWorkspaceServices(
     .where(eq(workspaces.id, workspace.id));
 
   revalidatePath("/app/settings/workspace");
+  return {};
+}
+
+const LOGO_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+const LOGO_ALLOWED_MIME = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/svg+xml",
+  "image/gif",
+]);
+const LOGO_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/svg+xml": "svg",
+  "image/gif": "gif",
+};
+
+/**
+ * Upload a workspace logo to the public `workspace-logos` bucket and persist
+ * its public URL on the workspace. Owner/admin only. Returns the new URL so
+ * the client can optimistically render it.
+ */
+export async function uploadWorkspaceLogo(input: {
+  fileBase64: string; // raw base64, without the data URL prefix
+  mimeType: string;
+  fileSize: number;
+}): Promise<{ logoUrl?: string; error?: string }> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) return { error: "Workspace no encontrado" };
+  const member = await getWorkspaceMember(workspace.id, userId);
+  assertCanManage(member?.role);
+
+  if (!LOGO_ALLOWED_MIME.has(input.mimeType)) {
+    return { error: "Formato no soportado (usá PNG, JPG, WEBP, SVG o GIF)" };
+  }
+  if (input.fileSize <= 0 || input.fileSize > LOGO_MAX_BYTES) {
+    return { error: "El archivo supera el máximo de 2 MB" };
+  }
+
+  const admin = createAdminClient();
+  // Idempotent: create the bucket as public if it doesn't exist yet.
+  await admin.storage.createBucket(WORKSPACE_LOGOS_BUCKET, { public: true });
+
+  const ext = LOGO_EXT[input.mimeType] ?? "png";
+  const path = `${workspace.id}/${Date.now()}.${ext}`;
+  const buffer = Buffer.from(input.fileBase64, "base64");
+  const { error: upErr } = await admin.storage
+    .from(WORKSPACE_LOGOS_BUCKET)
+    .upload(path, buffer, { contentType: input.mimeType, upsert: true });
+  if (upErr) return { error: upErr.message };
+
+  const {
+    data: { publicUrl },
+  } = admin.storage.from(WORKSPACE_LOGOS_BUCKET).getPublicUrl(path);
+
+  await db
+    .update(workspaces)
+    .set({ logoUrl: publicUrl, updatedAt: new Date() })
+    .where(eq(workspaces.id, workspace.id));
+
+  revalidatePath("/app/settings/workspace");
+  revalidatePath("/app", "layout");
+  return { logoUrl: publicUrl };
+}
+
+/**
+ * Clear the workspace logo. Owner/admin only. We only null the column — the
+ * underlying storage object is harmless to leave behind (public, tiny).
+ */
+export async function clearWorkspaceLogo(): Promise<{ error?: string }> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) return { error: "Workspace no encontrado" };
+  const member = await getWorkspaceMember(workspace.id, userId);
+  assertCanManage(member?.role);
+
+  await db
+    .update(workspaces)
+    .set({ logoUrl: null, updatedAt: new Date() })
+    .where(eq(workspaces.id, workspace.id));
+
+  revalidatePath("/app/settings/workspace");
+  revalidatePath("/app", "layout");
   return {};
 }
 

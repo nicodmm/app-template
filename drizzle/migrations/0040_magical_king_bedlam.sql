@@ -1,0 +1,1 @@
+ALTER TABLE "account_finance" ADD COLUMN "invoice_country" text;

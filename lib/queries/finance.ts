@@ -214,6 +214,43 @@ export async function getFxRate(
   };
 }
 
+/**
+ * Map of fx rates for a workspace keyed by "year-month", for the inclusive
+ * [from, to] month range. Used by the MEP/IPC compounding calc, which needs the
+ * anchor month's MEP plus each intervening month's IPC coefficient.
+ */
+export async function getFxRatesMap(
+  workspaceId: string,
+  from: { year: number; month: number },
+  to: { year: number; month: number }
+): Promise<Map<string, { mepRate: number; ipcCoefficient: number }>> {
+  const fromKey = from.year * 12 + (from.month - 1);
+  const toKey = to.year * 12 + (to.month - 1);
+  const lo = Math.min(fromKey, toKey);
+  const hi = Math.max(fromKey, toKey);
+
+  const rows = await db
+    .select({
+      year: fxRates.year,
+      month: fxRates.month,
+      mepRate: fxRates.mepRate,
+      ipcCoefficient: fxRates.ipcCoefficient,
+    })
+    .from(fxRates)
+    .where(eq(fxRates.workspaceId, workspaceId));
+
+  const map = new Map<string, { mepRate: number; ipcCoefficient: number }>();
+  for (const r of rows) {
+    const key = r.year * 12 + (r.month - 1);
+    if (key < lo || key > hi) continue;
+    map.set(`${r.year}-${r.month}`, {
+      mepRate: Number(r.mepRate),
+      ipcCoefficient: Number(r.ipcCoefficient ?? 1),
+    });
+  }
+  return map;
+}
+
 export interface FinanceAccountCard {
   id: string;
   name: string;

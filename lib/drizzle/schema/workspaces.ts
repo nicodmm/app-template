@@ -20,6 +20,11 @@ export const workspaces = pgTable("workspaces", {
    * prompt so the AI can produce more relevant suggestions.
    */
   agencyContext: text("agency_context"),
+  /**
+   * Public URL of the workspace logo (Supabase Storage, `workspace-logos`
+   * bucket). Rendered centered in the app top bar. Nullable — no logo by default.
+   */
+  logoUrl: text("logo_url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

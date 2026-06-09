@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { LogOut, User, Users, Plug } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -11,9 +12,11 @@ import { NotificationsBell } from "@/components/notifications-bell";
 export function AppHeader({
   userEmail,
   userInitial,
+  logoUrl,
 }: {
   userEmail: string;
   userInitial: string;
+  logoUrl?: string | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -26,11 +29,25 @@ export function AppHeader({
 
   return (
     <header
-      className="flex h-14 shrink-0 items-center justify-between px-4 backdrop-blur-[18px] [background:var(--glass-bg)] [border-bottom:1px_solid_var(--glass-border)]"
+      className="relative flex h-14 shrink-0 items-center justify-between px-4 backdrop-blur-[18px] [background:var(--glass-bg)] [border-bottom:1px_solid_var(--glass-border)]"
     >
       <Link href="/app/portfolio" className="font-semibold text-sm tracking-tight">
         nao.fyi
       </Link>
+
+      {logoUrl && (
+        <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center">
+          <Image
+            src={logoUrl}
+            alt="Logo del workspace"
+            width={160}
+            height={32}
+            className="h-7 w-auto max-h-8 object-contain"
+            unoptimized
+            priority
+          />
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         <GlobalSearch />

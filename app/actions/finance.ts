@@ -136,6 +136,25 @@ export async function saveAccountFinanceFields(input: {
   }
 }
 
+export async function setAccountInvoiceCountry(input: {
+  accountId: string;
+  country: "AR" | "US" | null;
+}): Promise<R> {
+  try {
+    const workspaceId = await requireFinanceAccount(input.accountId);
+    await ensureAccountFinance(input.accountId, workspaceId);
+    await db
+      .update(accountFinance)
+      .set({ invoiceCountry: input.country, updatedAt: new Date() })
+      .where(eq(accountFinance.accountId, input.accountId));
+    revalidatePath(`/app/accounts/${input.accountId}`);
+    return { success: true };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
 export async function addAccountConsultant(input: {
   accountId: string;
   userId: string;

@@ -49,7 +49,11 @@ export default async function ProtectedLayout({
 
   return (
     <div className="flex h-dvh flex-col">
-      <AppHeader userEmail={email} userInitial={userInitial} />
+      <AppHeader
+        userEmail={email}
+        userInitial={userInitial}
+        logoUrl={workspaceData?.workspace.logoUrl}
+      />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           isPlatformAdmin={isPlatformAdmin}

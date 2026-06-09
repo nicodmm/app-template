@@ -140,12 +140,12 @@ export function FxEditor({ rates }: Props) {
           </div>
 
           <div className="flex flex-col gap-1 min-w-[110px]">
-            <label className="text-[11px] text-muted-foreground">Coef. IPC</label>
+            <label className="text-[11px] text-muted-foreground">Coef. IPC (2% = 1.02)</label>
             <input
               type="number"
               value={ipcCoefficient}
               onChange={(e) => setIpcCoefficient(e.target.value)}
-              placeholder="1"
+              placeholder="1.02"
               min={0}
               step="0.0001"
               disabled={isPending}

@@ -15,3 +15,5 @@ export function createAdminClient() {
 
 export const SELECTION_CV_BUCKET = "selection-cvs";
 export const FINANCE_DOCS_BUCKET = "finance-docs";
+/** Public bucket: workspace logos are served directly via `getPublicUrl`. */
+export const WORKSPACE_LOGOS_BUCKET = "workspace-logos";
