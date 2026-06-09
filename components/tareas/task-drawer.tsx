@@ -269,7 +269,7 @@ export function TaskDrawer({
               >
                 <option value="">Mover a otro contenedor…</option>
                 {scope.kind !== "loose" && (
-                  <option value="loose">Mis tareas (suelta)</option>
+                  <option value="loose">Tareas Sueltas</option>
                 )}
                 {moveTargets.projects.length > 0 && (
                   <optgroup label="Proyectos">
