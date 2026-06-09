@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { CheckSquare, Maximize2 } from "lucide-react";
 import {
   getAccountKanbanTasks,
   listAccountTaskLabels,
@@ -8,6 +10,7 @@ import {
   getAccessibleProjectIds,
 } from "@/lib/queries/task-access";
 import { getWorkspaceByUserId } from "@/lib/queries/workspace";
+import { CollapsibleSection } from "@/components/collapsible-section";
 import { KanbanBoard } from "@/components/tareas/kanban-board";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
 
@@ -23,7 +26,10 @@ export async function TasksSection({ accountId, currentUserId, members }: Props)
     listAccountTaskLabels(accountId),
   ]);
 
-  let moveTargets: { accounts: { id: string; name: string }[]; projects: { id: string; name: string }[] } = {
+  let moveTargets: {
+    accounts: { id: string; name: string }[];
+    projects: { id: string; name: string }[];
+  } = {
     accounts: [],
     projects: [],
   };
@@ -41,29 +47,36 @@ export async function TasksSection({ accountId, currentUserId, members }: Props)
     }
   }
 
-  const total = boardTasks.length;
-  const done = boardTasks.filter((t) => t.column === "listas").length;
+  const total = boardTasks.filter((t) => !t.parentTaskId).length;
+  const done = boardTasks.filter(
+    (t) => !t.parentTaskId && t.column === "listas"
+  ).length;
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-muted-foreground">
-          Tareas{" "}
-          {total > 0 && (
-            <span>
-              · {done}/{total} listas
-            </span>
-          )}
-        </h2>
+    <CollapsibleSection
+      title="Tareas"
+      icon={<CheckSquare size={16} aria-hidden />}
+      summary={total > 0 ? `${done}/${total} listas` : undefined}
+      defaultOpen
+    >
+      <div className="space-y-3">
+        <div className="flex justify-end">
+          <Link
+            href={`/app/tareas/${accountId}`}
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            <Maximize2 size={12} aria-hidden /> Pantalla completa
+          </Link>
+        </div>
+        <KanbanBoard
+          scope={{ kind: "account", accountId }}
+          currentUserId={currentUserId}
+          initialTasks={boardTasks}
+          members={members}
+          labels={labels}
+          moveTargets={moveTargets}
+        />
       </div>
-      <KanbanBoard
-        scope={{ kind: "account", accountId }}
-        currentUserId={currentUserId}
-        initialTasks={boardTasks}
-        members={members}
-        labels={labels}
-        moveTargets={moveTargets}
-      />
-    </section>
+    </CollapsibleSection>
   );
 }
