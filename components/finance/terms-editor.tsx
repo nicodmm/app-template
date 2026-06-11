@@ -90,6 +90,16 @@ export function TermsEditor({ accountId, terms, members }: Props) {
   const status = terms.termsStatus ?? "none";
   const isStructuring = status === "structuring";
 
+  // After structuring, the LLM may have correctly inferred the billing rule and
+  // shares but left the fee at 0 because the terms text carried no amount and the
+  // account has no base fee. Surface that explicitly instead of a silent $0.
+  const totalPeriodFee = terms.engagements.reduce(
+    (sum, eng) => sum + eng.periods.reduce((s, p) => s + (p.fee || 0), 0),
+    0
+  );
+  const missingFee =
+    status === "ready" && terms.engagements.length > 0 && totalPeriodFee === 0;
+
   // Auto-refresh while the structuring task runs out of band.
   useEffect(() => {
     if (!isStructuring) return;
@@ -228,6 +238,18 @@ export function TermsEditor({ accountId, terms, members }: Props) {
         </div>
       </div>
 
+      {missingFee && (
+        <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+          <p className="font-medium">Falta cargar el monto del fee</p>
+          <p className="mt-1 text-amber-700/90 dark:text-amber-300/90">
+            La IA interpretó la regla de facturación y los honorarios, pero los términos no
+            indican un importe y la cuenta no tiene un <b>Fee base</b>. Cargá el Fee base de la
+            cuenta y volvé a estructurar, o editá el monto del período manualmente. La regla
+            MEP/IPC se aplicará sobre ese monto.
+          </p>
+        </div>
+      )}
+
       {/* Engagements */}
       <div className="mt-5 flex items-center justify-between">
         <p className="text-xs font-medium text-muted-foreground">Engagements</p>
@@ -341,8 +363,15 @@ export function TermsEditor({ accountId, terms, members }: Props) {
                           <span className="truncate">
                             {p.fromDate} → {p.toDate ?? "—"}
                           </span>
-                          <span className="font-medium">
+                          <span
+                            className={
+                              p.fee === 0
+                                ? "font-medium text-amber-600 dark:text-amber-400"
+                                : "font-medium"
+                            }
+                          >
                             {p.fee.toLocaleString()} {p.currency}
+                            {p.fee === 0 && " · falta monto"}
                           </span>
                           {p.source === "llm" && <IATag />}
                         </span>
