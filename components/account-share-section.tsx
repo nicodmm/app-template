@@ -161,7 +161,7 @@ export function AccountShareSection({ accountId, existing }: Props) {
   if (!link) {
     return (
       <GlassCard className="p-6 mb-6">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-3">
           <div>
             <h2 className="font-semibold mb-1 flex items-center gap-2">
               <Eye size={16} aria-hidden /> Vista pública
@@ -175,7 +175,7 @@ export function AccountShareSection({ accountId, existing }: Props) {
             type="button"
             onClick={handleGenerate}
             disabled={pendingAction === "create"}
-            className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            className="inline-flex w-full items-center justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
             {pendingAction === "create"
               ? "Generando..."

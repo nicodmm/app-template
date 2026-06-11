@@ -103,14 +103,6 @@ export function CandidateDetailPanel({ accountId, searchId, candidate }: Props) 
             <h2 className="text-2xl font-semibold leading-tight">
               {candidate.firstName} {candidate.lastName}
             </h2>
-            <span
-              className={cn(
-                "w-fit inline-flex items-center rounded-full px-3 py-1 text-sm font-medium",
-                statusStyle
-              )}
-            >
-              {statusLabel}
-            </span>
           </div>
           <div className="flex shrink-0 gap-2">
             <button
