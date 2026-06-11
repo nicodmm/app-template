@@ -48,3 +48,4 @@ export * from "./task_labels";
 export * from "./task_label_assignments";
 export * from "./task_projects";
 export * from "./task_project_members";
+export * from "./finance_projection_assumptions";

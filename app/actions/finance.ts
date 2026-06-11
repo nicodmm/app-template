@@ -11,6 +11,7 @@ import {
   billingRecords,
   memberCompensation,
   workspaceMembers,
+  financeProjectionAssumptions,
 } from "@/lib/drizzle/schema";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspace";
@@ -537,6 +538,51 @@ export async function deleteMemberCompensation(input: { id: string }): Promise<R
           eq(memberCompensation.workspaceId, workspaceId)
         )
       );
+    revalidatePath("/app/finanzas");
+    return { success: true };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
+export async function upsertProjectionAssumptions(input: {
+  breakevenUsd: number;
+  otrosIngresosUsd: number;
+  clientesNuevosMes: number;
+  ticketMedioNuevoUsd: number;
+  churnUsdMes: number;
+  horizonteMeses: number;
+}): Promise<R> {
+  try {
+    const { workspaceId, userId } = await requireFinanceWorkspace();
+    const horizonte = input.horizonteMeses === 18 ? 18 : 6;
+    const num = (n: number) => (Number.isFinite(n) ? n : 0).toString();
+    await db
+      .insert(financeProjectionAssumptions)
+      .values({
+        workspaceId,
+        breakevenUsd: num(input.breakevenUsd),
+        otrosIngresosUsd: num(input.otrosIngresosUsd),
+        clientesNuevosMes: Math.trunc(input.clientesNuevosMes) || 0,
+        ticketMedioNuevoUsd: num(input.ticketMedioNuevoUsd),
+        churnUsdMes: num(input.churnUsdMes),
+        horizonteMeses: horizonte,
+        updatedByUserId: userId,
+      })
+      .onConflictDoUpdate({
+        target: financeProjectionAssumptions.workspaceId,
+        set: {
+          breakevenUsd: num(input.breakevenUsd),
+          otrosIngresosUsd: num(input.otrosIngresosUsd),
+          clientesNuevosMes: Math.trunc(input.clientesNuevosMes) || 0,
+          ticketMedioNuevoUsd: num(input.ticketMedioNuevoUsd),
+          churnUsdMes: num(input.churnUsdMes),
+          horizonteMeses: horizonte,
+          updatedByUserId: userId,
+          updatedAt: new Date(),
+        },
+      });
     revalidatePath("/app/finanzas");
     return { success: true };
   } catch (e) {
