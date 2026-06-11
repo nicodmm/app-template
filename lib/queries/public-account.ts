@@ -231,7 +231,7 @@ export async function getPublicAccountSnapshot(
   if (!accountRow) return { status: "not_found" };
 
   const [workspaceRow] = await db
-    .select({ name: workspaces.name })
+    .select({ name: workspaces.name, logoUrl: workspaces.logoUrl })
     .from(workspaces)
     .where(eq(workspaces.id, accountRow.workspaceId))
     .limit(1);
@@ -430,7 +430,7 @@ export async function getPublicAccountSnapshot(
     },
     workspace: {
       name: workspaceRow?.name ?? "",
-      logoUrl: null,
+      logoUrl: workspaceRow?.logoUrl ?? null,
     },
     account: {
       id: accountRow.id,

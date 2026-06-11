@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { PublicAccountSnapshot } from "@/lib/queries/public-account";
 import { SummarySection } from "./summary-section";
 import { ContextSection } from "./context-section";
@@ -31,6 +32,17 @@ export function PublicAccountView({ snapshot }: Props) {
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       <header className="space-y-2">
+        {workspace.logoUrl && (
+          <Image
+            src={workspace.logoUrl}
+            alt={workspace.name || "Logo"}
+            width={200}
+            height={48}
+            className="h-10 w-auto max-h-12 object-contain mb-2"
+            unoptimized
+            priority
+          />
+        )}
         <p className="text-xs text-muted-foreground">{workspace.name}</p>
         <h1 className="text-3xl font-semibold">{account.name}</h1>
         <p className="text-sm text-muted-foreground">
