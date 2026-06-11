@@ -6,6 +6,8 @@ import { FxEditor } from "@/components/finance/fx-editor";
 import { BillingList } from "@/components/finance/billing-list";
 import { HonorariosAdmin } from "@/components/finance/honorarios-admin";
 import { FinanceAccountsGrid } from "@/components/finance/finance-accounts-grid";
+import { CarteraProyeccion } from "@/components/finance/cartera-proyeccion";
+import type { PortfolioRow, Assumptions } from "@/lib/finance/projection-model";
 import type {
   BillingRow,
   FxRateRow,
@@ -27,16 +29,21 @@ interface Props {
   honorarios: HonorarioRow[];
   compensationRows: CompensationRow[];
   members: Array<{ userId: string; name: string }>;
+  portfolio: PortfolioRow[];
+  assumptions: Assumptions;
+  baseYear: number;
+  baseMonth: number;
   initialTab?: TabId;
 }
 
-type TabId = "accounts" | "billing" | "fx" | "honorarios";
+type TabId = "accounts" | "billing" | "fx" | "honorarios" | "proyeccion";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "accounts", label: "Cuentas" },
   { id: "billing", label: "A facturar" },
   { id: "fx", label: "TC / IPC" },
   { id: "honorarios", label: "Honorarios" },
+  { id: "proyeccion", label: "Proyección" },
 ];
 
 export function FinanzasTabs({
@@ -50,6 +57,10 @@ export function FinanzasTabs({
   honorarios,
   compensationRows,
   members,
+  portfolio,
+  assumptions,
+  baseYear,
+  baseMonth,
   initialTab,
 }: Props) {
   const [tab, setTab] = useState<TabId>(initialTab ?? "accounts");
@@ -97,6 +108,15 @@ export function FinanzasTabs({
           members={members}
           year={year}
           month={month}
+        />
+      )}
+      {tab === "proyeccion" && (
+        <CarteraProyeccion
+          portfolio={portfolio}
+          assumptions={assumptions}
+          rates={rates}
+          baseYear={baseYear}
+          baseMonth={baseMonth}
         />
       )}
     </div>

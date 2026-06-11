@@ -10,6 +10,10 @@ import {
   listMemberCompensation,
   computeHonorarios,
 } from "@/lib/queries/finance";
+import {
+  getPortfolioForProjection,
+  getProjectionAssumptions,
+} from "@/lib/queries/projection";
 import { runMonthlyBilling } from "@/lib/finance/run-monthly-billing";
 import { FinanzasTabs } from "@/components/finance/finanzas-tabs";
 import { MisHonorarios } from "@/components/finance/mis-honorarios";
@@ -80,6 +84,8 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
     accountCards,
     honorarios,
     compensationRows,
+    portfolio,
+    assumptions,
   ] = await Promise.all([
     getBillingForMonth(workspace.id, year, month),
     listFxRates(workspace.id),
@@ -88,6 +94,8 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
     listFinanceAccountCards(workspace.id),
     computeHonorarios(workspace.id, year, month),
     listMemberCompensation(workspace.id),
+    getPortfolioForProjection(workspace.id, year, month),
+    getProjectionAssumptions(workspace.id),
   ]);
 
   // Member options for the compensation editor (deduped by userId).
@@ -102,7 +110,8 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
     params.tab === "fx" ||
     params.tab === "honorarios" ||
     params.tab === "billing" ||
-    params.tab === "accounts"
+    params.tab === "accounts" ||
+    params.tab === "proyeccion"
       ? params.tab
       : undefined;
 
@@ -125,6 +134,10 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
         honorarios={honorarios}
         compensationRows={compensationRows}
         members={members}
+        portfolio={portfolio}
+        assumptions={assumptions}
+        baseYear={year}
+        baseMonth={month}
         initialTab={initialTab}
       />
     </div>
