@@ -343,6 +343,20 @@ export async function upsertFxRate(input: {
   }
 }
 
+export async function deleteFxRate(input: { id: string }): Promise<R> {
+  try {
+    const { workspaceId } = await requireFinanceWorkspace();
+    await db
+      .delete(fxRates)
+      .where(and(eq(fxRates.id, input.id), eq(fxRates.workspaceId, workspaceId)));
+    revalidatePath("/app/finanzas");
+    return { success: true };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
 export async function getFinanceDocUrl(input: {
   accountId: string;
   kind: "nda" | "proposal";

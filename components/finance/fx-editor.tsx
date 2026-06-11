@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Save } from "lucide-react";
+import { Save, Pencil, Trash2, X } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
-import { upsertFxRate } from "@/app/actions/finance";
+import { upsertFxRate, deleteFxRate } from "@/app/actions/finance";
 import type { FxRateRow } from "@/lib/queries/finance";
 
 interface Props {
@@ -29,8 +29,21 @@ const MONTHS: Record<number, string> = {
 const ghostBtn =
   "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] hover:bg-white/40 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed";
 
+const iconBtn =
+  "shrink-0 rounded p-1 text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors disabled:opacity-50";
+
 const inputClass =
   "rounded-md border px-2 py-1 text-xs bg-transparent [border-color:var(--glass-border)] focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50 w-full";
+
+/** coefficient (1.02) → percentage number (2). 1 → 0. */
+function coefToPct(coef: number): number {
+  return Math.round((coef - 1) * 100 * 10000) / 10000;
+}
+
+/** percentage number (2) → coefficient (1.02). */
+function pctToCoef(pct: number): number {
+  return 1 + pct / 100;
+}
 
 export function FxEditor({ rates }: Props) {
   const router = useRouter();
@@ -41,7 +54,46 @@ export function FxEditor({ rates }: Props) {
   const [year, setYear] = useState<string>(String(currentYear));
   const [month, setMonth] = useState<string>("1");
   const [mepRate, setMepRate] = useState<string>("");
-  const [ipcCoefficient, setIpcCoefficient] = useState<string>("1");
+  const [ipcPct, setIpcPct] = useState<string>("0");
+
+  // When editing an existing row, remember which one (so we can drop it if the
+  // year/month is changed) and surface the "edit mode" affordances.
+  const [editing, setEditing] = useState<{
+    id: string;
+    year: number;
+    month: number;
+  } | null>(null);
+
+  function resetForm() {
+    setYear(String(currentYear));
+    setMonth("1");
+    setMepRate("");
+    setIpcPct("0");
+    setEditing(null);
+    setError(null);
+  }
+
+  function startEdit(r: FxRateRow) {
+    setError(null);
+    setEditing({ id: r.id, year: r.year, month: r.month });
+    setYear(String(r.year));
+    setMonth(String(r.month));
+    setMepRate(String(r.mepRate));
+    setIpcPct(String(coefToPct(r.ipcCoefficient)));
+  }
+
+  function handleDelete(id: string) {
+    setError(null);
+    startTransition(async () => {
+      const res = await deleteFxRate({ id });
+      if (!res.success) {
+        setError(res.error ?? "Error al eliminar");
+        return;
+      }
+      if (editing?.id === id) resetForm();
+      router.refresh();
+    });
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -50,7 +102,7 @@ export function FxEditor({ rates }: Props) {
     const parsedYear = parseInt(year, 10);
     const parsedMonth = parseInt(month, 10);
     const parsedMep = parseFloat(mepRate);
-    const parsedIpc = ipcCoefficient.trim() === "" ? null : parseFloat(ipcCoefficient);
+    const parsedPct = ipcPct.trim() === "" ? null : parseFloat(ipcPct);
 
     if (isNaN(parsedYear) || parsedYear < 2000 || parsedYear > 2100) {
       setError("Año inválido");
@@ -60,24 +112,36 @@ export function FxEditor({ rates }: Props) {
       setError("MEP inválido");
       return;
     }
-    if (parsedIpc !== null && (isNaN(parsedIpc) || parsedIpc <= 0)) {
+    if (parsedPct !== null && (isNaN(parsedPct) || parsedPct < 0)) {
       setError("IPC inválido");
       return;
     }
+
+    const ipcCoefficient = parsedPct === null ? null : pctToCoef(parsedPct);
+    const movedPeriod =
+      editing !== null &&
+      (editing.year !== parsedYear || editing.month !== parsedMonth);
 
     startTransition(async () => {
       const res = await upsertFxRate({
         year: parsedYear,
         month: parsedMonth,
         mepRate: parsedMep,
-        ipcCoefficient: parsedIpc,
+        ipcCoefficient,
       });
       if (!res.success) {
         setError(res.error ?? "Error al guardar");
         return;
       }
-      setMepRate("");
-      setIpcCoefficient("1");
+      // If editing moved the rate to a different month, drop the original row.
+      if (movedPeriod && editing) {
+        const del = await deleteFxRate({ id: editing.id });
+        if (!del.success) {
+          setError(del.error ?? "Error al mover la tasa");
+          return;
+        }
+      }
+      resetForm();
       router.refresh();
     });
   }
@@ -91,7 +155,9 @@ export function FxEditor({ rates }: Props) {
       {/* Form */}
       <GlassCard className="p-4">
         <p className="text-xs font-medium text-muted-foreground mb-3">
-          Agregar / actualizar tasa mensual
+          {editing
+            ? `Editando ${MONTHS[editing.month]} ${editing.year}`
+            : "Agregar / actualizar tasa mensual"}
         </p>
         <form onSubmit={handleSubmit} className="flex flex-wrap gap-3 items-end">
           <div className="flex flex-col gap-1 min-w-[80px]">
@@ -140,14 +206,14 @@ export function FxEditor({ rates }: Props) {
           </div>
 
           <div className="flex flex-col gap-1 min-w-[110px]">
-            <label className="text-[11px] text-muted-foreground">Coef. IPC (2% = 1.02)</label>
+            <label className="text-[11px] text-muted-foreground">IPC mensual (%)</label>
             <input
               type="number"
-              value={ipcCoefficient}
-              onChange={(e) => setIpcCoefficient(e.target.value)}
-              placeholder="1.02"
+              value={ipcPct}
+              onChange={(e) => setIpcPct(e.target.value)}
+              placeholder="2"
               min={0}
-              step="0.0001"
+              step="0.01"
               disabled={isPending}
               className={inputClass}
             />
@@ -155,8 +221,19 @@ export function FxEditor({ rates }: Props) {
 
           <button type="submit" disabled={isPending} className={ghostBtn}>
             <Save size={13} aria-hidden />
-            {isPending ? "Guardando…" : "Guardar"}
+            {isPending ? "Guardando…" : editing ? "Guardar cambios" : "Guardar"}
           </button>
+          {editing && (
+            <button
+              type="button"
+              onClick={resetForm}
+              disabled={isPending}
+              className={ghostBtn}
+            >
+              <X size={13} aria-hidden />
+              Cancelar
+            </button>
+          )}
         </form>
 
         {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
@@ -176,8 +253,9 @@ export function FxEditor({ rates }: Props) {
                   MEP (ARS/USD)
                 </th>
                 <th className="px-4 py-2.5 text-right font-semibold text-muted-foreground">
-                  Coef. IPC
+                  IPC mensual
                 </th>
+                <th className="px-4 py-2.5 text-right font-semibold text-muted-foreground" />
               </tr>
             </thead>
             <tbody>
@@ -195,10 +273,33 @@ export function FxEditor({ rates }: Props) {
                     })}
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums">
-                    {r.ipcCoefficient.toLocaleString("es-AR", {
-                      minimumFractionDigits: 4,
-                      maximumFractionDigits: 4,
+                    {coefToPct(r.ipcCoefficient).toLocaleString("es-AR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
                     })}
+                    %
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <span className="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(r)}
+                        disabled={isPending}
+                        className={iconBtn}
+                        aria-label="Editar tasa"
+                      >
+                        <Pencil size={14} aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(r.id)}
+                        disabled={isPending}
+                        className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                        aria-label="Eliminar tasa"
+                      >
+                        <Trash2 size={14} aria-hidden />
+                      </button>
+                    </span>
                   </td>
                 </tr>
               ))}
