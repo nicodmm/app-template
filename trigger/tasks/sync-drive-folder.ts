@@ -5,47 +5,18 @@ import { driveConnections, accounts } from "@/lib/drizzle/schema";
 import {
   ensureFreshAccessToken,
   listDriveFolderFiles,
-  type DriveFileMeta,
 } from "@/lib/google/drive";
-import { importDriveFileForAccount } from "@/lib/google/drive-import";
+import {
+  resolveAccountByFilename,
+  resolveAccountByContent,
+  deriveDomain,
+  normalize,
+  type AccountMatchOption,
+} from "@/lib/google/account-matching";
+import { importDriveFileForAccount, extractDriveFileText } from "@/lib/google/drive-import";
 
 interface SyncDriveFolderInput {
   connectionId: string;
-}
-
-const ACCENT_MAP: Record<string, string> = {
-  á: "a", à: "a", ä: "a", â: "a", ã: "a",
-  é: "e", è: "e", ë: "e", ê: "e",
-  í: "i", ì: "i", ï: "i", î: "i",
-  ó: "o", ò: "o", ö: "o", ô: "o", õ: "o",
-  ú: "u", ù: "u", ü: "u", û: "u",
-  ñ: "n",
-};
-
-function normalize(s: string): string {
-  return s
-    .toLowerCase()
-    .split("")
-    .map((ch) => ACCENT_MAP[ch] ?? ch)
-    .join("");
-}
-
-interface AccountOption {
-  id: string;
-  name: string;
-  normalizedName: string;
-}
-
-function matchAccountByFilename(
-  fileName: string,
-  options: AccountOption[]
-): AccountOption | null {
-  const norm = normalize(fileName);
-  const matches = options.filter((a) => norm.includes(a.normalizedName));
-  if (matches.length === 0) return null;
-  return matches.sort(
-    (a, b) => b.normalizedName.length - a.normalizedName.length
-  )[0];
 }
 
 export const syncDriveFolder = task({
@@ -89,22 +60,41 @@ export const syncDriveFolder = task({
       });
 
       const workspaceAccounts = await db
-        .select({ id: accounts.id, name: accounts.name })
+        .select({ id: accounts.id, name: accounts.name, websiteUrl: accounts.websiteUrl })
         .from(accounts)
         .where(eq(accounts.workspaceId, connection.workspaceId));
 
-      const accountOptions: AccountOption[] = workspaceAccounts.map((a) => ({
+      const accountOptions: AccountMatchOption[] = workspaceAccounts.map((a) => ({
         id: a.id,
         name: a.name,
         normalizedName: normalize(a.name),
+        domain: deriveDomain(a.websiteUrl),
       }));
 
       for (const file of files) {
-        const matched = matchAccountByFilename(file.name, accountOptions);
-        if (!matched) {
-          logger.info("No account matched filename — skipping", {
-            fileName: file.name,
-          });
+        // Paso 1: nombre de archivo (rápido, sin descarga).
+        let matchedAccountId =
+          resolveAccountByFilename(file.name, accountOptions)?.id ?? null;
+        let prefetchedText: string | null = null;
+
+        // Paso 2: contenido — solo si no matcheó por nombre y NO es link-only.
+        if (!matchedAccountId && !(connection.linkOnlySync ?? false)) {
+          const text = await extractDriveFileText(accessToken, file);
+          if (text) {
+            const res = resolveAccountByContent(text, accountOptions);
+            if (res.kind === "matched") {
+              matchedAccountId = res.account.id;
+              prefetchedText = text;
+            } else if (res.kind === "ambiguous") {
+              logger.info("Content match ambiguo — no se importa", {
+                fileName: file.name,
+              });
+            }
+          }
+        }
+
+        if (!matchedAccountId) {
+          logger.info("Sin cuenta para el archivo — skip", { fileName: file.name });
           skipped += 1;
           continue;
         }
@@ -113,10 +103,11 @@ export const syncDriveFolder = task({
           file,
           accessToken,
           workspaceId: connection.workspaceId,
-          accountId: matched.id,
+          accountId: matchedAccountId,
           uploadedByUserId: connection.connectedByUserId,
           source: "drive_sync",
           linkOnly: connection.linkOnlySync ?? false,
+          prefetchedText,
         });
         if (outcome === "imported") imported += 1;
         else skipped += 1;
@@ -153,9 +144,6 @@ export const syncDriveFolder = task({
     return { imported, skipped };
   },
 });
-
-// Preserve DriveFileMeta import usage for the worker bundler.
-void ({} as DriveFileMeta | undefined);
 
 /**
  * Scheduled wrapper: run every 30 minutes against every connected drive.
