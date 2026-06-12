@@ -28,7 +28,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   if (!isGoogleOAuthConfigured()) {
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/app/settings/workspace?drive_error=not_configured`
+      `${process.env.NEXT_PUBLIC_APP_URL}/app/settings/integrations?drive_error=not_configured`
     );
   }
 
