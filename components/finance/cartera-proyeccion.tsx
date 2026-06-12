@@ -132,27 +132,27 @@ export function CarteraProyeccion({ portfolio, assumptions, rates, baseYear, bas
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
             <div>
               <label className={labelCls}>Breakeven (USD/mes)</label>
-              <input className={inputCls} type="number" value={a.breakevenUsd}
+              <input className={inputCls} type="number" value={a.breakevenUsd === 0 ? "" : a.breakevenUsd}
                 onChange={(e) => setAssum("breakevenUsd", Number(e.target.value) || 0)} />
             </div>
             <div>
               <label className={labelCls}>Otros ingresos rec. (USD)</label>
-              <input className={inputCls} type="number" value={a.otrosIngresosUsd}
+              <input className={inputCls} type="number" value={a.otrosIngresosUsd === 0 ? "" : a.otrosIngresosUsd}
                 onChange={(e) => setAssum("otrosIngresosUsd", Number(e.target.value) || 0)} />
             </div>
             <div>
               <label className={labelCls}>Clientes nuevos / mes</label>
-              <input className={inputCls} type="number" value={a.clientesNuevosMes}
+              <input className={inputCls} type="number" value={a.clientesNuevosMes === 0 ? "" : a.clientesNuevosMes}
                 onChange={(e) => setAssum("clientesNuevosMes", Number(e.target.value) || 0)} />
             </div>
             <div>
               <label className={labelCls}>Ticket medio nuevo (USD)</label>
-              <input className={inputCls} type="number" value={a.ticketMedioNuevoUsd}
+              <input className={inputCls} type="number" value={a.ticketMedioNuevoUsd === 0 ? "" : a.ticketMedioNuevoUsd}
                 onChange={(e) => setAssum("ticketMedioNuevoUsd", Number(e.target.value) || 0)} />
             </div>
             <div>
               <label className={labelCls}>Churn adicional (USD/mes)</label>
-              <input className={inputCls} type="number" value={a.churnUsdMes}
+              <input className={inputCls} type="number" value={a.churnUsdMes === 0 ? "" : a.churnUsdMes}
                 onChange={(e) => setAssum("churnUsdMes", Number(e.target.value) || 0)} />
             </div>
             <div>
@@ -271,7 +271,7 @@ export function CarteraProyeccion({ portfolio, assumptions, rates, baseYear, bas
                       </select>
                     </td>
                     <td className="py-1 pr-2">
-                      <input className={cn(inputCls, "text-right")} type="number" value={r.ticketUsd}
+                      <input className={cn(inputCls, "text-right")} type="number" value={r.ticketUsd === 0 ? "" : r.ticketUsd}
                         onChange={(e) => updRow(i, "ticketUsd", e.target.value)} />
                     </td>
                     <td className="py-1 pr-2">
