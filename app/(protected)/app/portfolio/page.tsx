@@ -80,7 +80,7 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
             className="inline-flex items-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-medium transition-colors backdrop-blur-[14px] [background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] hover:bg-accent/50"
           >
             <Upload size={15} />
-            Importar CSV
+            Importar
           </Link>
           <Link
             href="/app/accounts/new"
