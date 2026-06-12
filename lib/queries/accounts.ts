@@ -1,6 +1,6 @@
 import { db } from "@/lib/drizzle/db";
-import { accounts, users } from "@/lib/drizzle/schema";
-import { eq, and, desc, isNull, isNotNull, sql } from "drizzle-orm";
+import { accounts, users, accountConsultants } from "@/lib/drizzle/schema";
+import { eq, and, or, exists, desc, isNull, isNotNull, sql } from "drizzle-orm";
 import type { Account } from "@/lib/drizzle/schema";
 
 export type AccountWithOwner = Account & {
@@ -16,6 +16,8 @@ export interface PortfolioScope {
   role: string;
   /** Filter by archive status. Defaults to 'active' (only non-closed accounts). */
   status?: PortfolioStatus;
+  /** Solo para roles elevados: restringe a cuentas "mías" (dueño O consultor). */
+  onlyMine?: boolean;
 }
 
 function canSeeAllAccounts(role: string): boolean {
@@ -26,6 +28,22 @@ function scopeBaseConditions(scope: PortfolioScope) {
   const conditions = [eq(accounts.workspaceId, scope.workspaceId)];
   if (!canSeeAllAccounts(scope.role)) {
     conditions.push(eq(accounts.ownerId, scope.userId));
+  } else if (scope.onlyMine) {
+    const mine = or(
+      eq(accounts.ownerId, scope.userId),
+      exists(
+        db
+          .select({ one: sql`1` })
+          .from(accountConsultants)
+          .where(
+            and(
+              eq(accountConsultants.accountId, accounts.id),
+              eq(accountConsultants.userId, scope.userId)
+            )
+          )
+      )
+    );
+    if (mine) conditions.push(mine);
   }
   return conditions;
 }

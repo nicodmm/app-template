@@ -12,11 +12,12 @@ import {
 } from "@/lib/queries/onboarding";
 import { PortfolioGrid } from "@/components/portfolio-grid";
 import { PortfolioStatusTabs } from "@/components/portfolio-status-tabs";
+import { PortfolioScopeToggle } from "@/components/portfolio-scope-toggle";
 import { OnboardingChecklist } from "@/components/onboarding-checklist";
 import { redirect } from "next/navigation";
 
 interface PageProps {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; mine?: string }>;
 }
 
 export default async function PortfolioPage({ searchParams }: PageProps) {
@@ -30,6 +31,7 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
     params.status === "archived" ? "archived" : "active";
 
   const isElevated = member.role === "owner" || member.role === "admin";
+  const onlyMine = isElevated && params.mine === "1";
 
   const [accounts, counts, onboarding] = await Promise.all([
     getPortfolioAccounts({
@@ -37,11 +39,13 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
       userId,
       role: member.role,
       status,
+      onlyMine,
     }),
     getPortfolioAccountCounts({
       workspaceId: workspace.id,
       userId,
       role: member.role,
+      onlyMine,
     }),
     isElevated
       ? getOnboardingState(workspace.id)
@@ -88,12 +92,13 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <PortfolioStatusTabs
           active={counts.active}
           archived={counts.archived}
           current={status}
         />
+        {isElevated && <PortfolioScopeToggle mine={onlyMine} />}
       </div>
 
       {showChecklist && onboarding && (
