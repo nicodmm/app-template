@@ -16,9 +16,9 @@ export default async function ImportAccountsPage() {
         Volver al portfolio
       </Link>
 
-      <h1 className="text-2xl font-semibold mb-1">Importar cuentas desde CSV</h1>
+      <h1 className="text-2xl font-semibold mb-1">Importar cuentas desde CSV o Excel</h1>
       <p className="text-sm text-muted-foreground mb-8">
-        Pegá un CSV (o subí un archivo) con tus cuentas. Las creamos en bloque y
+        Pegá un CSV (o subí un archivo CSV o Excel) con tus cuentas. Las creamos en bloque y
         después podés enriquecerlas individualmente con la web del cliente.
       </p>
 
