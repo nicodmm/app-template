@@ -2,6 +2,7 @@ import { task, logger, schedules } from "@trigger.dev/sdk/v3";
 import { eq, and, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/lib/drizzle/db";
 import { driveConnections, accounts } from "@/lib/drizzle/schema";
+import type { DriveConnection } from "@/lib/drizzle/schema/drive_connections";
 import {
   ensureFreshAccessToken,
   listDriveFolderFiles,
@@ -56,6 +57,7 @@ export const syncDriveFolderForAccount = task({
         driveFolderId: accounts.driveFolderId,
         driveFolderName: accounts.driveFolderName,
         driveFolderMatchAccountName: accounts.driveFolderMatchAccountName,
+        driveFolderConnectionId: accounts.driveFolderConnectionId,
       })
       .from(accounts)
       .where(
@@ -74,14 +76,26 @@ export const syncDriveFolderForAccount = task({
       return;
     }
 
-    const [conn] = await db
-      .select()
-      .from(driveConnections)
-      .where(eq(driveConnections.workspaceId, payload.workspaceId))
-      .limit(1);
+    let conn: DriveConnection | undefined = acc.driveFolderConnectionId
+      ? (
+          await db
+            .select()
+            .from(driveConnections)
+            .where(eq(driveConnections.id, acc.driveFolderConnectionId))
+            .limit(1)
+        )[0]
+      : undefined;
     if (!conn) {
-      logger.warn("No Drive connection on workspace — skip", {
+      [conn] = await db
+        .select()
+        .from(driveConnections)
+        .where(eq(driveConnections.workspaceId, payload.workspaceId))
+        .limit(1);
+    }
+    if (!conn) {
+      logger.warn("No Drive connection for account folder — skip", {
         workspaceId: payload.workspaceId,
+        accountId: payload.accountId,
       });
       return;
     }
