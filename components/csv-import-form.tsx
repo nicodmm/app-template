@@ -13,28 +13,72 @@ Acme Corp,nico@miagencia.com,3500,2025-09-01,https://acme.com,Growth;Paid Media
 Globex,maria@miagencia.com,2000,2025-11-15,globex.com,SEO;Content
 Initech,,1500,,initech.com,Paid Media`;
 
+const EXCEL_EXT = /\.(xlsx|xls)$/i;
+const EXCEL_MIME = new Set([
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+]);
+
 export function CsvImportForm() {
   const router = useRouter();
   const [csv, setCsv] = useState("");
   const [result, setResult] = useState<ImportResult | null>(null);
   const [pending, startTransition] = useTransition();
+  const [converting, setConverting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = ""; // permite re-seleccionar el mismo archivo
     if (!file) return;
+
+    const isExcel = EXCEL_EXT.test(file.name) || EXCEL_MIME.has(file.type);
+
+    if (!isExcel) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = typeof reader.result === "string" ? reader.result : "";
+        setCsv(text);
+        setResult(null);
+      };
+      reader.readAsText(file);
+      return;
+    }
+
+    setConverting(true);
+    setResult(null);
     const reader = new FileReader();
-    reader.onload = () => {
-      const text = typeof reader.result === "string" ? reader.result : "";
-      setCsv(text);
-      setResult(null);
+    reader.onload = async () => {
+      try {
+        const data = reader.result;
+        if (!(data instanceof ArrayBuffer)) throw new Error("read_failed");
+        const XLSX = await import("xlsx");
+        const wb = XLSX.read(data, { type: "array" });
+        const firstSheet = wb.SheetNames[0];
+        if (!firstSheet) throw new Error("empty_workbook");
+        const csvText = XLSX.utils.sheet_to_csv(wb.Sheets[firstSheet]);
+        setCsv(csvText);
+        setResult(null);
+      } catch {
+        setResult({
+          success: false,
+          error:
+            "No pudimos leer el Excel. Probá exportarlo como CSV e intentá de nuevo.",
+        });
+      } finally {
+        setConverting(false);
+      }
     };
-    reader.readAsText(file);
+    reader.onerror = () => {
+      setConverting(false);
+      setResult({ success: false, error: "No se pudo leer el archivo." });
+    };
+    reader.readAsArrayBuffer(file);
   }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!csv.trim() || pending) return;
+    if (!csv.trim() || pending || converting) return;
     startTransition(async () => {
       const fd = new FormData();
       fd.set("csv", csv);
@@ -121,6 +165,10 @@ export function CsvImportForm() {
           La primera fila debe ser cabeceras. Solo <strong>name</strong> es
           obligatorio. Sinónimos aceptados (case-insensitive):
         </p>
+        <p className="text-xs text-muted-foreground mt-2">
+          También podés subir un Excel (.xlsx): tomamos la primera hoja y la
+          convertimos a CSV en el textarea para que la revises antes de importar.
+        </p>
         <ul className="text-xs space-y-1 text-muted-foreground">
           <li>
             <code>name</code> · nombre, cuenta, cliente, account
@@ -173,20 +221,21 @@ export function CsvImportForm() {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <label htmlFor="csv-textarea" className="text-sm font-medium">
-            CSV / TSV
+            CSV / TSV / Excel
           </label>
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+            disabled={converting}
+            className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline disabled:opacity-50"
           >
             <Upload size={13} aria-hidden />
-            Cargar archivo
+            {converting ? "Convirtiendo…" : "Cargar archivo"}
           </button>
           <input
             ref={fileRef}
             type="file"
-            accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain"
+            accept=".csv,.tsv,.txt,.xlsx,.xls,text/csv,text/tab-separated-values,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
             onChange={onFileChange}
             className="hidden"
           />
@@ -198,7 +247,7 @@ export function CsvImportForm() {
             setCsv(e.target.value);
             setResult(null);
           }}
-          placeholder="Pegá tu CSV o TSV acá. Primera fila debe ser cabeceras."
+          placeholder="Pegá tu CSV/TSV, o subí un archivo CSV o Excel (.xlsx). Primera fila = cabeceras."
           rows={14}
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
         />
@@ -207,7 +256,7 @@ export function CsvImportForm() {
       <div className="flex justify-end gap-2">
         <button
           type="submit"
-          disabled={!csv.trim() || pending}
+          disabled={!csv.trim() || pending || converting}
           className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
           {pending ? "Importando…" : "Importar"}
