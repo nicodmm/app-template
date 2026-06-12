@@ -7,18 +7,20 @@ import { DeleteButton } from "@/components/delete-button";
 import { AdAccountMappingForm } from "@/components/ad-account-mapping-form";
 import { BackfillButton } from "@/components/backfill-button";
 import { disconnectMetaConnection } from "@/app/actions/meta-connections";
+import type { MetaAdAccount } from "@/lib/drizzle/schema";
 
-export interface MetaAdAccountView {
-  id: string;
-  accountId: string | null;
-  metaAdAccountId: string;
-  name: string;
-  currency: string;
-  timezone: string;
-  isEcommerce: boolean;
-  conversionEvent: string;
-  lastSyncedAt: Date | null;
-}
+export type MetaAdAccountView = Pick<
+  MetaAdAccount,
+  | "id"
+  | "accountId"
+  | "metaAdAccountId"
+  | "name"
+  | "currency"
+  | "timezone"
+  | "isEcommerce"
+  | "conversionEvent"
+  | "lastSyncedAt"
+>;
 
 interface Props {
   connectionId: string;
@@ -47,6 +49,7 @@ export function MetaConnectionCard({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
           className="flex items-center gap-2 min-w-0 text-left"
         >
           {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
