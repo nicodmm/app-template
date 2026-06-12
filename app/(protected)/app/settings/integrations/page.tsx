@@ -165,6 +165,26 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
               </div>
             )}
 
+            <details className="mb-4 rounded-lg p-3 text-sm [background:var(--glass-tile-bg)] [border:1px_solid_var(--glass-tile-border)]">
+              <summary className="cursor-pointer font-medium select-none">
+                ¿Usás Tactiq para transcribir reuniones?
+              </summary>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-muted-foreground">
+                <li>
+                  En Tactiq, activá el auto-guardado a Google Drive con tu cuenta de
+                  Google.
+                </li>
+                <li>
+                  Conectá esa misma cuenta acá como tu Drive personal y elegí la
+                  carpeta <strong>&ldquo;Tactiq Transcription&rdquo;</strong>.
+                </li>
+                <li>
+                  Cada nueva reunión se importa sola y se rutea a la cuenta del
+                  cliente por el nombre o el contenido del transcript.
+                </li>
+              </ol>
+            </details>
+
             <div className="flex flex-wrap gap-2">
               {!myPersonal && (
                 <Link
