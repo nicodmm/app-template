@@ -5,15 +5,14 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/drizzle/db";
 import { metaAdAccounts, metaConnections, accounts } from "@/lib/drizzle/schema";
 import { requireUserId } from "@/lib/auth";
-import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspace";
+import { getWorkspaceWithMember } from "@/lib/queries/workspace";
 
 async function getWorkspaceAndOwner(
   userId: string
 ): Promise<{ workspaceId: string; isOwner: boolean }> {
-  const workspace = await getWorkspaceByUserId(userId);
-  if (!workspace) throw new Error("Workspace no encontrado");
-  const member = await getWorkspaceMember(workspace.id, userId);
-  return { workspaceId: workspace.id, isOwner: member?.role === "owner" };
+  const result = await getWorkspaceWithMember(userId);
+  if (!result) throw new Error("Workspace no encontrado");
+  return { workspaceId: result.workspace.id, isOwner: result.member.role === "owner" };
 }
 
 /**
@@ -88,7 +87,7 @@ export async function updateAdAccountMapping(input: {
   conversionEvent: string;
 }): Promise<{ triggeredBackfill: boolean }> {
   const userId = await requireUserId();
-  const { workspaceId } = await requireAdAccountAccess(input.adAccountId, userId);
+  await requireAdAccountAccess(input.adAccountId, userId);
 
   const [adRow] = await db
     .select({ currentAccountId: metaAdAccounts.accountId })
@@ -120,9 +119,6 @@ export async function updateAdAccountMapping(input: {
 
   revalidatePath("/app/settings/integrations");
   if (input.accountId) revalidatePath(`/app/accounts/${input.accountId}`);
-
-  // workspaceId is available for future revalidations if needed
-  void workspaceId;
 
   if (shouldBackfill) {
     const { tasks } = await import("@trigger.dev/sdk/v3");
