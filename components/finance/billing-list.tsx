@@ -1,8 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, Plus, Trash2, AlertTriangle } from "lucide-react";
+import {
+  RefreshCw,
+  Plus,
+  Trash2,
+  AlertTriangle,
+  ChevronRight,
+  ChevronDown,
+} from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import {
   generateBillingForMonth,
@@ -177,6 +184,46 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
   const hasPendingFx = billing.some((r) => r.amountArs == null);
   const maxHistory = history.reduce((m, h) => Math.max(m, h.totalArs), 0);
 
+  // Group the per-concept rows into one expandable total per client/account.
+  const groups = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        accountId: string;
+        accountName: string;
+        rows: BillingRow[];
+        totalArs: number;
+        hasPending: boolean;
+      }
+    >();
+    for (const r of billing) {
+      let g = map.get(r.accountId);
+      if (!g) {
+        g = {
+          accountId: r.accountId,
+          accountName: r.accountName,
+          rows: [],
+          totalArs: 0,
+          hasPending: false,
+        };
+        map.set(r.accountId, g);
+      }
+      g.rows.push(r);
+      g.totalArs += r.amountArs ?? 0;
+      if (r.amountArs == null) g.hasPending = true;
+    }
+    return Array.from(map.values());
+  }, [billing]);
+
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleGroup = (accountId: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(accountId)) next.delete(accountId);
+      else next.add(accountId);
+      return next;
+    });
+
   return (
     <div className="space-y-6">
       {/* Toolbar */}
@@ -321,82 +368,119 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
             <thead>
               <tr className="border-b [border-color:var(--glass-border)]">
                 <th className="px-4 py-2.5 text-left font-semibold text-muted-foreground">Cliente</th>
-                <th className="px-4 py-2.5 text-left font-semibold text-muted-foreground">Concepto</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-muted-foreground">Monto original</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-muted-foreground">Monto ARS</th>
-                <th className="px-4 py-2.5 text-left font-semibold text-muted-foreground">Estado</th>
-                <th className="px-4 py-2.5" />
+                <th className="px-4 py-2.5 text-left font-semibold text-muted-foreground">Conceptos</th>
+                <th className="px-4 py-2.5 text-right font-semibold text-muted-foreground">Total ARS</th>
               </tr>
             </thead>
             <tbody>
-              {billing.map((r) => (
-                <tr
-                  key={r.id}
-                  className="border-b last:border-0 [border-color:var(--glass-border)] hover:bg-white/20 dark:hover:bg-white/5 transition-colors"
-                >
-                  <td className="px-4 py-2 font-medium">{r.accountName}</td>
-                  <td className="px-4 py-2">
-                    {r.concept}
-                    {r.isAdditional && (
-                      <span className="ml-2 rounded-full px-1.5 py-0.5 text-[10px] bg-primary/10 text-primary">
-                        adicional
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2 text-right tabular-nums">
-                    {formatOriginal(r.amountOriginal, r.currencyOriginal)}
-                  </td>
-                  <td className="px-4 py-2 text-right tabular-nums">
-                    {r.amountArs == null ? (
-                      <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                        <AlertTriangle size={11} aria-hidden />
-                        TC pendiente
-                      </span>
-                    ) : (
-                      <span className="font-medium">{formatArs(r.amountArs)}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2">
-                    <select
-                      value={r.status}
-                      disabled={isPending}
-                      onChange={(e) =>
-                        handleStatus(r.id, e.target.value as "pending" | "billed" | "paid")
-                      }
-                      className={inputClass}
+              {groups.map((g) => {
+                const open = expanded.has(g.accountId);
+                return (
+                  <Fragment key={g.accountId}>
+                    {/* Client total row (expandable) */}
+                    <tr
+                      className="border-b last:border-0 [border-color:var(--glass-border)] hover:bg-white/20 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                      onClick={() => toggleGroup(g.accountId)}
                     >
-                      {(["pending", "billed", "paid"] as const).map((s) => (
-                        <option key={s} value={s}>
-                          {STATUS_LABELS[s]}
-                        </option>
+                      <td className="px-4 py-2 font-medium">
+                        <span className="inline-flex items-center gap-1.5">
+                          {open ? (
+                            <ChevronDown size={13} aria-hidden />
+                          ) : (
+                            <ChevronRight size={13} aria-hidden />
+                          )}
+                          {g.accountName}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-muted-foreground">
+                        {g.rows.length} concepto{g.rows.length !== 1 ? "s" : ""}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        <span className="inline-flex items-center justify-end gap-1.5">
+                          {g.hasPending && (
+                            <AlertTriangle
+                              size={11}
+                              aria-hidden
+                              className="text-amber-600 dark:text-amber-400"
+                            />
+                          )}
+                          <span className="font-semibold">{formatArs(g.totalArs)}</span>
+                        </span>
+                      </td>
+                    </tr>
+
+                    {/* Concept breakdown */}
+                    {open &&
+                      g.rows.map((r) => (
+                        <tr
+                          key={r.id}
+                          className="border-b last:border-0 [border-color:var(--glass-border)] bg-white/10 dark:bg-white/[0.03]"
+                        >
+                          <td className="px-4 py-1.5 pl-10">
+                            {r.concept}
+                            {r.isAdditional && (
+                              <span className="ml-2 rounded-full px-1.5 py-0.5 text-[10px] bg-primary/10 text-primary">
+                                adicional
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-1.5 text-muted-foreground tabular-nums">
+                            {formatOriginal(r.amountOriginal, r.currencyOriginal)}
+                            {r.amountArs == null ? (
+                              <span className="ml-2 inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                                <AlertTriangle size={11} aria-hidden />
+                                TC pendiente
+                              </span>
+                            ) : (
+                              <span className="ml-2">→ {formatArs(r.amountArs)}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-1.5">
+                            <div className="flex items-center justify-end gap-2">
+                              <select
+                                value={r.status}
+                                disabled={isPending}
+                                onChange={(e) =>
+                                  handleStatus(
+                                    r.id,
+                                    e.target.value as "pending" | "billed" | "paid"
+                                  )
+                                }
+                                className={inputClass}
+                              >
+                                {(["pending", "billed", "paid"] as const).map((s) => (
+                                  <option key={s} value={s}>
+                                    {STATUS_LABELS[s]}
+                                  </option>
+                                ))}
+                              </select>
+                              {r.isAdditional && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(r.id)}
+                                  disabled={isPending}
+                                  aria-label="Eliminar cargo"
+                                  className="text-muted-foreground hover:text-destructive disabled:opacity-50"
+                                >
+                                  <Trash2 size={14} aria-hidden />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
                       ))}
-                    </select>
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    {r.isAdditional && (
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(r.id)}
-                        disabled={isPending}
-                        aria-label="Eliminar cargo"
-                        className="text-muted-foreground hover:text-destructive disabled:opacity-50"
-                      >
-                        <Trash2 size={14} aria-hidden />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                  </Fragment>
+                );
+              })}
             </tbody>
             <tfoot>
               <tr className="border-t [border-color:var(--glass-border)]">
-                <td className="px-4 py-2.5 font-semibold" colSpan={3}>
+                <td className="px-4 py-2.5 font-semibold" colSpan={2}>
                   Total ARS
                 </td>
                 <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
                   {formatArs(totalArs)}
                 </td>
-                <td colSpan={2} />
               </tr>
             </tfoot>
           </table>

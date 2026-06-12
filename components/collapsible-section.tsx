@@ -16,6 +16,8 @@ interface CollapsibleSectionProps {
   defaultOpen?: boolean;
   /** Optional anchor id so other UI (e.g. strip chart) can scroll into view. */
   id?: string;
+  /** Extra classes for the outer <section> (e.g. h-full for equal-height grids). */
+  className?: string;
   children: ReactNode;
 }
 
@@ -25,6 +27,7 @@ export function CollapsibleSection({
   summary,
   defaultOpen = false,
   id,
+  className,
   children,
 }: CollapsibleSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -34,7 +37,8 @@ export function CollapsibleSection({
       id={id}
       className={cn(
         "rounded-xl overflow-hidden backdrop-blur-[14px]",
-        "[background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]"
+        "[background:var(--glass-bg)] [border:1px_solid_var(--glass-border)] [box-shadow:var(--glass-shadow)]",
+        className
       )}
     >
       <button

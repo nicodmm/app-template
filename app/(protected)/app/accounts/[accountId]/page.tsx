@@ -396,12 +396,13 @@ export default async function AccountDetailPage({
 
       {/* Operación interna: vista pública + términos, compacto y lado a lado.
           Se baja del tope para no tapar la visión principal de la cuenta. */}
-      <div className="grid gap-4 sm:grid-cols-2 mb-6">
+      <div className="grid gap-4 sm:grid-cols-2 mb-6 items-stretch">
         <AccountShareSection accountId={accountId} existing={existingShareLink} />
         {canFinance && (
           <CollapsibleSection
             title="Términos de contratación y pagos"
             icon={<DollarSign size={16} aria-hidden />}
+            className="h-full"
           >
             <div className="space-y-5">
               <div className="flex justify-end">
