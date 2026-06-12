@@ -5,18 +5,6 @@ import type { DriveConnection } from "@/lib/drizzle/schema/drive_connections";
 
 export type { DriveConnection };
 
-/** @deprecated use getVisibleDriveConnections/resolveDriveConnectionForUser */
-export async function getDriveConnectionForWorkspace(
-  workspaceId: string
-): Promise<DriveConnection | null> {
-  const result = await db
-    .select()
-    .from(driveConnections)
-    .where(eq(driveConnections.workspaceId, workspaceId))
-    .limit(1);
-  return result[0] ?? null;
-}
-
 /**
  * Conexiones de Drive visibles para un usuario:
  *  - las personales propias (connectedByUserId == userId)

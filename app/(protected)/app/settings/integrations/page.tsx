@@ -6,20 +6,30 @@ import { requireUserId } from "@/lib/auth";
 import { db } from "@/lib/drizzle/db";
 import { metaConnections, metaAdAccounts, accounts, crmConnections } from "@/lib/drizzle/schema";
 import { getWorkspaceByUserId, getWorkspaceMember, getWorkspaceMembers } from "@/lib/queries/workspace";
+import { getVisibleDriveConnections } from "@/lib/queries/drive";
+import { isGoogleOAuthConfigured } from "@/lib/google/oauth";
 import { MetaConnectionCard } from "@/components/meta-connection-card";
+import { DriveConnectionSection } from "@/components/drive-connection-section";
 
 interface PageProps {
-  searchParams: Promise<{ connected?: string; error?: string }>;
+  searchParams: Promise<{ connected?: string; error?: string; drive?: string; drive_error?: string }>;
 }
 
 export default async function IntegrationsPage({ searchParams }: PageProps) {
   const userId = await requireUserId();
-  const { connected, error } = await searchParams;
+  const { connected, error, drive, drive_error: driveError } = await searchParams;
   const workspace = await getWorkspaceByUserId(userId);
   if (!workspace) redirect("/auth/login");
 
   const member = await getWorkspaceMember(workspace.id, userId);
   const isOwner = member?.role === "owner";
+
+  const driveConns = await getVisibleDriveConnections(workspace.id, userId, isOwner);
+  const myPersonal = driveConns.find(
+    (c) => c.connectedByUserId === userId && c.scope === "personal"
+  );
+  const canManageShared = member?.role === "owner" || member?.role === "admin";
+  const driveConfigured = isGoogleOAuthConfigured();
 
   const allConnections = await db
     .select()
@@ -135,6 +145,59 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
           </div>
         )}
       </div>
+
+      <section className="mt-8">
+        <h2 className="text-lg font-semibold mb-3">Google Drive</h2>
+        {!driveConfigured ? (
+          <p className="text-sm text-muted-foreground">
+            La integración de Google Drive no está configurada (faltan credenciales OAuth).
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {drive && (
+              <div className="rounded-md border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+                Drive conectado correctamente.
+              </div>
+            )}
+            {driveError && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                Error al conectar Drive: {decodeURIComponent(driveError)}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              {!myPersonal && (
+                <Link
+                  href="/api/auth/google/login?returnTo=/app/settings/integrations"
+                  className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Conectar mi Drive
+                </Link>
+              )}
+              {canManageShared && (
+                <Link
+                  href="/api/auth/google/login?scope=workspace&returnTo=/app/settings/integrations"
+                  className="inline-flex items-center rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-accent transition-colors"
+                >
+                  Conectar Drive compartido del workspace
+                </Link>
+              )}
+            </div>
+
+            {driveConns.map((conn) => (
+              <DriveConnectionSection
+                key={conn.id}
+                connection={conn}
+                canManage={
+                  conn.scope === "workspace"
+                    ? canManageShared
+                    : conn.connectedByUserId === userId || isOwner
+                }
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="mt-8">
         <h2 className="text-lg font-semibold mb-3">CRM</h2>
