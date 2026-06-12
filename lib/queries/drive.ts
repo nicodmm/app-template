@@ -5,6 +5,18 @@ import type { DriveConnection } from "@/lib/drizzle/schema/drive_connections";
 
 export type { DriveConnection };
 
+export type DriveConnectionView = Pick<
+  DriveConnection,
+  | "id"
+  | "scope"
+  | "googleAccountEmail"
+  | "folderId"
+  | "folderName"
+  | "linkOnlySync"
+  | "lastSyncAt"
+  | "lastError"
+>;
+
 /**
  * Conexiones de Drive visibles para un usuario:
  *  - las personales propias (connectedByUserId == userId)

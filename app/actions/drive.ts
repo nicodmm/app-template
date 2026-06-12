@@ -14,6 +14,7 @@ import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspac
 import {
   getDriveConnectionById,
   resolveDriveConnectionForUser,
+  type DriveConnection,
 } from "@/lib/queries/drive";
 import {
   ensureFreshAccessToken,
@@ -28,7 +29,7 @@ import {
 
 async function requireDriveConnectionAccess(
   connectionId: string
-): Promise<{ connectionId: string; userId: string }> {
+): Promise<{ conn: DriveConnection; userId: string }> {
   const userId = await requireUserId();
   const workspace = await getWorkspaceByUserId(userId);
   if (!workspace) throw new Error("Workspace no encontrado");
@@ -44,7 +45,7 @@ async function requireDriveConnectionAccess(
       ? isManager
       : conn.connectedByUserId === userId || isOwner;
   if (!allowed) throw new Error("No tenés permisos sobre esta conexión");
-  return { connectionId, userId };
+  return { conn, userId };
 }
 
 export async function listDriveFoldersForConnection(
@@ -469,9 +470,7 @@ export async function syncDriveNow(
   connectionId: string
 ): Promise<{ runId?: string; error?: string }> {
   try {
-    await requireDriveConnectionAccess(connectionId);
-    const conn = await getDriveConnectionById(connectionId);
-    if (!conn) return { error: "Drive no está conectado" };
+    const { conn } = await requireDriveConnectionAccess(connectionId);
     if (!conn.folderId) return { error: "Configurá una carpeta primero" };
     const { tasks } = await import("@trigger.dev/sdk/v3");
     const handle = await tasks.trigger("sync-drive-folder", { connectionId });

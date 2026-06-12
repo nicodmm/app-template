@@ -187,7 +187,16 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
             {driveConns.map((conn) => (
               <DriveConnectionSection
                 key={conn.id}
-                connection={conn}
+                connection={{
+                  id: conn.id,
+                  scope: conn.scope,
+                  googleAccountEmail: conn.googleAccountEmail,
+                  folderId: conn.folderId,
+                  folderName: conn.folderName,
+                  linkOnlySync: conn.linkOnlySync,
+                  lastSyncAt: conn.lastSyncAt,
+                  lastError: conn.lastError,
+                }}
                 canManage={
                   conn.scope === "workspace"
                     ? canManageShared

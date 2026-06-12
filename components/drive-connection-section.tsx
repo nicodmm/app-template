@@ -10,10 +10,10 @@ import {
   disconnectDrive,
   syncDriveNow,
 } from "@/app/actions/drive";
-import type { DriveConnection } from "@/lib/queries/drive";
+import type { DriveConnectionView } from "@/lib/queries/drive";
 
 interface Props {
-  connection: DriveConnection;
+  connection: DriveConnectionView;
   canManage: boolean;
 }
 
