@@ -304,6 +304,7 @@ function buildAccount(seed: DemoAccountSeed): AccountWithOwner {
     driveFolderName: null,
     driveFolderSyncedAt: null,
     driveFolderMatchAccountName: false,
+    driveFolderConnectionId: null,
     industry: seed.industry,
     industryCategory: seed.industryCategory,
     employeeCount: seed.employeeCount,

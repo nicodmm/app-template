@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp, uuid, uniqueIndex, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, uniqueIndex, boolean, check } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { workspaces } from "./workspaces";
 import { users } from "./users";
 
@@ -12,7 +13,7 @@ export const driveConnections = pgTable(
     connectedByUserId: uuid("connected_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
-
+    scope: text("scope").notNull().default("personal"),
     googleAccountEmail: text("google_account_email"),
     accessToken: text("access_token").notNull(),
     refreshToken: text("refresh_token").notNull(),
@@ -30,7 +31,12 @@ export const driveConnections = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("drive_connections_workspace_unique").on(table.workspaceId),
+    uniqueIndex("drive_connections_ws_user_scope_unique").on(
+      table.workspaceId,
+      table.connectedByUserId,
+      table.scope
+    ),
+    check("drive_connections_scope_check", sql`${table.scope} IN ('personal','workspace')`),
   ]
 );
 

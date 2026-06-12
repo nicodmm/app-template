@@ -12,6 +12,11 @@ import {
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspace";
 import {
+  getDriveConnectionById,
+  resolveDriveConnectionForUser,
+  type DriveConnection,
+} from "@/lib/queries/drive";
+import {
   ensureFreshAccessToken,
   listDriveFolders,
   type DriveFolder,
@@ -22,29 +27,34 @@ import {
   parseDriveFolderIdFromUrl,
 } from "@/lib/google/drive-links";
 
-async function ensureManager(): Promise<{ workspaceId: string }> {
+async function requireDriveConnectionAccess(
+  connectionId: string
+): Promise<{ conn: DriveConnection; userId: string }> {
   const userId = await requireUserId();
   const workspace = await getWorkspaceByUserId(userId);
   if (!workspace) throw new Error("Workspace no encontrado");
-  const member = await getWorkspaceMember(workspace.id, userId);
-  if (!member || (member.role !== "owner" && member.role !== "admin")) {
-    throw new Error("No tenés permisos");
+  const conn = await getDriveConnectionById(connectionId);
+  if (!conn || conn.workspaceId !== workspace.id) {
+    throw new Error("Conexión no encontrada");
   }
-  return { workspaceId: workspace.id };
+  const member = await getWorkspaceMember(workspace.id, userId);
+  const isOwner = member?.role === "owner";
+  const isManager = isOwner || member?.role === "admin";
+  const allowed =
+    conn.scope === "workspace"
+      ? isManager
+      : conn.connectedByUserId === userId || isOwner;
+  if (!allowed) throw new Error("No tenés permisos sobre esta conexión");
+  return { conn, userId };
 }
 
-export async function listDriveFoldersForWorkspace(
+export async function listDriveFoldersForConnection(
+  connectionId: string,
   search?: string
 ): Promise<{ folders?: DriveFolder[]; error?: string }> {
   try {
-    const { workspaceId } = await ensureManager();
-    const [conn] = await db
-      .select()
-      .from(driveConnections)
-      .where(eq(driveConnections.workspaceId, workspaceId))
-      .limit(1);
-    if (!conn) return { error: "Drive no está conectado" };
-    const accessToken = await ensureFreshAccessToken(conn.id);
+    await requireDriveConnectionAccess(connectionId);
+    const accessToken = await ensureFreshAccessToken(connectionId);
     const folders = await listDriveFolders(accessToken, search);
     return { folders };
   } catch (err) {
@@ -55,15 +65,16 @@ export async function listDriveFoldersForWorkspace(
 }
 
 export async function setDriveLinkOnlySync(
+  connectionId: string,
   enabled: boolean
 ): Promise<{ error?: string }> {
   try {
-    const { workspaceId } = await ensureManager();
+    await requireDriveConnectionAccess(connectionId);
     await db
       .update(driveConnections)
       .set({ linkOnlySync: enabled, updatedAt: new Date() })
-      .where(eq(driveConnections.workspaceId, workspaceId));
-    revalidatePath("/app/settings/workspace");
+      .where(eq(driveConnections.id, connectionId));
+    revalidatePath("/app/settings/integrations");
     return {};
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Error" };
@@ -71,11 +82,12 @@ export async function setDriveLinkOnlySync(
 }
 
 export async function setDriveFolder(
+  connectionId: string,
   folderId: string,
   folderName: string
 ): Promise<{ error?: string }> {
   try {
-    const { workspaceId } = await ensureManager();
+    await requireDriveConnectionAccess(connectionId);
     await db
       .update(driveConnections)
       .set({
@@ -84,20 +96,20 @@ export async function setDriveFolder(
         lastError: null,
         updatedAt: new Date(),
       })
-      .where(eq(driveConnections.workspaceId, workspaceId));
-    revalidatePath("/app/settings/workspace");
+      .where(eq(driveConnections.id, connectionId));
+    revalidatePath("/app/settings/integrations");
     return {};
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Error" };
   }
 }
 
-export async function disconnectDrive(): Promise<void> {
-  const { workspaceId } = await ensureManager();
+export async function disconnectDrive(connectionId: string): Promise<void> {
+  await requireDriveConnectionAccess(connectionId);
   await db
     .delete(driveConnections)
-    .where(eq(driveConnections.workspaceId, workspaceId));
-  revalidatePath("/app/settings/workspace");
+    .where(eq(driveConnections.id, connectionId));
+  revalidatePath("/app/settings/integrations");
 }
 
 export async function importDriveLinkForAccount(
@@ -119,15 +131,11 @@ export async function importDriveLinkForAccount(
   const workspace = await getWorkspaceByUserId(userId);
   if (!workspace) return { error: "Workspace no encontrado" };
 
-  // Single up-front Drive-connection check — both folder and file paths
-  // need it. Returning a structured outcome lets the UI offer an inline
-  // "Connect Drive" CTA instead of a dead-end error message.
-  const [hasConn] = await db
-    .select({ id: driveConnections.id })
-    .from(driveConnections)
-    .where(eq(driveConnections.workspaceId, workspace.id))
-    .limit(1);
-  if (!hasConn) return { outcome: "drive_not_connected" };
+  // Resolve the Drive connection this user operates with (personal first,
+  // else a shared workspace one). Returning a structured outcome lets the UI
+  // offer an inline "Connect Drive" CTA instead of a dead-end error message.
+  const conn = await resolveDriveConnectionForUser(workspace.id, userId);
+  if (!conn) return { outcome: "drive_not_connected" };
 
   // If the URL points at a folder, route to the folder-binding flow instead
   // of trying to import a single file.
@@ -158,16 +166,6 @@ export async function importDriveLinkForAccount(
     .where(and(eq(accounts.id, accountId), eq(accounts.workspaceId, workspace.id)))
     .limit(1);
   if (!account) return { error: "Cuenta no encontrada" };
-
-  // Must have an active Drive connection on this workspace.
-  const [conn] = await db
-    .select({ id: driveConnections.id })
-    .from(driveConnections)
-    .where(eq(driveConnections.workspaceId, workspace.id))
-    .limit(1);
-  if (!conn) {
-    return { outcome: "drive_not_connected" };
-  }
 
   // Refresh token and fetch metadata quickly to fail fast on permission issues
   // before we enqueue. If this part takes long we time out at 8s and let the
@@ -289,18 +287,14 @@ async function bindFolderInternal(
     return { outcome: "folder_bound", folderName: "", error: "Cuenta no encontrada" };
   }
 
-  // Drive connection on the workspace.
-  const [conn] = await db
-    .select({ id: driveConnections.id })
-    .from(driveConnections)
-    .where(eq(driveConnections.workspaceId, workspaceId))
-    .limit(1);
+  // Drive connection this user operates with.
+  const conn = await resolveDriveConnectionForUser(workspaceId, userId);
   if (!conn) {
     return {
       outcome: "folder_bound",
       folderName: "",
       error:
-        "Conectá Google Drive primero desde el Workspace para poder vincular carpetas.",
+        "Conectá Google Drive primero desde Integraciones para vincular carpetas.",
     };
   }
 
@@ -383,6 +377,7 @@ async function bindFolderInternal(
     .set({
       driveFolderId: folderId,
       driveFolderName: folderName,
+      driveFolderConnectionId: conn.id,
       driveFolderMatchAccountName: matchAccountName,
       updatedAt: new Date(),
     })
@@ -459,6 +454,7 @@ export async function unlinkDriveFolderForAccount(
     .set({
       driveFolderId: null,
       driveFolderName: null,
+      driveFolderConnectionId: null,
       driveFolderSyncedAt: null,
       driveFolderMatchAccountName: false,
       updatedAt: new Date(),
@@ -470,21 +466,14 @@ export async function unlinkDriveFolderForAccount(
   return {};
 }
 
-export async function syncDriveNow(): Promise<{ runId?: string; error?: string }> {
+export async function syncDriveNow(
+  connectionId: string
+): Promise<{ runId?: string; error?: string }> {
   try {
-    const { workspaceId } = await ensureManager();
-    const [conn] = await db
-      .select({ id: driveConnections.id, folderId: driveConnections.folderId })
-      .from(driveConnections)
-      .where(eq(driveConnections.workspaceId, workspaceId))
-      .limit(1);
-    if (!conn) return { error: "Drive no está conectado" };
+    const { conn } = await requireDriveConnectionAccess(connectionId);
     if (!conn.folderId) return { error: "Configurá una carpeta primero" };
-
     const { tasks } = await import("@trigger.dev/sdk/v3");
-    const handle = await tasks.trigger("sync-drive-folder", {
-      connectionId: conn.id,
-    });
+    const handle = await tasks.trigger("sync-drive-folder", { connectionId });
     return { runId: handle.id };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "No se pudo disparar el sync" };
