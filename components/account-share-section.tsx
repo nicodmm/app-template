@@ -160,7 +160,7 @@ export function AccountShareSection({ accountId, existing }: Props) {
 
   if (!link) {
     return (
-      <GlassCard className="p-6 mb-6">
+      <GlassCard className="p-6 h-full">
         <div className="flex flex-col gap-3">
           <div>
             <h2 className="font-semibold mb-1 flex items-center gap-2">
@@ -187,7 +187,7 @@ export function AccountShareSection({ accountId, existing }: Props) {
   }
 
   return (
-    <GlassCard className="p-6 mb-6">
+    <GlassCard className="p-6 h-full">
       <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="font-semibold flex items-center gap-2">
