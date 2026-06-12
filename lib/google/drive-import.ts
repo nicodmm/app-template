@@ -37,6 +37,9 @@ interface ImportOptions {
    * stale tasks.
    */
   skipTaskExtraction?: boolean;
+  /** Texto ya extraído por el caller (sync por contenido). Cuando viene y el
+   *  archivo es transcript-shaped, evita re-descargar. */
+  prefetchedText?: string | null;
 }
 
 function hashContent(content: string): string {
@@ -81,6 +84,19 @@ async function extractTextFromBuffer(
     }
   }
   return null;
+}
+
+export async function extractDriveFileText(
+  accessToken: string,
+  file: DriveFileMeta
+): Promise<string | null> {
+  let downloaded: { data: ArrayBuffer; mimeType: string };
+  try {
+    downloaded = await downloadDriveFileAsArrayBuffer(accessToken, file.id, file.mimeType);
+  } catch {
+    return null;
+  }
+  return extractTextFromBuffer(downloaded.data, downloaded.mimeType, file.name);
 }
 
 /**
@@ -163,20 +179,26 @@ export async function importDriveFileForAccount(
     return "imported";
   }
 
-  let downloaded: { data: ArrayBuffer; mimeType: string } | null = null;
-  try {
-    downloaded = await downloadDriveFileAsArrayBuffer(
-      accessToken,
-      file.id,
-      file.mimeType
-    );
-  } catch {
-    return "skipped";
-  }
+  const usePrefetched = opts.prefetchedText != null && shape.isTranscriptShaped;
 
-  const text = shape.isTranscriptShaped
-    ? await extractTextFromBuffer(downloaded.data, downloaded.mimeType, file.name)
-    : null;
+  let downloaded: { data: ArrayBuffer; mimeType: string } | null = null;
+  let text: string | null;
+  if (usePrefetched) {
+    text = opts.prefetchedText ?? null;
+  } else {
+    try {
+      downloaded = await downloadDriveFileAsArrayBuffer(
+        accessToken,
+        file.id,
+        file.mimeType
+      );
+    } catch {
+      return "skipped";
+    }
+    text = shape.isTranscriptShaped
+      ? await extractTextFromBuffer(downloaded.data, downloaded.mimeType, file.name)
+      : null;
+  }
 
   if (shape.isTranscriptShaped && text && text.trim().split(/\s+/).length >= 10) {
     const wordCount = text.trim().split(/\s+/).length;
@@ -221,6 +243,10 @@ export async function importDriveFileForAccount(
     }
     return "imported";
   }
+
+  // Si usamos texto pre-cargado (sin descarga) y no entró por el path de
+  // transcript, no hay bytes para el context_document → skip.
+  if (!downloaded) return "skipped";
 
   const autoNote =
     opts.source === "drive_link"
