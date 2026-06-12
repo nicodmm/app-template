@@ -9,6 +9,7 @@ import {
 
 const STATE_COOKIE = "google_oauth_state";
 const RETURN_TO_COOKIE = "google_oauth_return_to";
+const SCOPE_COOKIE = "google_oauth_drive_scope";
 const STATE_TTL_SECONDS = 600;
 
 /**
@@ -53,6 +54,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   } else {
     cookieStore.delete(RETURN_TO_COOKIE);
   }
+
+  const requestedScope =
+    req.nextUrl.searchParams.get("scope") === "workspace" ? "workspace" : "personal";
+  cookieStore.set(SCOPE_COOKIE, requestedScope, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: STATE_TTL_SECONDS,
+  });
 
   return NextResponse.redirect(buildGoogleAuthorizeUrl(state));
 }

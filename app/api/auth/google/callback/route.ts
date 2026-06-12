@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/drizzle/db";
 import { driveConnections } from "@/lib/drizzle/schema";
 import { requireUserId } from "@/lib/auth";
@@ -13,7 +13,8 @@ import {
 
 const STATE_COOKIE = "google_oauth_state";
 const RETURN_TO_COOKIE = "google_oauth_return_to";
-const DEFAULT_REDIRECT_BASE = `/app/settings/workspace`;
+const SCOPE_COOKIE = "google_oauth_drive_scope";
+const DEFAULT_REDIRECT_BASE = `/app/settings/integrations`;
 
 function redirect(
   reason: string,
@@ -43,12 +44,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       : null;
   if (rawReturn) cookieStore.delete(RETURN_TO_COOKIE);
 
+  const requestedScope =
+    cookieStore.get(SCOPE_COOKIE)?.value === "workspace" ? "workspace" : "personal";
+  cookieStore.delete(SCOPE_COOKIE);
+
   const workspace = await getWorkspaceByUserId(userId);
   if (!workspace) return redirect("no_workspace", false, returnTo);
   const member = await getWorkspaceMember(workspace.id, userId);
-  if (!member || (member.role !== "owner" && member.role !== "admin")) {
-    return redirect("forbidden", false, returnTo);
-  }
+  const canManageWorkspaceScope =
+    member?.role === "owner" || member?.role === "admin";
+  const scope =
+    requestedScope === "workspace" && canManageWorkspaceScope ? "workspace" : "personal";
 
   const code = req.nextUrl.searchParams.get("code");
   const state = req.nextUrl.searchParams.get("state");
@@ -70,18 +76,23 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
     const userInfo = await fetchGoogleUserInfo(tokens.access_token);
 
-    // Upsert connection (workspace_id is unique).
+    // Upsert connection keyed by (workspaceId, connectedByUserId, scope).
     const existing = await db
       .select({ id: driveConnections.id })
       .from(driveConnections)
-      .where(eq(driveConnections.workspaceId, workspace.id))
+      .where(
+        and(
+          eq(driveConnections.workspaceId, workspace.id),
+          eq(driveConnections.connectedByUserId, userId),
+          eq(driveConnections.scope, scope)
+        )
+      )
       .limit(1);
 
     if (existing.length > 0) {
       await db
         .update(driveConnections)
         .set({
-          connectedByUserId: userId,
           googleAccountEmail: userInfo.email,
           accessToken: tokens.access_token,
           refreshToken: tokens.refresh_token,
@@ -95,6 +106,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       await db.insert(driveConnections).values({
         workspaceId: workspace.id,
         connectedByUserId: userId,
+        scope,
         googleAccountEmail: userInfo.email,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
