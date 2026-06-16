@@ -250,12 +250,19 @@ export function AccountBillingPanel({ accountId, year, month, billing }: Props) 
                   {r.currencyOriginal}
                 </td>
                 <td className="py-2 text-right tabular-nums">
-                  {r.amountArs == null ? (
+                  {r.amountArs != null ? (
+                    arsFmt.format(r.amountArs)
+                  ) : r.billingRule === "same" ? (
+                    <span
+                      className="text-muted-foreground"
+                      title={`Se factura en ${r.currencyOriginal}, sin conversión a ARS`}
+                    >
+                      Factura en {r.currencyOriginal}
+                    </span>
+                  ) : (
                     <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
                       <AlertTriangle size={11} aria-hidden /> TC pendiente
                     </span>
-                  ) : (
-                    arsFmt.format(r.amountArs)
                   )}
                 </td>
                 <td className="py-2">

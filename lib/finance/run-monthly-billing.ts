@@ -1,4 +1,4 @@
-import { and, eq, inArray, notInArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray } from "drizzle-orm";
 import { db } from "@/lib/drizzle/db";
 import {
   financeEngagements,
@@ -77,6 +77,26 @@ export async function runMonthlyBilling(
         eq(billingRecords.month, month),
         eq(billingRecords.isAdditional, false),
         notInArray(billingRecords.engagementId, billableIds)
+      )
+    );
+
+  // Limpieza de huérfanos: cuando se borra un engagement (p.ej. al re-parsear
+  // términos, que elimina los engagements source="llm"), sus billing_records
+  // quedan con engagement_id = NULL por el ON DELETE SET NULL. El `notInArray`
+  // de arriba NO los alcanza, porque en SQL `engagement_id NOT IN (...)` es NULL
+  // (no TRUE) cuando engagement_id es NULL — así que nunca se borraban y se
+  // acumulaban como conceptos duplicados. Los eliminamos acá, restringido a
+  // status "pending" para no destruir filas ya facturadas/cobradas.
+  await db
+    .delete(billingRecords)
+    .where(
+      and(
+        eq(billingRecords.workspaceId, workspaceId),
+        eq(billingRecords.year, year),
+        eq(billingRecords.month, month),
+        eq(billingRecords.isAdditional, false),
+        isNull(billingRecords.engagementId),
+        eq(billingRecords.status, "pending")
       )
     );
 

@@ -331,6 +331,13 @@ export interface BillingRow {
   amountArs: number | null;
   status: string;
   isAdditional: boolean;
+  /**
+   * Regla de facturación del engagement de origen (null para cargos adicionales
+   * o huérfanos). Cuando es "same", la fila se factura en su moneda original y
+   * `amountArs` es null por diseño (no requiere TC) — la UI no debe mostrar
+   * "TC pendiente" en ese caso.
+   */
+  billingRule: string | null;
 }
 
 export async function getBillingForMonth(
@@ -349,9 +356,14 @@ export async function getBillingForMonth(
       amountArs: billingRecords.amountArs,
       status: billingRecords.status,
       isAdditional: billingRecords.isAdditional,
+      billingRule: financeEngagements.billingRule,
     })
     .from(billingRecords)
     .innerJoin(accounts, eq(billingRecords.accountId, accounts.id))
+    .leftJoin(
+      financeEngagements,
+      eq(billingRecords.engagementId, financeEngagements.id)
+    )
     .where(
       and(
         eq(billingRecords.workspaceId, workspaceId),
@@ -371,6 +383,7 @@ export async function getBillingForMonth(
     amountArs: r.amountArs == null ? null : Number(r.amountArs),
     status: r.status,
     isAdditional: r.isAdditional,
+    billingRule: r.billingRule ?? null,
   }));
 }
 

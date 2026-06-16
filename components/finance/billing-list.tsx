@@ -76,6 +76,15 @@ const usdFmt = new Intl.NumberFormat("es-AR", {
   maximumFractionDigits: 2,
 });
 
+/**
+ * True cuando la fila espera un tipo de cambio (TC) que aún no está cargado.
+ * Las filas con regla "same" se facturan en su moneda original, así que un
+ * `amountArs` null ahí NO significa TC pendiente (no requiere conversión).
+ */
+function isTcPending(r: BillingRow): boolean {
+  return r.amountArs == null && r.billingRule !== "same";
+}
+
 function formatOriginal(amount: number, currency: string): string {
   return new Intl.NumberFormat("es-AR", {
     minimumFractionDigits: 2,
@@ -181,7 +190,7 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
   }
 
   const totalArs = billing.reduce((sum, r) => sum + (r.amountArs ?? 0), 0);
-  const hasPendingFx = billing.some((r) => r.amountArs == null);
+  const hasPendingFx = billing.some(isTcPending);
   const maxHistory = history.reduce((m, h) => Math.max(m, h.totalArs), 0);
 
   // Group the per-concept rows into one expandable total per client/account.
@@ -210,7 +219,7 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
       }
       g.rows.push(r);
       g.totalArs += r.amountArs ?? 0;
-      if (r.amountArs == null) g.hasPending = true;
+      if (isTcPending(r)) g.hasPending = true;
     }
     return Array.from(map.values());
   }, [billing]);
@@ -426,13 +435,20 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
                           </td>
                           <td className="px-4 py-1.5 text-muted-foreground tabular-nums">
                             {formatOriginal(r.amountOriginal, r.currencyOriginal)}
-                            {r.amountArs == null ? (
+                            {r.amountArs != null ? (
+                              <span className="ml-2">→ {formatArs(r.amountArs)}</span>
+                            ) : r.billingRule === "same" ? (
+                              <span
+                                className="ml-2 text-muted-foreground"
+                                title={`Se factura en ${r.currencyOriginal}, sin conversión a ARS`}
+                              >
+                                (se factura en {r.currencyOriginal})
+                              </span>
+                            ) : (
                               <span className="ml-2 inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
                                 <AlertTriangle size={11} aria-hidden />
                                 TC pendiente
                               </span>
-                            ) : (
-                              <span className="ml-2">→ {formatArs(r.amountArs)}</span>
                             )}
                           </td>
                           <td className="px-4 py-1.5">
