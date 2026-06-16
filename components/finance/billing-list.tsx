@@ -16,6 +16,7 @@ import {
   setBillingStatus,
   addBillingCharge,
   deleteBillingCharge,
+  setAccountInvoiceCountry,
 } from "@/app/actions/finance";
 import type {
   BillingRow,
@@ -76,6 +77,15 @@ const usdFmt = new Intl.NumberFormat("es-AR", {
   maximumFractionDigits: 2,
 });
 
+function formatUsd(n: number): string {
+  return usdFmt.format(n);
+}
+
+const COUNTRY_LABELS: Record<"AR" | "US", string> = {
+  AR: "Argentina",
+  US: "Estados Unidos",
+};
+
 /**
  * True cuando la fila espera un tipo de cambio (TC) que aún no está cargado.
  * Las filas con regla "same" se facturan en su moneda original, así que un
@@ -90,6 +100,42 @@ function formatOriginal(amount: number, currency: string): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount) + ` ${currency}`;
+}
+
+/** Selector inline del país de facturación de una cuenta (AR / US / sin definir). */
+function CountryCell({
+  accountId,
+  country,
+}: {
+  accountId: string;
+  country: "AR" | "US" | null;
+}) {
+  const router = useRouter();
+  const [value, setValue] = useState<"AR" | "US" | "">(country ?? "");
+  const [isPending, startTransition] = useTransition();
+
+  return (
+    <select
+      value={value}
+      disabled={isPending}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => {
+        const raw = e.target.value as "AR" | "US" | "";
+        const next = raw === "" ? null : raw;
+        setValue(raw);
+        startTransition(async () => {
+          await setAccountInvoiceCountry({ accountId, country: next });
+          router.refresh();
+        });
+      }}
+      className={inputClass}
+      aria-label="País de facturación"
+    >
+      <option value="">— Sin definir</option>
+      <option value="AR">Argentina</option>
+      <option value="US">Estados Unidos</option>
+    </select>
+  );
 }
 
 export function BillingList({ year, month, billing, history, accounts }: Props) {
@@ -190,6 +236,7 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
   }
 
   const totalArs = billing.reduce((sum, r) => sum + (r.amountArs ?? 0), 0);
+  const totalUsd = billing.reduce((sum, r) => sum + (r.amountUsd ?? 0), 0);
   const hasPendingFx = billing.some(isTcPending);
   const maxHistory = history.reduce((m, h) => Math.max(m, h.totalArs), 0);
 
@@ -202,6 +249,8 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
         accountName: string;
         rows: BillingRow[];
         totalArs: number;
+        totalUsd: number;
+        invoiceCountry: "AR" | "US" | null;
         hasPending: boolean;
       }
     >();
@@ -213,12 +262,15 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
           accountName: r.accountName,
           rows: [],
           totalArs: 0,
+          totalUsd: 0,
+          invoiceCountry: r.invoiceCountry,
           hasPending: false,
         };
         map.set(r.accountId, g);
       }
       g.rows.push(r);
       g.totalArs += r.amountArs ?? 0;
+      g.totalUsd += r.amountUsd ?? 0;
       if (isTcPending(r)) g.hasPending = true;
     }
     return Array.from(map.values());
@@ -377,8 +429,10 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
             <thead>
               <tr className="border-b [border-color:var(--glass-border)]">
                 <th className="px-4 py-2.5 text-left font-semibold text-muted-foreground">Cliente</th>
+                <th className="px-4 py-2.5 text-left font-semibold text-muted-foreground">País</th>
                 <th className="px-4 py-2.5 text-left font-semibold text-muted-foreground">Conceptos</th>
                 <th className="px-4 py-2.5 text-right font-semibold text-muted-foreground">Total ARS</th>
+                <th className="px-4 py-2.5 text-right font-semibold text-muted-foreground">Total USD</th>
               </tr>
             </thead>
             <tbody>
@@ -401,6 +455,12 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
                           {g.accountName}
                         </span>
                       </td>
+                      <td className="px-4 py-2">
+                        <CountryCell
+                          accountId={g.accountId}
+                          country={g.invoiceCountry}
+                        />
+                      </td>
                       <td className="px-4 py-2 text-muted-foreground">
                         {g.rows.length} concepto{g.rows.length !== 1 ? "s" : ""}
                       </td>
@@ -415,6 +475,9 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
                           )}
                           <span className="font-semibold">{formatArs(g.totalArs)}</span>
                         </span>
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums font-semibold">
+                        {formatUsd(g.totalUsd)}
                       </td>
                     </tr>
 
@@ -433,6 +496,7 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
                               </span>
                             )}
                           </td>
+                          <td className="px-4 py-1.5" />
                           <td className="px-4 py-1.5 text-muted-foreground tabular-nums">
                             {formatOriginal(r.amountOriginal, r.currencyOriginal)}
                             {r.amountArs != null ? (
@@ -483,6 +547,9 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
                               )}
                             </div>
                           </td>
+                          <td className="px-4 py-1.5 text-right tabular-nums text-muted-foreground">
+                            {r.amountUsd != null ? formatUsd(r.amountUsd) : "—"}
+                          </td>
                         </tr>
                       ))}
                   </Fragment>
@@ -491,11 +558,14 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
             </tbody>
             <tfoot>
               <tr className="border-t [border-color:var(--glass-border)]">
-                <td className="px-4 py-2.5 font-semibold" colSpan={2}>
-                  Total ARS
+                <td className="px-4 py-2.5 font-semibold" colSpan={3}>
+                  Totales
                 </td>
                 <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
                   {formatArs(totalArs)}
+                </td>
+                <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
+                  {formatUsd(totalUsd)}
                 </td>
               </tr>
             </tfoot>

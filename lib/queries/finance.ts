@@ -339,6 +339,14 @@ export interface BillingRow {
    * "TC pendiente" en ese caso.
    */
   billingRule: string | null;
+  /**
+   * USD nominal de la fila: si la moneda original es USD, es el monto original;
+   * si es ARS, es el ARS facturado convertido al MEP del mes. Null si no se puede
+   * determinar (sin TC).
+   */
+  amountUsd: number | null;
+  /** País de facturación de la cuenta (account_finance.invoice_country). */
+  invoiceCountry: "AR" | "US" | null;
 }
 
 export async function getBillingForMonth(
@@ -358,6 +366,7 @@ export async function getBillingForMonth(
       status: billingRecords.status,
       isAdditional: billingRecords.isAdditional,
       billingRule: financeEngagements.billingRule,
+      invoiceCountry: accountFinance.invoiceCountry,
     })
     .from(billingRecords)
     .innerJoin(accounts, eq(billingRecords.accountId, accounts.id))
@@ -365,6 +374,7 @@ export async function getBillingForMonth(
       financeEngagements,
       eq(billingRecords.engagementId, financeEngagements.id)
     )
+    .leftJoin(accountFinance, eq(accountFinance.accountId, billingRecords.accountId))
     .where(
       and(
         eq(billingRecords.workspaceId, workspaceId),
@@ -374,18 +384,38 @@ export async function getBillingForMonth(
     )
     .orderBy(asc(accounts.name));
 
-  return rows.map((r) => ({
-    id: r.id,
-    accountId: r.accountId,
-    accountName: r.accountName,
-    concept: r.concept,
-    amountOriginal: Number(r.amountOriginal),
-    currencyOriginal: r.currencyOriginal,
-    amountArs: r.amountArs == null ? null : Number(r.amountArs),
-    status: r.status,
-    isAdditional: r.isAdditional,
-    billingRule: r.billingRule ?? null,
-  }));
+  // TC del mes para pasar las filas en ARS a USD nominal.
+  const fx = await getFxRate(workspaceId, year, month);
+  const mep = fx?.mepRate ?? null;
+
+  return rows.map((r) => {
+    const amountOriginal = Number(r.amountOriginal);
+    const amountArs = r.amountArs == null ? null : Number(r.amountArs);
+    const amountUsd =
+      r.currencyOriginal === "USD"
+        ? round2(amountOriginal)
+        : amountArs != null && mep && mep > 0
+          ? round2(amountArs / mep)
+          : null;
+    const invoiceCountry =
+      r.invoiceCountry === "AR" || r.invoiceCountry === "US"
+        ? r.invoiceCountry
+        : null;
+    return {
+      id: r.id,
+      accountId: r.accountId,
+      accountName: r.accountName,
+      concept: r.concept,
+      amountOriginal,
+      currencyOriginal: r.currencyOriginal,
+      amountArs,
+      status: r.status,
+      isAdditional: r.isAdditional,
+      billingRule: r.billingRule ?? null,
+      amountUsd,
+      invoiceCountry,
+    };
+  });
 }
 
 export interface BillingHistoryRow {
