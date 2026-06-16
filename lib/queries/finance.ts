@@ -14,6 +14,7 @@ import {
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   convertToArs,
+  effectiveFeeCurrency,
   isActiveInMonth,
   monthBounds,
   round2,
@@ -536,7 +537,8 @@ export async function getLtvByAccount(workspaceId: string): Promise<LtvRow[]> {
     const fee = Number(period.fee);
     const perMonthArs = convertToArs(
       fee,
-      period.currency,
+      // mep/mep_ipc ⇒ el fee es USD aunque esté guardado como ARS.
+      effectiveFeeCurrency(e.billingRule as BillingRule, period.currency),
       e.billingRule as BillingRule,
       mepRate,
       ipcCoefficient
@@ -707,6 +709,7 @@ export async function computeHonorarios(
       id: financeEngagements.id,
       neurona: financeEngagements.neurona,
       currency: financeEngagements.currency,
+      billingRule: financeEngagements.billingRule,
       accountName: accounts.name,
     })
     .from(financeEngagements)
@@ -771,7 +774,12 @@ export async function computeHonorarios(
       );
       const currency =
         shareType === "percent"
-          ? activePeriod.currency
+          ? // El % se calcula sobre el fee del período: su moneda es la real del
+            // fee (mep/mep_ipc ⇒ USD aunque esté guardado como ARS).
+            effectiveFeeCurrency(
+              e.billingRule as BillingRule,
+              activePeriod.currency
+            )
           : s.shareCurrency ?? e.currency;
 
       const line: HonorarioLine = {

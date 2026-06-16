@@ -9,6 +9,7 @@ import { getFxRate, getFxRatesMap } from "@/lib/queries/finance";
 import {
   isActiveInMonth,
   periodBillableArs,
+  effectiveFeeCurrency,
   type BillingRule,
 } from "@/lib/finance/compute";
 
@@ -129,11 +130,15 @@ export async function runMonthlyBilling(
     if (!activePeriod) continue;
 
     const fee = Number(activePeriod.fee);
+    const rule = engagement.billingRule as BillingRule;
     const currency = activePeriod.currency;
+    // Moneda real del fee (mep/mep_ipc ⇒ USD aunque esté guardado como ARS), para
+    // que la columna "Original" no muestre "ARS" cuando es un USD a convertir.
+    const effCurrency = effectiveFeeCurrency(rule, currency);
     const amountArs = periodBillableArs({
       fee,
       currency,
-      rule: engagement.billingRule as BillingRule,
+      rule,
       fromDate: activePeriod.fromDate,
       targetYear: year,
       targetMonth: month,
@@ -159,7 +164,7 @@ export async function runMonthlyBilling(
         .update(billingRecords)
         .set({
           amountOriginal: String(fee),
-          currencyOriginal: currency,
+          currencyOriginal: effCurrency,
           amountArs: amountArs == null ? null : String(amountArs),
           fxRateUsed: fx ? String(fx.mepRate) : null,
           ipcUsed: fx ? String(fx.ipcCoefficient) : null,

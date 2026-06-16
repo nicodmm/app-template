@@ -1,5 +1,21 @@
 export type BillingRule = "same" | "mep" | "mep_ipc";
 
+/**
+ * Moneda real en la que está denominado un fee, dada su regla de facturación.
+ * Las reglas "mep" y "mep_ipc" convierten un monto en USD a ARS (por TC y/o
+ * IPC), así que el fee SIEMPRE es USD bajo esas reglas, aunque haya quedado
+ * (mal) guardado como ARS — p.ej. cuando el LLM etiqueta mal la moneda. La regla
+ * "same" factura en la moneda guardada. Usar este helper en todo lugar que
+ * interprete la moneda de un período para no leer "ARS" cuando en realidad es
+ * un fee USD a convertir.
+ */
+export function effectiveFeeCurrency(
+  rule: BillingRule,
+  storedCurrency: string
+): string {
+  return rule === "mep" || rule === "mep_ipc" ? "USD" : storedCurrency;
+}
+
 /** First and last calendar day (YYYY-MM-DD) of the given year/month (month is 1-based). */
 export function monthBounds(year: number, month: number): { start: string; end: string } {
   const mm = String(month).padStart(2, "0");
@@ -69,8 +85,10 @@ export function monthOffset(
 /**
  * Billable ARS for one engagement period in a target month, applying the MEP/IPC
  * business rule:
- *  - ARS currency: passes through (`fee`), unaffected by MEP/IPC.
- *  - USD + rule "same": billed in USD, no ARS figure → null.
+ *  - rule "same": billed in the stored currency. ARS passes through (`fee`),
+ *    unaffected by MEP/IPC; USD has no ARS figure → null.
+ *  - rule "mep"/"mep_ipc": the fee is a USD amount and is ALWAYS converted to
+ *    ARS, even if the stored currency says ARS (a mis-tagged USD fee).
  *  - USD + rule "mep": `fee × MEP(target month)` (one-shot conversion each month).
  *  - USD + rule "mep_ipc": the ANCHOR month (the period's first month) converts
  *    once at the anchor's MEP (`fee × anchorMep`); every subsequent month
@@ -94,10 +112,15 @@ export function computeBillableArs(params: {
   const { fee, currency, rule, anchorMepRate, targetMepRate, ipcCoefficients } =
     params;
 
-  if (currency === "ARS") return round2(fee);
-  // USD (or any non-ARS treated as USD).
-  if (rule === "same") return null;
+  // "same": se factura en la moneda guardada. ARS pasa directo; USD no tiene
+  // figura en ARS (se factura en USD).
+  if (rule === "same") {
+    return currency === "ARS" ? round2(fee) : null;
+  }
 
+  // "mep" / "mep_ipc": el fee es un monto en USD que se convierte a ARS. Lo
+  // convertimos SIEMPRE, aunque la moneda guardada diga ARS (ver
+  // effectiveFeeCurrency): un fee ARS con estas reglas es un USD mal etiquetado.
   if (rule === "mep") {
     if (targetMepRate == null) return null;
     return round2(fee * targetMepRate);

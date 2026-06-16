@@ -9,6 +9,7 @@ import { getFxRatesMap } from "@/lib/queries/finance";
 import {
   isActiveInMonth,
   periodBillableArs,
+  effectiveFeeCurrency,
   round2,
   monthBounds,
   type BillingRule,
@@ -103,17 +104,21 @@ export async function projectAccountBilling(
       );
       if (!p) continue;
       const fee = Number(p.fee);
+      const rule = e.billingRule as BillingRule;
       const arsAmt = periodBillableArs({
         fee,
         currency: p.currency,
-        rule: e.billingRule as BillingRule,
+        rule,
         fromDate: p.fromDate,
         targetYear: year,
         targetMonth: month,
         fxByMonth,
       });
       if (arsAmt != null) ars += arsAmt;
-      usd += p.currency === "USD" ? fee : mep && mep > 0 ? fee / mep : 0;
+      // El ticket USD: con mep/mep_ipc el fee ya está en USD; con "same" en ARS
+      // se divide por el TC del mes.
+      const feeIsUsd = effectiveFeeCurrency(rule, p.currency) === "USD";
+      usd += feeIsUsd ? fee : mep && mep > 0 ? fee / mep : 0;
     }
     out.push({ year, month, totalArs: round2(ars), totalUsd: round2(usd) });
   }

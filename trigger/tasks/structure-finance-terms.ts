@@ -308,11 +308,19 @@ export const structureFinanceTerms = task({
         const neurona = (eng.neurona ?? "").trim();
         if (!neurona) continue;
 
-        const currency = eng.currency === "ARS" ? "ARS" : "USD";
         const billingRule =
           eng.billingRule === "same" || eng.billingRule === "mep_ipc"
             ? eng.billingRule
             : "mep";
+        // Invariante: mep/mep_ipc convierten un fee USD a ARS, así que la moneda
+        // SIEMPRE es USD bajo esas reglas. Solo "same" puede ser ARS. Esto evita
+        // el contrasentido (rule mep_ipc + moneda ARS) que el LLM a veces produce.
+        const usdByRule = billingRule === "mep" || billingRule === "mep_ipc";
+        const currency = usdByRule
+          ? "USD"
+          : eng.currency === "ARS"
+            ? "ARS"
+            : "USD";
 
         const [insertedEng] = await db
           .insert(financeEngagements)
@@ -342,7 +350,12 @@ export const structureFinanceTerms = task({
             period.toMonth != null
               ? lastDayOfMonthISO(engStart, period.toMonth - 1)
               : null;
-          const periodCurrency = period.currency === "ARS" ? "ARS" : "USD";
+          // Misma invariante que el engagement: mep/mep_ipc ⇒ USD.
+          const periodCurrency = usdByRule
+            ? "USD"
+            : period.currency === "ARS"
+              ? "ARS"
+              : "USD";
 
           await db.insert(financeEngagementPeriods).values({
             engagementId,

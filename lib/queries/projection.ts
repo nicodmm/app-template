@@ -7,7 +7,12 @@ import {
   financeProjectionAssumptions,
 } from "@/lib/drizzle/schema";
 import { getFxRatesMap } from "@/lib/queries/finance";
-import { isActiveInMonth, monthBounds } from "@/lib/finance/compute";
+import {
+  isActiveInMonth,
+  monthBounds,
+  effectiveFeeCurrency,
+  type BillingRule,
+} from "@/lib/finance/compute";
 import type {
   PortfolioRow,
   Assumptions,
@@ -42,6 +47,7 @@ export async function getPortfolioForProjection(
       id: financeEngagements.id,
       accountId: financeEngagements.accountId,
       neurona: financeEngagements.neurona,
+      billingRule: financeEngagements.billingRule,
     })
     .from(financeEngagements)
     .where(
@@ -79,8 +85,10 @@ export async function getPortfolioForProjection(
     const eng = engById.get(p.engagementId);
     if (!eng) continue;
     const feeNum = Number(p.fee);
-    const usd =
-      p.currency === "USD" ? feeNum : mep && mep > 0 ? feeNum / mep : 0;
+    // mep/mep_ipc ⇒ el fee ya es USD aunque esté guardado como ARS.
+    const feeIsUsd =
+      effectiveFeeCurrency(eng.billingRule as BillingRule, p.currency) === "USD";
+    const usd = feeIsUsd ? feeNum : mep && mep > 0 ? feeNum / mep : 0;
     const cur = agg.get(eng.accountId) ?? { ticketUsd: 0, neurona: "Otro", bestFee: 0 };
     cur.ticketUsd += usd;
     if (usd > cur.bestFee) {
