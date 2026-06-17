@@ -7,6 +7,7 @@ import { db } from "@/lib/drizzle/db";
 import { workspaces } from "@/lib/drizzle/schema";
 import { eq } from "drizzle-orm";
 import { acceptWorkspaceInvite } from "@/app/actions/workspace";
+import { ensureUserRecord } from "@/app/actions/auth";
 
 interface PageProps {
   params: Promise<{ token: string }>;
@@ -54,6 +55,11 @@ export default async function AcceptInvitePage({ params }: PageProps) {
   if (!user) {
     redirect(`/auth/signup?invite=${token}`);
   }
+
+  // Asegurar la fila en public.users antes de aceptar. Con la confirmación por
+  // email desactivada el callback nunca corre, así que esta fila (FK de
+  // workspace_members) podría no existir todavía. Es idempotente.
+  await ensureUserRecord(user.id, user.email ?? "");
 
   // User is authed. Try accepting.
   const existing = await getWorkspaceByUserId(user.id);

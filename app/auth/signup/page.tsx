@@ -42,7 +42,7 @@ export default async function SignupPage({ searchParams }: PageProps) {
     const next = token ? `/invites/${token}` : "/app/portfolio";
     const emailRedirectTo = `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=${encodeURIComponent(next)}${token ? `&invite=${encodeURIComponent(token)}` : ""}`;
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { emailRedirectTo },
@@ -52,6 +52,15 @@ export default async function SignupPage({ searchParams }: PageProps) {
       if (token) params.set("invite", token);
       redirect("/auth/signup?" + params.toString());
     }
+    // Si la confirmación por email está desactivada, signUp devuelve una sesión
+    // (el usuario queda logueado) y NO hay vuelta por email/callback. En ese caso
+    // mandamos directo al destino: la página de aceptar invitación (que suma al
+    // workspace con el rol invitado) o el portfolio. Así el invitado NO termina
+    // con un workspace propio.
+    if (data.session) {
+      redirect(next);
+    }
+    // Confirmación activada: hay que revisar el email para confirmar la cuenta.
     const okParams = new URLSearchParams({
       message: "Revisá tu email para confirmar tu cuenta",
     });
