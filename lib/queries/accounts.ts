@@ -24,25 +24,30 @@ function canSeeAllAccounts(role: string): boolean {
   return role === "owner" || role === "admin";
 }
 
+/** Cuentas "mías": las que poseo O en las que estoy como consultor. */
+function ownerOrConsultant(userId: string) {
+  return or(
+    eq(accounts.ownerId, userId),
+    exists(
+      db
+        .select({ one: sql`1` })
+        .from(accountConsultants)
+        .where(
+          and(
+            eq(accountConsultants.accountId, accounts.id),
+            eq(accountConsultants.userId, userId)
+          )
+        )
+    )
+  );
+}
+
 function scopeBaseConditions(scope: PortfolioScope) {
   const conditions = [eq(accounts.workspaceId, scope.workspaceId)];
-  if (!canSeeAllAccounts(scope.role)) {
-    conditions.push(eq(accounts.ownerId, scope.userId));
-  } else if (scope.onlyMine) {
-    const mine = or(
-      eq(accounts.ownerId, scope.userId),
-      exists(
-        db
-          .select({ one: sql`1` })
-          .from(accountConsultants)
-          .where(
-            and(
-              eq(accountConsultants.accountId, accounts.id),
-              eq(accountConsultants.userId, scope.userId)
-            )
-          )
-      )
-    );
+  // Los members ven sus cuentas (dueño O consultor). Owner/admin ven todas,
+  // salvo que pidan "solo mías", que usa el mismo criterio.
+  if (!canSeeAllAccounts(scope.role) || scope.onlyMine) {
+    const mine = ownerOrConsultant(scope.userId);
     if (mine) conditions.push(mine);
   }
   return conditions;
@@ -125,9 +130,22 @@ export async function getAccountById(
 
   if (!rows[0]) return null;
 
-  // Role gating: members can only read accounts they own.
+  // Role gating: members pueden leer cuentas que poseen O en las que son
+  // consultores. Owner/admin leen cualquiera del workspace.
   if (viewer && !canSeeAllAccounts(viewer.role)) {
-    if (rows[0].account.ownerId !== viewer.userId) return null;
+    if (rows[0].account.ownerId !== viewer.userId) {
+      const [consultantRow] = await db
+        .select({ id: accountConsultants.id })
+        .from(accountConsultants)
+        .where(
+          and(
+            eq(accountConsultants.accountId, accountId),
+            eq(accountConsultants.userId, viewer.userId)
+          )
+        )
+        .limit(1);
+      if (!consultantRow) return null;
+    }
   }
 
   return {
