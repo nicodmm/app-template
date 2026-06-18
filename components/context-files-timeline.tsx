@@ -12,12 +12,17 @@ import {
   Trash2,
   Download,
   RotateCcw,
+  RefreshCw,
   ExternalLink,
   Search,
   Sparkles,
   Loader2,
 } from "lucide-react";
-import { deleteTranscript, retryTranscript } from "@/app/actions/transcripts";
+import {
+  deleteTranscript,
+  retryTranscript,
+  reprocessTranscript,
+} from "@/app/actions/transcripts";
 import {
   deleteContextDocument,
   summarizeContextDocument,
@@ -234,6 +239,27 @@ export function ContextFilesTimeline({
                   >
                     <RotateCcw size={12} />
                     Reintentar
+                  </button>
+                )}
+                {t.status === "completed" && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      startTransition(async () => {
+                        await reprocessTranscript(t.id);
+                        router.refresh();
+                      })
+                    }
+                    disabled={isPending}
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50"
+                    title={
+                      t.googleDriveFileId
+                        ? "Re-importa la última versión del archivo de Drive y vuelve a extraer tareas"
+                        : "Vuelve a procesar la reunión y extraer tareas"
+                    }
+                  >
+                    <RefreshCw size={12} />
+                    Reprocesar
                   </button>
                 )}
                 {t.googleDriveFileId && (

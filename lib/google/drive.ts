@@ -111,6 +111,20 @@ export async function listDriveFolderFiles(
   return res.files.slice(0, limit);
 }
 
+/** Metadata de un archivo puntual por id (para re-importar la última versión). */
+export async function getDriveFileMeta(
+  accessToken: string,
+  fileId: string
+): Promise<DriveFileMeta> {
+  const params = new URLSearchParams({
+    fields: "id,name,mimeType,modifiedTime,size",
+  });
+  return driveFetch<DriveFileMeta>(
+    `/files/${fileId}?${params.toString()}`,
+    accessToken
+  );
+}
+
 const GOOGLE_DOC_MIME = "application/vnd.google-apps.document";
 const GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet";
 const GOOGLE_SLIDE_MIME = "application/vnd.google-apps.presentation";

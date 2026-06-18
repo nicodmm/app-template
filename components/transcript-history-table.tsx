@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, Download, RotateCcw, X, CheckSquare } from "lucide-react";
-import { bulkDeleteTranscripts, deleteTranscript, retryTranscript } from "@/app/actions/transcripts";
+import { bulkDeleteTranscripts, deleteTranscript, retryTranscript, reprocessTranscript } from "@/app/actions/transcripts";
 import type { Transcript } from "@/lib/drizzle/schema";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -229,6 +229,16 @@ export function TranscriptHistoryTable({
                   className="text-xs text-primary hover:underline disabled:opacity-50"
                 >
                   Reintentar
+                </button>
+              )}
+              {t.status === "completed" && (
+                <button
+                  onClick={() => startTransition(() => reprocessTranscript(t.id).then(() => router.refresh()))}
+                  disabled={isPending}
+                  className="text-xs text-primary hover:underline disabled:opacity-50"
+                  title={t.googleDriveFileId ? "Re-importa la última versión de Drive y re-extrae tareas" : "Vuelve a procesar y extraer tareas"}
+                >
+                  Reprocesar
                 </button>
               )}
               <button
