@@ -6,8 +6,11 @@ import { db } from "@/lib/drizzle/db";
 import {
   selectionSearches,
   selectionCandidates,
+  selectionSearchShareLinks,
   accounts,
 } from "@/lib/drizzle/schema";
+import { generateShareToken } from "@/lib/share/token";
+import { hashSharePassword } from "@/lib/share/password";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId } from "@/lib/queries/workspace";
 import { createAdminClient, SELECTION_CV_BUCKET } from "@/lib/supabase/admin";
@@ -40,6 +43,20 @@ async function requireAccountInWorkspace(accountId: string): Promise<string> {
     .limit(1);
   if (!acct) throw new Error("Account not found in workspace");
   return workspace.id;
+}
+
+async function requireSearchInWorkspace(searchId: string): Promise<{
+  workspaceId: string;
+  accountId: string;
+}> {
+  const [s] = await db
+    .select({ accountId: selectionSearches.accountId })
+    .from(selectionSearches)
+    .where(eq(selectionSearches.id, searchId))
+    .limit(1);
+  if (!s) throw new Error("Búsqueda no encontrada");
+  const workspaceId = await requireAccountInWorkspace(s.accountId);
+  return { workspaceId, accountId: s.accountId };
 }
 
 export async function createSearch(input: {
@@ -558,4 +575,107 @@ export async function saveCandidateReport(input: {
     rethrowIfRedirect(e);
     return { success: false, error: e instanceof Error ? e.message : "Error" };
   }
+}
+
+export async function createSearchShareLink(input: {
+  accountId: string;
+  searchId: string;
+}): Promise<{ success: boolean; error?: string; token?: string }> {
+  try {
+    await requireSearchInWorkspace(input.searchId);
+    const [existing] = await db
+      .select({ token: selectionSearchShareLinks.token })
+      .from(selectionSearchShareLinks)
+      .where(eq(selectionSearchShareLinks.searchId, input.searchId))
+      .limit(1);
+    if (existing) {
+      revalidatePath(`/app/accounts/${input.accountId}/selection/${input.searchId}`);
+      return { success: true, token: existing.token };
+    }
+    const token = generateShareToken();
+    await db
+      .insert(selectionSearchShareLinks)
+      .values({ searchId: input.searchId, token });
+    revalidatePath(`/app/accounts/${input.accountId}/selection/${input.searchId}`);
+    return { success: true, token };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
+export async function setSearchShareActive(input: {
+  accountId: string;
+  searchId: string;
+  isActive: boolean;
+}): Promise<ActionResult> {
+  try {
+    await requireSearchInWorkspace(input.searchId);
+    await db
+      .update(selectionSearchShareLinks)
+      .set({ isActive: input.isActive, updatedAt: new Date() })
+      .where(eq(selectionSearchShareLinks.searchId, input.searchId));
+    revalidatePath(`/app/accounts/${input.accountId}/selection/${input.searchId}`);
+    return { success: true };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
+export async function setSearchSharePassword(input: {
+  accountId: string;
+  searchId: string;
+  password: string | null;
+}): Promise<ActionResult> {
+  try {
+    await requireSearchInWorkspace(input.searchId);
+    const [link] = await db
+      .select({ passwordVersion: selectionSearchShareLinks.passwordVersion })
+      .from(selectionSearchShareLinks)
+      .where(eq(selectionSearchShareLinks.searchId, input.searchId))
+      .limit(1);
+    if (!link) return { success: false, error: "No hay link para esta búsqueda" };
+    const passwordHash =
+      input.password && input.password.trim().length > 0
+        ? await hashSharePassword(input.password)
+        : null;
+    await db
+      .update(selectionSearchShareLinks)
+      .set({
+        passwordHash,
+        passwordVersion: link.passwordVersion + 1,
+        updatedAt: new Date(),
+      })
+      .where(eq(selectionSearchShareLinks.searchId, input.searchId));
+    revalidatePath(`/app/accounts/${input.accountId}/selection/${input.searchId}`);
+    return { success: true };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
+export async function getSearchShareLink(input: {
+  accountId: string;
+  searchId: string;
+}): Promise<{ token: string | null; isActive: boolean; hasPassword: boolean; viewCount: number }> {
+  await requireSearchInWorkspace(input.searchId);
+  const [link] = await db
+    .select({
+      token: selectionSearchShareLinks.token,
+      isActive: selectionSearchShareLinks.isActive,
+      passwordHash: selectionSearchShareLinks.passwordHash,
+      viewCount: selectionSearchShareLinks.viewCount,
+    })
+    .from(selectionSearchShareLinks)
+    .where(eq(selectionSearchShareLinks.searchId, input.searchId))
+    .limit(1);
+  if (!link) return { token: null, isActive: false, hasPassword: false, viewCount: 0 };
+  return {
+    token: link.token,
+    isActive: link.isActive,
+    hasPassword: !!link.passwordHash,
+    viewCount: link.viewCount,
+  };
 }
