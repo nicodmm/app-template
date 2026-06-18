@@ -44,6 +44,7 @@ export interface SearchWithCounts {
   createdAt: Date;
   candidateCount: number;
   pendingCount: number;
+  confidential: boolean;
 }
 
 export async function listSearchesForAccount(
@@ -58,6 +59,7 @@ export async function listSearchesForAccount(
       razonSocial: selectionSearches.razonSocial,
       cuit: selectionSearches.cuit,
       createdAt: selectionSearches.createdAt,
+      confidential: selectionSearches.confidential,
       candidateCount: sql<number>`count(${selectionCandidates.id})`,
       pendingCount: sql<number>`count(${selectionCandidates.id}) filter (where ${selectionCandidates.status} = 'pending')`,
     })

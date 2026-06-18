@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Pencil, Briefcase, Users, Clock, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Briefcase, Users, Clock, ChevronRight, EyeOff } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { SearchFormDialog, type EditSearchData } from "@/components/selection/search-form-dialog";
 import type { SearchWithCounts } from "@/lib/queries/selection";
 import { cn } from "@/lib/utils";
+import { setSearchConfidential } from "@/app/actions/selection";
 
 type DialogState =
   | { open: false }
@@ -32,6 +34,19 @@ interface Props {
 
 export function SearchList({ accountId, searches }: Props) {
   const [dialog, setDialog] = useState<DialogState>({ open: false });
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  function handleToggleConfidential(search: SearchWithCounts) {
+    startTransition(async () => {
+      await setSearchConfidential({
+        accountId,
+        searchId: search.id,
+        confidential: !search.confidential,
+      });
+      router.refresh();
+    });
+  }
 
   function openCreate() {
     setDialog({ open: true, mode: "create" });
@@ -151,10 +166,27 @@ export function SearchList({ accountId, searches }: Props) {
                 onClick={() => openEdit(search)}
                 className="absolute top-3 right-3 z-10 rounded-md p-1.5 text-muted-foreground bg-background/60 hover:bg-accent hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                 aria-label={`Editar ${search.position}`}
-                // Prevent the Link from capturing this click
                 onPointerDown={(e) => e.stopPropagation()}
               >
                 <Pencil size={12} />
+              </button>
+
+              {/* Confidential toggle — sits above the card link via z-index */}
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => handleToggleConfidential(search)}
+                onPointerDown={(e) => e.stopPropagation()}
+                title="Si está activo, esta búsqueda NO aparece en el link general del cliente"
+                className={cn(
+                  "absolute bottom-3 left-3 z-10",
+                  search.confidential
+                    ? "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium bg-amber-500/15 text-amber-700 dark:text-amber-400 disabled:opacity-50"
+                    : "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-muted-foreground ring-1 [--tw-ring-color:var(--glass-border)] hover:text-foreground disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                )}
+              >
+                <EyeOff size={10} aria-hidden />
+                {search.confidential ? "Confidencial" : "Marcar confidencial"}
               </button>
             </div>
           ))}

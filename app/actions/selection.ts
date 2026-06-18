@@ -504,6 +504,31 @@ export async function getCandidateReportUrl(input: {
   }
 }
 
+export async function setSearchConfidential(input: {
+  accountId: string;
+  searchId: string;
+  confidential: boolean;
+}): Promise<ActionResult> {
+  try {
+    await requireAccountInWorkspace(input.accountId);
+    await db
+      .update(selectionSearches)
+      .set({ confidential: input.confidential, updatedAt: new Date() })
+      .where(
+        and(
+          eq(selectionSearches.id, input.searchId),
+          eq(selectionSearches.accountId, input.accountId)
+        )
+      );
+    revalidatePath(`/app/accounts/${input.accountId}/selection`);
+    revalidatePath(`/app/accounts/${input.accountId}/selection/${input.searchId}`);
+    return { success: true };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
 /** Manual edit of the report markdown by the admin. */
 export async function saveCandidateReport(input: {
   accountId: string;

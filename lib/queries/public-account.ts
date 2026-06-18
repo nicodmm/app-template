@@ -705,7 +705,8 @@ async function loadSelectionForAccount(accountId: string) {
     .where(
       and(
         eq(selectionSearches.accountId, accountId),
-        eq(selectionSearches.status, "active")
+        eq(selectionSearches.status, "active"),
+        eq(selectionSearches.confidential, false)
       )
     )
     .orderBy(desc(selectionSearches.createdAt));
