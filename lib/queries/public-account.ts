@@ -19,9 +19,9 @@ import {
   workspaceMembers,
   users,
   selectionSearches,
-  selectionCandidates,
 } from "@/lib/drizzle/schema";
 import { and, desc, eq, gte, inArray, isNull, ne } from "drizzle-orm";
+import { loadCandidatesForSearch } from "./selection-public";
 import { coerceShareConfig, type ShareConfig } from "@/lib/share/share-config";
 import { stripCitations } from "@/lib/text/citations";
 
@@ -711,57 +711,12 @@ async function loadSelectionForAccount(accountId: string) {
     )
     .orderBy(desc(selectionSearches.createdAt));
   if (searches.length === 0) return { searches: [] };
-  const searchIds = searches.map((s) => s.id);
-  const cands = await db
-    .select({
-      id: selectionCandidates.id,
-      searchId: selectionCandidates.searchId,
-      firstName: selectionCandidates.firstName,
-      lastName: selectionCandidates.lastName,
-      email: selectionCandidates.email,
-      phone: selectionCandidates.phone,
-      linkedinUrl: selectionCandidates.linkedinUrl,
-      expectedSalary: selectionCandidates.expectedSalary,
-      status: selectionCandidates.status,
-      clientRating: selectionCandidates.clientRating,
-      clientNotes: selectionCandidates.clientNotes,
-      interviewModality: selectionCandidates.interviewModality,
-      interviewSchedule: selectionCandidates.interviewSchedule,
-      offerConditions: selectionCandidates.offerConditions,
-      rejectionReason: selectionCandidates.rejectionReason,
-      cvStoragePath: selectionCandidates.cvStoragePath,
-      cvUrl: selectionCandidates.cvUrl,
-      reportContent: selectionCandidates.reportContent,
-      reportStatus: selectionCandidates.reportStatus,
-    })
-    .from(selectionCandidates)
-    .where(inArray(selectionCandidates.searchId, searchIds))
-    .orderBy(desc(selectionCandidates.createdAt));
-  return {
-    searches: searches.map((s) => ({
+  const results = await Promise.all(
+    searches.map(async (s) => ({
       id: s.id,
       position: s.position,
-      candidates: cands
-        .filter((c) => c.searchId === s.id)
-        .map((c) => ({
-          id: c.id,
-          firstName: c.firstName,
-          lastName: c.lastName,
-          email: c.email,
-          phone: c.phone,
-          linkedinUrl: c.linkedinUrl,
-          expectedSalary: c.expectedSalary,
-          status: c.status,
-          clientRating: c.clientRating,
-          clientNotes: c.clientNotes,
-          interviewModality: c.interviewModality,
-          interviewSchedule: c.interviewSchedule,
-          offerConditions: c.offerConditions,
-          rejectionReason: c.rejectionReason,
-          hasCv: c.cvStoragePath != null || c.cvUrl != null,
-          reportContent: c.reportContent,
-          reportStatus: c.reportStatus,
-        })),
-    })),
-  };
+      candidates: await loadCandidatesForSearch(s.id),
+    }))
+  );
+  return { searches: results };
 }
