@@ -7,7 +7,9 @@ import { db } from "@/lib/drizzle/db";
 import { accounts } from "@/lib/drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { getSearch, listCandidatesForSearch } from "@/lib/queries/selection";
+import { getSearchShareLink } from "@/app/actions/selection";
 import { CandidateWorkspace } from "@/components/selection/candidate-workspace";
+import { SearchShareSection } from "@/components/selection/search-share-section";
 
 interface Props {
   params: Promise<{ accountId: string; searchId: string }>;
@@ -30,6 +32,7 @@ export default async function CandidatesPage({ params }: Props) {
   if (!search) notFound();
 
   const candidates = await listCandidatesForSearch(searchId);
+  const share = await getSearchShareLink({ accountId, searchId });
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -42,7 +45,14 @@ export default async function CandidatesPage({ params }: Props) {
         Selección — {acct.name}
       </Link>
 
-      <h1 className="mb-6 text-2xl font-semibold">{search.position}</h1>
+      <div className="flex flex-col gap-4 mb-6">
+        <h1 className="text-2xl font-semibold">{search.position}</h1>
+        <SearchShareSection
+          accountId={accountId}
+          searchId={searchId}
+          initial={share}
+        />
+      </div>
 
       <CandidateWorkspace
         accountId={accountId}
