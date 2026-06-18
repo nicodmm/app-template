@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, boolean, index } from "drizzle-orm/pg-core";
 import { accounts } from "./accounts";
 import { workspaces } from "./workspaces";
 import { users } from "./users";
@@ -17,6 +17,9 @@ export const selectionSearches = pgTable(
     positionDescription: text("position_description"),
     // "active" | "paused" | "closed"
     status: text("status").notNull().default("active"),
+    // true = no se muestra en el link público general de la cuenta. La agencia la
+    // sigue viendo en la app; se comparte por su link individual.
+    confidential: boolean("confidential").notNull().default(false),
     razonSocial: text("razon_social"),
     cuit: text("cuit"),
     ownerId: uuid("owner_id").references(() => users.id, {

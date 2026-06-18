@@ -30,6 +30,7 @@ export * from "./llm_usage";
 export * from "./admin_dashboard_snapshot";
 export * from "./account_share_links";
 export * from "./selection_searches";
+export * from "./selection_search_share_links";
 export * from "./selection_candidates";
 export * from "./account_finance";
 export * from "./finance_engagements";
