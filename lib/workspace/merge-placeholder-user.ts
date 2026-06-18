@@ -29,7 +29,7 @@ const USER_FK_COLUMNS: ReadonlyArray<readonly [table: string, column: string]> =
   ["tasks", "assignee_id"],
   ["task_attachments", "created_by"],
   ["task_comments", "author_id"],
-  ["task_comment_mentions", "user_id"],
+  ["task_comment_mentions", "mentioned_user_id"],
   ["task_projects", "created_by"],
   ["task_project_members", "user_id"],
   ["transcripts", "uploaded_by"],
