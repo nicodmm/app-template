@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
-import { createSearch, updateSearch } from "@/app/actions/selection";
+import { X, Trash2 } from "lucide-react";
+import { createSearch, updateSearch, deleteSearch } from "@/app/actions/selection";
 
 const STATUS_OPTIONS = [
   { value: "active", label: "Activa" },
@@ -92,6 +92,26 @@ export function SearchFormDialog({ accountId, open, onClose, dialogMode }: Props
         return;
       }
 
+      router.refresh();
+      handleClose();
+    });
+  }
+
+  function handleDelete() {
+    if (!editSearch) return;
+    if (
+      !window.confirm(
+        `¿Eliminar la búsqueda "${editSearch.position}"? Se borran también sus candidatos y el link público. No se puede deshacer.`
+      )
+    )
+      return;
+    setError(null);
+    startTransition(async () => {
+      const result = await deleteSearch({ accountId, searchId: editSearch.id });
+      if (!result.success) {
+        setError(result.error ?? "Error al eliminar");
+        return;
+      }
       router.refresh();
       handleClose();
     });
@@ -215,7 +235,18 @@ export function SearchFormDialog({ accountId, open, onClose, dialogMode }: Props
           )}
 
           {/* Actions */}
-          <div className="flex justify-end gap-2 pt-1">
+          <div className="flex items-center justify-end gap-2 pt-1">
+            {isEdit && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isPending}
+                className="mr-auto inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-destructive/40 px-4 py-2 text-sm font-medium text-destructive shadow-sm hover:bg-destructive/10 transition-colors disabled:pointer-events-none disabled:opacity-50"
+              >
+                <Trash2 size={14} aria-hidden />
+                Eliminar
+              </button>
+            )}
             <button
               type="button"
               onClick={handleClose}

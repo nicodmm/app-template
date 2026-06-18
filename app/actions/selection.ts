@@ -126,6 +126,29 @@ export async function updateSearch(input: {
   }
 }
 
+export async function deleteSearch(input: {
+  accountId: string;
+  searchId: string;
+}): Promise<ActionResult> {
+  try {
+    await requireAccountInWorkspace(input.accountId);
+    // ON DELETE cascade limpia candidatos y el link público de la búsqueda.
+    await db
+      .delete(selectionSearches)
+      .where(
+        and(
+          eq(selectionSearches.id, input.searchId),
+          eq(selectionSearches.accountId, input.accountId)
+        )
+      );
+    revalidatePath(`/app/accounts/${input.accountId}/selection`);
+    return { success: true };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
 export async function createCandidate(input: {
   accountId: string;
   searchId: string;

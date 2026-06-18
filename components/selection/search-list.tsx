@@ -144,6 +144,24 @@ export function SearchList({ accountId, searches }: Props) {
                   </p>
                 )}
 
+                {/* Confidential toggle — inline (sits above the Link via z-10) */}
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => handleToggleConfidential(search)}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  title="Si está activo, esta búsqueda NO aparece en el link general del cliente"
+                  className={cn(
+                    "relative z-10 self-start inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium disabled:opacity-50",
+                    search.confidential
+                      ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                      : "text-muted-foreground ring-1 [--tw-ring-color:var(--glass-border)] hover:text-foreground"
+                  )}
+                >
+                  <EyeOff size={10} aria-hidden />
+                  {search.confidential ? "Confidencial" : "Marcar confidencial"}
+                </button>
+
                 {/* Counts */}
                 <div className="flex items-center gap-4 mt-auto pt-2 [border-top:1px_solid_var(--glass-border)]">
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -171,23 +189,6 @@ export function SearchList({ accountId, searches }: Props) {
                 <Pencil size={12} />
               </button>
 
-              {/* Confidential toggle — sits above the card link via z-index */}
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={() => handleToggleConfidential(search)}
-                onPointerDown={(e) => e.stopPropagation()}
-                title="Si está activo, esta búsqueda NO aparece en el link general del cliente"
-                className={cn(
-                  "absolute bottom-3 left-3 z-10",
-                  search.confidential
-                    ? "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium bg-amber-500/15 text-amber-700 dark:text-amber-400 disabled:opacity-50"
-                    : "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-muted-foreground ring-1 [--tw-ring-color:var(--glass-border)] hover:text-foreground disabled:opacity-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                )}
-              >
-                <EyeOff size={10} aria-hidden />
-                {search.confidential ? "Confidencial" : "Marcar confidencial"}
-              </button>
             </div>
           ))}
         </div>
