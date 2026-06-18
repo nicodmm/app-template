@@ -24,7 +24,7 @@ export function PublicSearchView({ snapshot }: Props): React.ReactElement {
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       <header className="space-y-2">
-        {workspace.logoUrl && (
+        {workspace.logoUrl ? (
           <Image
             src={workspace.logoUrl}
             alt={workspace.name || "Logo"}
@@ -34,8 +34,9 @@ export function PublicSearchView({ snapshot }: Props): React.ReactElement {
             unoptimized
             priority
           />
+        ) : (
+          <p className="text-xs text-muted-foreground">{workspace.name}</p>
         )}
-        <p className="text-xs text-muted-foreground">{workspace.name}</p>
         <h1 className="text-3xl font-semibold">{search.position}</h1>
         {search.positionDescription && (
           <p className="text-sm text-muted-foreground whitespace-pre-line">

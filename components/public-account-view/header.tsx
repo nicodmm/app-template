@@ -32,7 +32,7 @@ export function PublicAccountView({ snapshot }: Props) {
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       <header className="space-y-2">
-        {workspace.logoUrl && (
+        {workspace.logoUrl ? (
           <Image
             src={workspace.logoUrl}
             alt={workspace.name || "Logo"}
@@ -42,8 +42,9 @@ export function PublicAccountView({ snapshot }: Props) {
             unoptimized
             priority
           />
+        ) : (
+          <p className="text-xs text-muted-foreground">{workspace.name}</p>
         )}
-        <p className="text-xs text-muted-foreground">{workspace.name}</p>
         <h1 className="text-3xl font-semibold">{account.name}</h1>
         <p className="text-sm text-muted-foreground">
           {account.industry && <>{account.industry} · </>}
