@@ -1,12 +1,35 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Loader2, Pencil, Sparkles } from "lucide-react";
-import { generateCandidateReport, saveCandidateReport } from "@/app/actions/selection";
+import { FileText, Loader2, Pencil, Sparkles, Upload } from "lucide-react";
+import {
+  generateCandidateReport,
+  saveCandidateReport,
+  uploadCandidateReport,
+} from "@/app/actions/selection";
+import { extractTextFromFile } from "@/lib/selection/extract-text-client";
 import { GlassCard } from "@/components/ui/glass-card";
 import { cn } from "@/lib/utils";
 import type { SelectionCandidate } from "@/lib/drizzle/schema";
+
+/** Lee un File a base64 sin el prefijo "data:...;base64,". */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("No se pudo leer el archivo"));
+        return;
+      }
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Error de lectura"));
+    reader.readAsDataURL(file);
+  });
+}
 
 interface Props {
   accountId: string;
@@ -30,6 +53,7 @@ const STATUS_STYLE: Record<string, string> = {
 
 export function ReportEditor({ accountId, searchId, candidate }: Props) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -65,6 +89,43 @@ export function ReportEditor({ accountId, searchId, candidate }: Props) {
       });
       if (!result.success) {
         setError(result.error ?? "Error al generar el informe");
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function handleUploadFile(e: React.ChangeEvent<HTMLInputElement>): void {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    startTransition(async () => {
+      let extractedText: string | null = null;
+      try {
+        extractedText = await extractTextFromFile(file);
+      } catch {
+        extractedText = null;
+      }
+      let fileBase64: string;
+      try {
+        fileBase64 = await fileToBase64(file);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error al leer el archivo");
+        return;
+      }
+      const result = await uploadCandidateReport({
+        accountId,
+        searchId,
+        candidateId: candidate.id,
+        fileName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        fileSize: file.size,
+        extractedText: extractedText && extractedText.trim() ? extractedText : null,
+        fileBase64,
+      });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (!result.success) {
+        setError(result.error ?? "Error al subir el informe");
         return;
       }
       router.refresh();
@@ -137,7 +198,31 @@ export function ReportEditor({ accountId, searchId, candidate }: Props) {
             <Pencil size={14} aria-hidden />
             Editar informe
           </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx"
+            onChange={handleUploadFile}
+            disabled={isPending}
+            className="hidden"
+            id="report-file-input"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isPending}
+            title="Subir un informe ya hecho (.pdf, .docx)"
+            className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground transition-colors disabled:pointer-events-none disabled:opacity-50"
+          >
+            <Upload size={14} aria-hidden />
+            {isPending ? "Subiendo…" : "Subir informe"}
+          </button>
         </div>
+      )}
+      {candidate.reportFileName && !editing && (
+        <p className="text-xs text-muted-foreground truncate">
+          Archivo: <span className="text-foreground">{candidate.reportFileName}</span>
+        </p>
       )}
 
       {editing && (

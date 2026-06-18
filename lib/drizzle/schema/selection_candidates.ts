@@ -52,6 +52,13 @@ export const selectionCandidates = pgTable(
     reportGeneratedAt: timestamp("report_generated_at"),
     reportEditedAt: timestamp("report_edited_at"),
 
+    // Informe subido como archivo (PDF/Word) — opcional. Cuando existe, el visor
+    // muestra el archivo original; el texto extraído va a reportContent (portal).
+    reportStoragePath: text("report_storage_path"),
+    reportFileName: text("report_file_name"),
+    reportMimeType: text("report_mime_type"),
+    reportFileSize: integer("report_file_size"),
+
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

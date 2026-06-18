@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ExternalLink, FileText, FileWarning } from "lucide-react";
-import { getCandidateCvUrl } from "@/app/actions/selection";
+import { getCandidateCvUrl, getCandidateReportUrl } from "@/app/actions/selection";
 import { GlassCard } from "@/components/ui/glass-card";
 import { RichMarkdown } from "@/components/ui/rich-markdown";
 import { cn } from "@/lib/utils";
@@ -23,7 +23,13 @@ export function DocumentViewer({ accountId, candidate }: Props) {
   const [cvError, setCvError] = useState<string | null>(null);
   const [cvFetched, setCvFetched] = useState(false);
 
+  const [reportUrl, setReportUrl] = useState<string | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportErrorMsg, setReportErrorMsg] = useState<string | null>(null);
+  const [reportFetched, setReportFetched] = useState(false);
+
   const hasCv = Boolean(candidate.cvStoragePath || candidate.cvUrl);
+  const hasReportFile = Boolean(candidate.reportStoragePath);
 
   // Fetch the signed/external URL the first time the CV tab is active.
   useEffect(() => {
@@ -52,6 +58,33 @@ export function DocumentViewer({ accountId, candidate }: Props) {
     setCvUrl(null);
     setCvError(null);
   }, [candidate.id, candidate.cvStoragePath, candidate.cvUrl]);
+
+  // Fetch the signed URL the first time the report tab is active and a file exists.
+  useEffect(() => {
+    if (tab !== "report" || reportFetched || !hasReportFile) return;
+    let cancelled = false;
+    setReportLoading(true);
+    setReportErrorMsg(null);
+    void getCandidateReportUrl({ accountId, candidateId: candidate.id }).then((res) => {
+      if (cancelled) return;
+      setReportFetched(true);
+      setReportLoading(false);
+      if (res.error) {
+        setReportErrorMsg(res.error);
+        return;
+      }
+      setReportUrl(res.url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, reportFetched, hasReportFile, accountId, candidate.id]);
+
+  useEffect(() => {
+    setReportFetched(false);
+    setReportUrl(null);
+    setReportErrorMsg(null);
+  }, [candidate.id, candidate.reportStoragePath]);
 
   return (
     <GlassCard variant="strong" className="flex flex-col overflow-hidden">
@@ -112,24 +145,63 @@ export function DocumentViewer({ accountId, candidate }: Props) {
       )}
 
       {/* Informe tab */}
-      {tab === "report" && (
-        <div className="min-h-[480px] max-h-[640px] overflow-y-auto p-6">
-          {candidate.reportStatus === "ready" && candidate.reportContent ? (
-            <div className="text-sm leading-relaxed">
-              <RichMarkdown text={candidate.reportContent} />
-            </div>
-          ) : candidate.reportStatus === "generating" ? (
+      {tab === "report" &&
+        (candidate.reportStatus === "generating" ? (
+          <div className="min-h-[480px] flex flex-col">
             <EmptyState text="Generando informe…" />
-          ) : candidate.reportStatus === "error" ? (
+          </div>
+        ) : candidate.reportStatus === "error" ? (
+          <div className="min-h-[480px] flex flex-col">
             <EmptyState
               icon={<FileWarning size={28} aria-hidden />}
               text={candidate.reportError ?? "Error al generar el informe"}
             />
-          ) : (
+          </div>
+        ) : hasReportFile ? (
+          // Informe subido como archivo → mostrar el original (como el CV).
+          <div className="min-h-[480px] flex flex-col">
+            {reportLoading ? (
+              <EmptyState text="Cargando informe…" />
+            ) : reportErrorMsg ? (
+              <EmptyState icon={<FileWarning size={28} aria-hidden />} text={reportErrorMsg} />
+            ) : reportUrl && isEmbeddableCv(reportUrl, candidate.reportMimeType) ? (
+              <iframe
+                src={toEmbeddableCvUrl(reportUrl)}
+                title={candidate.reportFileName ?? "Informe"}
+                className="w-full h-[480px] flex-1 border-0"
+              />
+            ) : reportUrl ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center min-h-[480px]">
+                <FileText size={28} className="text-muted-foreground opacity-50" aria-hidden />
+                <p className="text-sm text-muted-foreground">
+                  Este archivo no se puede previsualizar.
+                </p>
+                <a
+                  href={reportUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium shadow hover:bg-primary/90 transition-colors"
+                >
+                  Abrir informe
+                  <ExternalLink size={14} aria-hidden />
+                </a>
+              </div>
+            ) : (
+              <EmptyState icon={<FileText size={28} aria-hidden />} text="Sin informe" />
+            )}
+          </div>
+        ) : candidate.reportStatus === "ready" && candidate.reportContent ? (
+          // Informe generado/editado → markdown.
+          <div className="min-h-[480px] max-h-[640px] overflow-y-auto p-6">
+            <div className="text-sm leading-relaxed">
+              <RichMarkdown text={candidate.reportContent} />
+            </div>
+          </div>
+        ) : (
+          <div className="min-h-[480px] flex flex-col">
             <EmptyState icon={<FileText size={28} aria-hidden />} text="Informe no generado aún" />
-          )}
-        </div>
-      )}
+          </div>
+        ))}
     </GlassCard>
   );
 }
