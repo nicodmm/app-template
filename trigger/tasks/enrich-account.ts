@@ -9,6 +9,7 @@ import {
   INDUSTRY_CATEGORIES,
   coerceIndustryCategory,
 } from "@/lib/industry-categories";
+import { stripCitations } from "@/lib/text/citations";
 
 const MODEL = "claude-haiku-4-5-20251001";
 const client = new Anthropic();
@@ -183,11 +184,13 @@ Devolvé SOLO JSON válido al final, sin texto extra antes ni después:
       await db
         .update(accounts)
         .set({
-          industry: parsed.industry,
+          // El modelo, al usar web_search, a veces envuelve fragmentos con
+          // etiquetas <cite index="...">. Las quitamos antes de persistir.
+          industry: stripCitations(parsed.industry),
           industryCategory: coerceIndustryCategory(parsed.industryCategory),
-          employeeCount: parsed.employeeCount,
-          location: parsed.location,
-          companyDescription: parsed.description,
+          employeeCount: stripCitations(parsed.employeeCount),
+          location: stripCitations(parsed.location),
+          companyDescription: stripCitations(parsed.description),
           enrichedAt: new Date(),
           enrichmentStatus: "ok",
           enrichmentError: null,

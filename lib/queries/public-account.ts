@@ -23,6 +23,7 @@ import {
 } from "@/lib/drizzle/schema";
 import { and, desc, eq, gte, inArray, isNull, ne } from "drizzle-orm";
 import { coerceShareConfig, type ShareConfig } from "@/lib/share/share-config";
+import { stripCitations } from "@/lib/text/citations";
 
 /**
  * Strip markdown sections that are explicitly internal-facing. The summary
@@ -435,7 +436,7 @@ export async function getPublicAccountSnapshot(
     account: {
       id: accountRow.id,
       name: accountRow.name,
-      industry: accountRow.industry,
+      industry: stripCitations(accountRow.industry),
       ownerName,
       lastActivityAt: accountRow.lastActivityAt,
     },
@@ -444,12 +445,12 @@ export async function getPublicAccountSnapshot(
       summary: config.summary ? { clientSummary: summaryText } : null,
       context: config.context
         ? {
-            goals: accountRow.goals,
+            goals: stripCitations(accountRow.goals),
             startDate: accountRow.startDate,
             serviceScope: accountRow.serviceScope,
-            industry: accountRow.industry,
-            location: accountRow.location,
-            companyDescription: accountRow.companyDescription,
+            industry: stripCitations(accountRow.industry),
+            location: stripCitations(accountRow.location),
+            companyDescription: stripCitations(accountRow.companyDescription),
             websiteUrl: accountRow.websiteUrl,
             linkedinUrl: accountRow.linkedinUrl,
           }

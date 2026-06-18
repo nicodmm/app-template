@@ -48,6 +48,7 @@ import { AccountConsultantsInline } from "@/components/account-detail/account-co
 import { AccountInvoiceCountry } from "@/components/account-detail/account-invoice-country";
 import { AccountTermsField } from "@/components/account-detail/account-terms-field";
 import { accountFinance, accountConsultants, users as usersTable } from "@/lib/drizzle/schema";
+import { stripCitations } from "@/lib/text/citations";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
@@ -199,6 +200,8 @@ export default async function AccountDetailPage({
             account={account}
             members={members}
             services={workspace.services ?? []}
+            consultants={financeConsultants}
+            canManageConsultants={canFinance}
           />
         </GlassCard>
       )}
@@ -240,7 +243,7 @@ export default async function AccountDetailPage({
               <h2 className="font-semibold">Contexto de la cuenta</h2>
               {account.industry && (
                 <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                  {account.industry}
+                  {stripCitations(account.industry)}
                 </span>
               )}
             </div>
@@ -267,7 +270,7 @@ export default async function AccountDetailPage({
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
                   Objetivos
                 </p>
-                <p className="text-sm leading-relaxed">{account.goals}</p>
+                <p className="text-sm leading-relaxed">{stripCitations(account.goals)}</p>
               </div>
             )}
             {account.serviceScope && (
@@ -320,7 +323,7 @@ export default async function AccountDetailPage({
                   Empleados
                 </p>
                 <p className="text-sm leading-relaxed">
-                  {account.employeeCount}
+                  {stripCitations(account.employeeCount)}
                 </p>
               </div>
             )}
@@ -329,7 +332,7 @@ export default async function AccountDetailPage({
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
                   Ubicación
                 </p>
-                <p className="text-sm leading-relaxed">{account.location}</p>
+                <p className="text-sm leading-relaxed">{stripCitations(account.location)}</p>
               </div>
             )}
             {(account.websiteUrl || account.linkedinUrl) && (
@@ -365,7 +368,7 @@ export default async function AccountDetailPage({
 
           {account.companyDescription && (
             <p className="text-sm text-muted-foreground leading-relaxed mt-6 pt-4 [border-top:1px_solid_var(--glass-border)]">
-              {account.companyDescription}
+              {stripCitations(account.companyDescription)}
             </p>
           )}
 

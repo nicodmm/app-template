@@ -10,11 +10,16 @@ import { ServiceScopeCheckboxes } from "@/components/service-scope-checkboxes";
 import { AccountModulesToggles } from "@/components/account-modules-toggles";
 import { AccountDangerZone } from "@/components/account-danger-zone";
 import { EndDateField } from "@/components/end-date-field";
+import { AccountConsultantsInline } from "@/components/account-detail/account-consultants-inline";
 
 interface EditAccountFormProps {
   account: AccountWithOwner;
   members: WorkspaceMemberWithUser[];
   services: string[];
+  /** Consultores actuales de la cuenta. Solo se muestran a finance-admins. */
+  consultants?: { id: string; displayName: string }[];
+  /** Si el usuario puede gestionar consultores (permiso de finanzas). */
+  canManageConsultants?: boolean;
 }
 
 interface FormState {
@@ -25,7 +30,13 @@ interface FormState {
 
 const initialState: FormState = {};
 
-export function EditAccountForm({ account, members, services }: EditAccountFormProps) {
+export function EditAccountForm({
+  account,
+  members,
+  services,
+  consultants = [],
+  canManageConsultants = false,
+}: EditAccountFormProps) {
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(
     async (_prev: FormState, formData: FormData): Promise<FormState> => {
@@ -92,6 +103,19 @@ export function EditAccountForm({ account, members, services }: EditAccountFormP
           ))}
         </select>
       </div>
+
+      {canManageConsultants && (
+        // Se guardan al instante (acción propia), independiente del submit del
+        // form. Por eso vive acá visualmente pero no usa el formAction. El
+        // componente ya renderiza su propio título "Consultores".
+        <div>
+          <AccountConsultantsInline
+            accountId={account.id}
+            consultants={consultants}
+            members={members}
+          />
+        </div>
+      )}
 
       <div>
         <label className="block text-sm font-medium mb-2">
