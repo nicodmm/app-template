@@ -21,6 +21,7 @@ import { AccountProjectionPanel } from "@/components/finance/account-projection-
 import { GlassCard } from "@/components/ui/glass-card";
 import { FinanceDocs } from "@/components/finance/finance-docs";
 import { TermsEditor } from "@/components/finance/terms-editor";
+import { AccountInvoiceCountry } from "@/components/account-detail/account-invoice-country";
 import { FinanceBillingForm } from "@/components/account-detail/finance-billing-form";
 import { FinanceTeam } from "@/components/account-detail/finance-team";
 import { AccountBillingPanel } from "@/components/finance/account-billing-panel";
@@ -96,6 +97,10 @@ export default async function AccountFinancePage({
     ]);
 
   const finance = financeRows[0] ?? null;
+  const invoiceCountry: "AR" | "US" | null =
+    finance?.invoiceCountry === "AR" || finance?.invoiceCountry === "US"
+      ? finance.invoiceCountry
+      : null;
   const consultants = consultantRows.map((r) => ({
     id: r.id,
     userId: r.userId,
@@ -147,8 +152,11 @@ export default async function AccountFinancePage({
       </GlassCard>
 
       {/* 2. Términos */}
-      <GlassCard className="p-6">
-        <TermsEditor accountId={accountId} terms={terms} members={financeMembers} />
+      <GlassCard className="p-6 space-y-5">
+        <AccountInvoiceCountry accountId={accountId} initialCountry={invoiceCountry} />
+        <div className="[border-top:1px_solid_var(--glass-border)] pt-5">
+          <TermsEditor accountId={accountId} terms={terms} members={financeMembers} />
+        </div>
       </GlassCard>
 
       {/* 3. Datos de facturación y legales. El `key` por ndaExtractedAt remonta
