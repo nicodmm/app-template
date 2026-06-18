@@ -9,6 +9,8 @@ export type WorkspaceMemberWithUser = {
   displayName: string;
   email: string;
   financeAdmin: boolean;
+  /** true si es un placeholder de invitación que aún no se registró. */
+  pending: boolean;
 };
 
 export async function getWorkspaceByUserId(
@@ -91,6 +93,7 @@ export async function getWorkspaceMembers(
       financeAdmin: workspaceMembers.financeAdmin,
       fullName: users.fullName,
       email: users.email,
+      pending: users.pending,
     })
     .from(workspaceMembers)
     .innerJoin(users, eq(workspaceMembers.userId, users.id))
@@ -102,6 +105,7 @@ export async function getWorkspaceMembers(
     financeAdmin: r.financeAdmin,
     displayName: r.fullName ?? r.email,
     email: r.email,
+    pending: r.pending,
   }));
 }
 

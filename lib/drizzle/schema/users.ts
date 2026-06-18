@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, boolean } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -6,6 +6,9 @@ export const users = pgTable("users", {
   fullName: text("full_name"),
   avatarUrl: text("avatar_url"),
   role: text("role").notNull().default("member"),
+  // true = placeholder creado por una invitación, sin cuenta de auth todavía.
+  // Se vuelve false al fusionarse con la cuenta real en el registro.
+  pending: boolean("pending").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

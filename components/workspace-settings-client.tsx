@@ -128,6 +128,11 @@ export function WorkspaceSettingsClient(props: WorkspaceSettingsClientProps) {
                     {isSelf && (
                       <span className="ml-2 text-xs text-muted-foreground">(vos)</span>
                     )}
+                    {m.pending && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                        Pendiente
+                      </span>
+                    )}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">{m.email}</p>
                 </div>

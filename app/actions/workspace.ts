@@ -12,6 +12,7 @@ import {
 } from "@/lib/drizzle/schema";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspace";
+import { placeholderHasAssignments } from "@/lib/workspace/merge-placeholder-user";
 import {
   createAdminClient,
   WORKSPACE_LOGOS_BUCKET,
@@ -70,7 +71,8 @@ export async function createWorkspaceInvite(
     return { error: "Rol inválido" };
   }
 
-  // If the email is already a member of this workspace, reject.
+  // Si el email YA es miembro real (registrado) del workspace, rechazar.
+  // Un placeholder pendiente no cuenta (permite re-invitar / re-generar link).
   const existingMember = await db
     .select({ id: workspaceMembers.id })
     .from(workspaceMembers)
@@ -78,12 +80,59 @@ export async function createWorkspaceInvite(
     .where(
       and(
         eq(workspaceMembers.workspaceId, workspace.id),
-        eq(users.email, normalizedEmail)
+        eq(users.email, normalizedEmail),
+        eq(users.pending, false)
       )
     )
     .limit(1);
   if (existingMember.length > 0) {
     return { error: "Ese email ya forma parte del workspace" };
+  }
+
+  // Placeholder asignable: si no existe ningún users para este email, crearlo
+  // (pending=true) + su membership, así se le pueden cargar cuentas/tareas antes
+  // de que se registre. Si ya existe un placeholder (re-invitación), asegurar la
+  // membership y sincronizar el rol. Si existe un usuario REAL sin membership, no
+  // tocamos nada (lo agrega el flujo de aceptar invitación).
+  const [existingUser] = await db
+    .select({ id: users.id, pending: users.pending })
+    .from(users)
+    .where(eq(users.email, normalizedEmail))
+    .limit(1);
+
+  if (!existingUser) {
+    const [ph] = await db
+      .insert(users)
+      .values({ email: normalizedEmail, pending: true })
+      .returning({ id: users.id });
+    await db.insert(workspaceMembers).values({
+      workspaceId: workspace.id,
+      userId: ph.id,
+      role,
+    });
+  } else if (existingUser.pending) {
+    const [m] = await db
+      .select({ id: workspaceMembers.id })
+      .from(workspaceMembers)
+      .where(
+        and(
+          eq(workspaceMembers.workspaceId, workspace.id),
+          eq(workspaceMembers.userId, existingUser.id)
+        )
+      )
+      .limit(1);
+    if (!m) {
+      await db.insert(workspaceMembers).values({
+        workspaceId: workspace.id,
+        userId: existingUser.id,
+        role,
+      });
+    } else {
+      await db
+        .update(workspaceMembers)
+        .set({ role })
+        .where(eq(workspaceMembers.id, m.id));
+    }
   }
 
   // Dedup: reuse an existing pending invite for the same email.
@@ -136,6 +185,18 @@ export async function revokeWorkspaceInvite(inviteId: string): Promise<void> {
   const member = await getWorkspaceMember(workspace.id, userId);
   assertCanManage(member?.role);
 
+  // Cargar el invite (para conocer el email del placeholder) antes de borrarlo.
+  const [invite] = await db
+    .select({ email: workspaceInvites.email })
+    .from(workspaceInvites)
+    .where(
+      and(
+        eq(workspaceInvites.id, inviteId),
+        eq(workspaceInvites.workspaceId, workspace.id)
+      )
+    )
+    .limit(1);
+
   await db
     .delete(workspaceInvites)
     .where(
@@ -144,6 +205,34 @@ export async function revokeWorkspaceInvite(inviteId: string): Promise<void> {
         eq(workspaceInvites.workspaceId, workspace.id)
       )
     );
+
+  // Limpieza del placeholder si quedó sin asignaciones.
+  if (invite) {
+    const lower = invite.email.trim().toLowerCase();
+    const [ph] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.pending, true), eq(users.email, lower)))
+      .limit(1);
+    if (ph && !(await placeholderHasAssignments(ph.id))) {
+      await db
+        .delete(workspaceMembers)
+        .where(
+          and(
+            eq(workspaceMembers.workspaceId, workspace.id),
+            eq(workspaceMembers.userId, ph.id)
+          )
+        );
+      const remaining = await db
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(eq(workspaceMembers.userId, ph.id))
+        .limit(1);
+      if (remaining.length === 0) {
+        await db.delete(users).where(eq(users.id, ph.id));
+      }
+    }
+  }
 
   revalidatePath("/app/settings/workspace");
 }
@@ -160,20 +249,33 @@ export async function acceptWorkspaceInvite(
     .limit(1);
 
   if (!invite) return { error: "Invitación no encontrada o expirada" };
+
+  const existing = await getWorkspaceByUserId(userId);
+
+  // Si ya es miembro del workspace del invite (placeholder fusionado en el
+  // registro, o re-click del link), éxito idempotente — incluso si ya está
+  // marcado como aceptado.
+  if (existing && existing.id === invite.workspaceId) {
+    if (!invite.acceptedAt) {
+      await db
+        .update(workspaceInvites)
+        .set({ acceptedAt: new Date(), acceptedByUserId: userId })
+        .where(eq(workspaceInvites.id, invite.id));
+    }
+    return { workspaceId: existing.id };
+  }
+
   if (invite.acceptedAt) return { error: "Esta invitación ya fue usada" };
   if (invite.expiresAt < new Date()) return { error: "La invitación expiró" };
 
-  // Is the user already in a workspace?
-  const existing = await getWorkspaceByUserId(userId);
   if (existing) {
-    if (existing.id === invite.workspaceId) {
-      return { workspaceId: existing.id };
-    }
     return {
-      error: "Ya pertenecés a otro workspace. Cerrá sesión y registrate con otro email para aceptar.",
+      error:
+        "Ya pertenecés a otro workspace. Cerrá sesión y registrate con otro email para aceptar.",
     };
   }
 
+  // Caso sin merge previo (no había placeholder): alta normal.
   await db.insert(workspaceMembers).values({
     workspaceId: invite.workspaceId,
     userId,
