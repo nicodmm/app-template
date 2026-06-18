@@ -1,19 +1,24 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/drizzle/db";
 import {
   accountShareLinks,
   selectionCandidates,
+  selectionSearchShareLinks,
+  selectionSearches,
 } from "@/lib/drizzle/schema";
 import { coerceShareConfig } from "@/lib/share/share-config";
 import { createAdminClient, SELECTION_CV_BUCKET } from "@/lib/supabase/admin";
 
 type R = { success: boolean; error?: string };
 
-/** Resolve token -> accountId, enforcing active link + selection share flag. */
-async function resolveTokenAccount(token: string): Promise<string | null> {
-  const [link] = await db
+/** Resuelve un token público (de cuenta o de búsqueda) a su contexto. */
+async function resolvePublicToken(
+  token: string
+): Promise<{ accountId: string; searchId: string | null } | null> {
+  // 1. Link de cuenta (requiere selection habilitado).
+  const [acc] = await db
     .select({
       accountId: accountShareLinks.accountId,
       isActive: accountShareLinks.isActive,
@@ -22,27 +27,49 @@ async function resolveTokenAccount(token: string): Promise<string | null> {
     .from(accountShareLinks)
     .where(eq(accountShareLinks.token, token))
     .limit(1);
-  if (!link || !link.isActive) return null;
-  const cfg = coerceShareConfig(link.shareConfig);
-  if (!cfg.selection) return null;
-  return link.accountId;
+  if (acc) {
+    if (!acc.isActive) return null;
+    if (!coerceShareConfig(acc.shareConfig).selection) return null;
+    return { accountId: acc.accountId, searchId: null };
+  }
+  // 2. Link de búsqueda individual.
+  const [sl] = await db
+    .select({
+      searchId: selectionSearchShareLinks.searchId,
+      isActive: selectionSearchShareLinks.isActive,
+    })
+    .from(selectionSearchShareLinks)
+    .where(eq(selectionSearchShareLinks.token, token))
+    .limit(1);
+  if (sl) {
+    if (!sl.isActive) return null;
+    const [s] = await db
+      .select({ accountId: selectionSearches.accountId })
+      .from(selectionSearches)
+      .where(eq(selectionSearches.id, sl.searchId))
+      .limit(1);
+    if (!s) return null;
+    return { accountId: s.accountId, searchId: sl.searchId };
+  }
+  return null;
 }
 
-async function assertCandidateInAccount(
+async function assertCandidateVisible(
   candidateId: string,
-  accountId: string
+  ctx: { accountId: string; searchId: string | null }
 ): Promise<boolean> {
   const [c] = await db
-    .select({ id: selectionCandidates.id })
+    .select({
+      accountId: selectionCandidates.accountId,
+      searchId: selectionCandidates.searchId,
+    })
     .from(selectionCandidates)
-    .where(
-      and(
-        eq(selectionCandidates.id, candidateId),
-        eq(selectionCandidates.accountId, accountId)
-      )
-    )
+    .where(eq(selectionCandidates.id, candidateId))
     .limit(1);
-  return !!c;
+  if (!c) return false;
+  if (c.accountId !== ctx.accountId) return false;
+  if (ctx.searchId && c.searchId !== ctx.searchId) return false;
+  return true;
 }
 
 export async function clientSetCandidateStatus(input: {
@@ -54,9 +81,9 @@ export async function clientSetCandidateStatus(input: {
   offerConditions?: string;
   rejectionReason?: string;
 }): Promise<R> {
-  const accountId = await resolveTokenAccount(input.token);
-  if (!accountId) return { success: false, error: "Acceso inválido" };
-  if (!(await assertCandidateInAccount(input.candidateId, accountId)))
+  const ctx = await resolvePublicToken(input.token);
+  if (!ctx) return { success: false, error: "Acceso inválido" };
+  if (!(await assertCandidateVisible(input.candidateId, ctx)))
     return { success: false, error: "Candidato no encontrado" };
   if (input.status === "rejected" && !input.rejectionReason?.trim())
     return { success: false, error: "El motivo de rechazo es obligatorio" };
@@ -86,9 +113,9 @@ export async function clientSaveCandidateFeedback(input: {
   clientNotes: string;
   clientRating: number;
 }): Promise<R> {
-  const accountId = await resolveTokenAccount(input.token);
-  if (!accountId) return { success: false, error: "Acceso inválido" };
-  if (!(await assertCandidateInAccount(input.candidateId, accountId)))
+  const ctx = await resolvePublicToken(input.token);
+  if (!ctx) return { success: false, error: "Acceso inválido" };
+  if (!(await assertCandidateVisible(input.candidateId, ctx)))
     return { success: false, error: "Candidato no encontrado" };
   const rating = Math.max(0, Math.min(5, Math.round(input.clientRating)));
   await db
@@ -107,9 +134,9 @@ export async function clientGetCandidateCvUrl(input: {
   token: string;
   candidateId: string;
 }): Promise<{ url: string | null; error?: string }> {
-  const accountId = await resolveTokenAccount(input.token);
-  if (!accountId) return { url: null, error: "Acceso inválido" };
-  if (!(await assertCandidateInAccount(input.candidateId, accountId)))
+  const ctx = await resolvePublicToken(input.token);
+  if (!ctx) return { url: null, error: "Acceso inválido" };
+  if (!(await assertCandidateVisible(input.candidateId, ctx)))
     return { url: null, error: "Candidato no encontrado" };
   const [c] = await db
     .select({
