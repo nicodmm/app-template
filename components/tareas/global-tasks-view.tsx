@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Search,
   X,
@@ -13,6 +14,7 @@ import {
   Repeat,
   Eye,
   ArrowUpDown,
+  Trash2,
 } from "lucide-react";
 import {
   TAREA_COLUMNS,
@@ -23,6 +25,7 @@ import {
 import type { GlobalTask } from "@/lib/queries/tareas";
 import type { WorkspaceMemberWithUser } from "@/lib/queries/workspace";
 import { scopeBoardPath } from "@/lib/tareas/scope";
+import { bulkUpdateTasks, bulkDeleteTasks } from "@/app/actions/tareas";
 
 interface GlobalTasksViewProps {
   tasks: GlobalTask[];
@@ -191,6 +194,72 @@ export function GlobalTasksView({
       setSortAsc(true);
     }
   }
+
+  // --- Multi-selección + acciones masivas (vista Lista) ---
+  const router = useRouter();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkPending, startBulk] = useTransition();
+
+  const allVisibleSelected =
+    sorted.length > 0 && sorted.every((t) => selected.has(t.id));
+
+  function toggleSelect(id: string): void {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll(): void {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (sorted.every((t) => next.has(t.id))) {
+        for (const t of sorted) next.delete(t.id);
+      } else {
+        for (const t of sorted) next.add(t.id);
+      }
+      return next;
+    });
+  }
+
+  function clearSelection(): void {
+    setSelected(new Set());
+  }
+
+  function applyBulk(patch: {
+    status?: string;
+    assigneeId?: string | null;
+    priority?: number;
+  }): void {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    startBulk(async () => {
+      await bulkUpdateTasks(ids, patch);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  function applyDelete(): void {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    if (
+      !window.confirm(
+        `¿Eliminar ${ids.length} tarea${ids.length === 1 ? "" : "s"}? No se puede deshacer.`
+      )
+    )
+      return;
+    startBulk(async () => {
+      await bulkDeleteTasks(ids);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  const selectClass =
+    "rounded-md border border-input bg-background px-2 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
 
   function taskHref(t: GlobalTask): string {
     const scope =
@@ -426,10 +495,91 @@ export function GlobalTasksView({
 
       {/* Lista */}
       {view === "list" && (
-        <div className="overflow-x-auto rounded-lg border border-border">
+        <div className="space-y-2">
+          {selected.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2 text-xs">
+              <span className="font-medium">
+                {selected.size} seleccionada{selected.size === 1 ? "" : "s"}
+              </span>
+              <select
+                disabled={bulkPending}
+                value=""
+                onChange={(e) => e.target.value && applyBulk({ status: e.target.value })}
+                className={selectClass}
+                aria-label="Cambiar estado"
+              >
+                <option value="">Estado…</option>
+                {TAREA_COLUMNS.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                disabled={bulkPending}
+                value=""
+                onChange={(e) =>
+                  e.target.value &&
+                  applyBulk({
+                    assigneeId: e.target.value === "__unassign" ? null : e.target.value,
+                  })
+                }
+                className={selectClass}
+                aria-label="Cambiar responsable"
+              >
+                <option value="">Responsable…</option>
+                <option value="__unassign">Sin asignar</option>
+                {members.map((m) => (
+                  <option key={m.userId} value={m.userId}>
+                    {m.displayName}
+                  </option>
+                ))}
+              </select>
+              <select
+                disabled={bulkPending}
+                value=""
+                onChange={(e) => e.target.value && applyBulk({ priority: Number(e.target.value) })}
+                className={selectClass}
+                aria-label="Cambiar prioridad"
+              >
+                <option value="">Prioridad…</option>
+                {Object.entries(PRIORITY_CONFIG).map(([p, { label }]) => (
+                  <option key={p} value={p}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={bulkPending}
+                onClick={applyDelete}
+                className="inline-flex items-center gap-1 rounded-md border border-destructive/40 px-2 py-1 font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
+              >
+                <Trash2 size={12} /> Eliminar
+              </button>
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Cancelar
+              </button>
+              {bulkPending && <span className="text-muted-foreground">Aplicando…</span>}
+            </div>
+          )}
+          <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-xs">
             <thead className="bg-muted/40 text-muted-foreground">
               <tr>
+                <th className="w-8 px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleSelectAll}
+                    className="h-3.5 w-3.5 cursor-pointer rounded border-input"
+                    aria-label="Seleccionar todas"
+                  />
+                </th>
                 {(
                   [
                     ["container", "Contenedor"],
@@ -459,8 +609,19 @@ export function GlobalTasksView({
                 return (
                   <tr
                     key={t.id}
-                    className="border-t border-border hover:bg-accent/30 transition-colors"
+                    className={`border-t border-border transition-colors ${
+                      selected.has(t.id) ? "bg-primary/5" : "hover:bg-accent/30"
+                    }`}
                   >
+                    <td className="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(t.id)}
+                        onChange={() => toggleSelect(t.id)}
+                        className="h-3.5 w-3.5 cursor-pointer rounded border-input"
+                        aria-label="Seleccionar tarea"
+                      />
+                    </td>
                     <td className="px-3 py-2 text-muted-foreground">
                       {t.containerName}
                     </td>
@@ -494,7 +655,7 @@ export function GlobalTasksView({
               {sorted.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-3 py-6 text-center text-muted-foreground/60"
                   >
                     Sin tareas
@@ -503,6 +664,7 @@ export function GlobalTasksView({
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

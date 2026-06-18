@@ -283,6 +283,131 @@ export async function deleteKanbanTask(
   return {};
 }
 
+/**
+ * Filtra una lista de taskIds a las que el usuario puede tocar (según el scope
+ * ALMACENADO de cada tarea), memoizando el acceso por contenedor. Devuelve los
+ * ids permitidos + las cuentas afectadas (para revalidar sus tableros).
+ */
+async function authorizeTaskIds(
+  userId: string,
+  workspaceId: string,
+  taskIds: string[]
+): Promise<{ allowed: string[]; affectedAccounts: Set<string> }> {
+  const rows = await db
+    .select({
+      id: tasks.id,
+      accountId: tasks.accountId,
+      projectId: tasks.projectId,
+      createdBy: tasks.createdBy,
+      assigneeId: tasks.assigneeId,
+    })
+    .from(tasks)
+    .where(and(inArray(tasks.id, taskIds), eq(tasks.workspaceId, workspaceId)));
+
+  const accountAccess = new Map<string, boolean>();
+  const projectAccess = new Map<string, boolean>();
+  const allowed: string[] = [];
+  const affectedAccounts = new Set<string>();
+
+  for (const t of rows) {
+    let ok = false;
+    if (t.accountId) {
+      if (!accountAccess.has(t.accountId)) {
+        accountAccess.set(
+          t.accountId,
+          await canAccessAccountTasks(userId, workspaceId, t.accountId)
+        );
+      }
+      ok = accountAccess.get(t.accountId) ?? false;
+    } else if (t.projectId) {
+      if (!projectAccess.has(t.projectId)) {
+        projectAccess.set(
+          t.projectId,
+          await canAccessProject(userId, workspaceId, t.projectId)
+        );
+      }
+      ok = projectAccess.get(t.projectId) ?? false;
+    } else {
+      ok = t.createdBy === userId || t.assigneeId === userId;
+    }
+    if (ok) {
+      allowed.push(t.id);
+      if (t.accountId) affectedAccounts.add(t.accountId);
+    }
+  }
+  return { allowed, affectedAccounts };
+}
+
+function revalidateBulk(affectedAccounts: Set<string>): void {
+  revalidatePath("/app/tareas");
+  revalidatePath("/app/tareas/todas");
+  for (const accountId of affectedAccounts)
+    revalidatePath(`/app/accounts/${accountId}`);
+}
+
+/**
+ * Acciones masivas sobre varias tareas (multi-selección de la lista global):
+ * cambiar estado/columna, responsable y/o prioridad. Cada tarea se autoriza por
+ * su scope almacenado; las no permitidas se ignoran silenciosamente.
+ */
+export async function bulkUpdateTasks(
+  taskIds: string[],
+  patch: { status?: string; assigneeId?: string | null; priority?: number }
+): Promise<{ error?: string; updated?: number }> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) return { error: "Workspace no encontrado" };
+  if (taskIds.length === 0) return { updated: 0 };
+  if (patch.status !== undefined && !isColumn(patch.status))
+    return { error: "Columna inválida" };
+
+  const { allowed, affectedAccounts } = await authorizeTaskIds(
+    userId,
+    workspace.id,
+    taskIds
+  );
+  if (allowed.length === 0) return { updated: 0 };
+
+  const set: Partial<typeof tasks.$inferInsert> = { updatedAt: new Date() };
+  if (patch.status !== undefined) {
+    set.status = patch.status;
+    set.completedAt = isDoneColumn(patch.status) ? new Date() : null;
+  }
+  if (patch.assigneeId !== undefined) set.assigneeId = patch.assigneeId || null;
+  if (patch.priority !== undefined) set.priority = patch.priority;
+
+  await db
+    .update(tasks)
+    .set(set)
+    .where(and(inArray(tasks.id, allowed), eq(tasks.workspaceId, workspace.id)));
+
+  revalidateBulk(affectedAccounts);
+  return { updated: allowed.length };
+}
+
+export async function bulkDeleteTasks(
+  taskIds: string[]
+): Promise<{ error?: string; deleted?: number }> {
+  const userId = await requireUserId();
+  const workspace = await getWorkspaceByUserId(userId);
+  if (!workspace) return { error: "Workspace no encontrado" };
+  if (taskIds.length === 0) return { deleted: 0 };
+
+  const { allowed, affectedAccounts } = await authorizeTaskIds(
+    userId,
+    workspace.id,
+    taskIds
+  );
+  if (allowed.length === 0) return { deleted: 0 };
+
+  await db
+    .delete(tasks)
+    .where(and(inArray(tasks.id, allowed), eq(tasks.workspaceId, workspace.id)));
+
+  revalidateBulk(affectedAccounts);
+  return { deleted: allowed.length };
+}
+
 export async function createLabel(
   scope: TaskScope,
   name: string,
