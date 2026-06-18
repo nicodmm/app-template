@@ -10,6 +10,7 @@ import {
   FolderOpen,
   ExternalLink,
   DollarSign,
+  Upload,
 } from "lucide-react";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { requireUserId } from "@/lib/auth";
@@ -452,31 +453,33 @@ export default async function AccountDetailPage({
         </div>
       )}
 
-      {/* Last meeting (streamed) */}
+      {/* Última reunión (streamed) + Subir contexto — ambos del módulo de
+          contexto. space-y-4 da el margen entre el resumen y subir contexto. */}
       {isModuleEnabled(account.enabledModules, "context_upload") && (
-        <Suspense fallback={null}>
-          <LastMeetingSection accountId={accountId} />
-        </Suspense>
-      )}
+        <div className="space-y-4 mb-6">
+          <Suspense fallback={null}>
+            <LastMeetingSection accountId={accountId} />
+          </Suspense>
 
-      {/* Context Upload */}
-      {isModuleEnabled(account.enabledModules, "context_upload") && (
-        <GlassCard className="p-6 mb-6">
-          <h2 className="font-semibold mb-4">Subir contexto</h2>
-          <ContextUploadForm
-            accountId={accountId}
-            accountName={account.name}
-            boundDriveFolder={
-              account.driveFolderId && account.driveFolderName
-                ? {
-                    id: account.driveFolderId,
-                    name: account.driveFolderName,
-                    syncedAt: account.driveFolderSyncedAt,
-                  }
-                : null
-            }
-          />
-        </GlassCard>
+          <CollapsibleSection
+            title="Subir contexto"
+            icon={<Upload size={16} aria-hidden />}
+          >
+            <ContextUploadForm
+              accountId={accountId}
+              accountName={account.name}
+              boundDriveFolder={
+                account.driveFolderId && account.driveFolderName
+                  ? {
+                      id: account.driveFolderId,
+                      name: account.driveFolderName,
+                      syncedAt: account.driveFolderSyncedAt,
+                    }
+                  : null
+              }
+            />
+          </CollapsibleSection>
+        </div>
       )}
 
       {/* Collapsible modules — each streamed independently */}
