@@ -16,6 +16,7 @@ import {
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspace";
 import { createAdminClient, FINANCE_DOCS_BUCKET } from "@/lib/supabase/admin";
+import { sanitizeStorageName } from "@/lib/storage/sanitize-filename";
 import { getFxRate } from "@/lib/queries/finance";
 import { convertToArs } from "@/lib/finance/compute";
 import { runMonthlyBilling } from "@/lib/finance/run-monthly-billing";
@@ -76,17 +77,6 @@ async function requireFinanceAccount(accountId: string): Promise<string> {
  * key"). Conservamos letras/números ASCII, punto, guion y guion bajo; el resto
  * se colapsa a "_". El nombre original se guarda aparte para mostrar.
  */
-function sanitizeStorageName(fileName: string): string {
-  const cleaned = fileName
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "") // quitar acentos
-    .replace(/[^a-zA-Z0-9._-]+/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^[_.]+/, "")
-    .slice(0, 120);
-  return cleaned || "archivo";
-}
-
 async function ensureAccountFinance(
   accountId: string,
   workspaceId: string

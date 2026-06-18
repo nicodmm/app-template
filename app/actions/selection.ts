@@ -11,6 +11,7 @@ import {
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId } from "@/lib/queries/workspace";
 import { createAdminClient, SELECTION_CV_BUCKET } from "@/lib/supabase/admin";
+import { sanitizeStorageName } from "@/lib/storage/sanitize-filename";
 
 type ActionResult = { success: boolean; error?: string; id?: string };
 
@@ -238,7 +239,7 @@ export async function uploadCandidateCv(input: {
   try {
     await requireAccountInWorkspace(input.accountId);
     const admin = createAdminClient();
-    const path = `${input.accountId}/${input.candidateId}/${Date.now()}-${input.fileName}`;
+    const path = `${input.accountId}/${input.candidateId}/${Date.now()}-${sanitizeStorageName(input.fileName)}`;
     const buffer = Buffer.from(input.fileBase64, "base64");
     const { error: upErr } = await admin.storage
       .from(SELECTION_CV_BUCKET)
@@ -435,7 +436,7 @@ export async function uploadCandidateReport(input: {
   try {
     await requireAccountInWorkspace(input.accountId);
     const admin = createAdminClient();
-    const path = `${input.accountId}/${input.candidateId}/report-${Date.now()}-${input.fileName}`;
+    const path = `${input.accountId}/${input.candidateId}/report-${Date.now()}-${sanitizeStorageName(input.fileName)}`;
     const buffer = Buffer.from(input.fileBase64, "base64");
     const { error: upErr } = await admin.storage
       .from(SELECTION_CV_BUCKET)
