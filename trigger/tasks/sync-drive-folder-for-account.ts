@@ -38,7 +38,11 @@ function normalize(s: string): string {
     .toLowerCase()
     .split("")
     .map((ch) => ACCENT_MAP[ch] ?? ch)
-    .join("");
+    .join("")
+    // Quitar separadores (espacios, guiones, puntuación) para que el filtro por
+    // nombre matchee aunque Tactiq titule "G-Fitness" o "G Fitness" cuando la
+    // cuenta es "Gfitness". Compara solo alfanuméricos.
+    .replace(/[^a-z0-9]/g, "");
 }
 
 export const syncDriveFolderForAccount = task({
