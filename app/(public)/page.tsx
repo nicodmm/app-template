@@ -404,6 +404,7 @@ export default function LandingPage() {
                   "Dashboard de portfolio",
                   "Detección completa de señales",
                   "Historial completo",
+                  "Link público para compartir con el cliente",
                 ].map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm">
                     <CheckIcon size={14} className="mt-0.5 shrink-0 text-success" />
