@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { db } from "@/lib/drizzle/db";
 import {
@@ -205,9 +206,13 @@ export async function runAccountSummaryGeneration(
     .map((r, i) => `Reunión anterior ${i + 1}: ${r.meetingSummary}`)
     .join("\n\n");
 
-  const response = await anthropic.messages.create({
+  const response = await anthropic.messages.parse({
     model: SUMMARY_MODEL,
     max_tokens: 1200,
+    // Salida estructurada: el modelo está obligado a devolver un objeto con
+    // EXACTAMENTE estos 3 campos string. Elimina el bug de JSON inválido que
+    // partía accountSituation en dos y caía al fallback con el texto crudo.
+    output_config: { format: zodOutputFormat(SummarySchema) },
     messages: [
       {
         role: "user",
@@ -264,19 +269,16 @@ Respondé SOLO con JSON válido (strings con \\n para saltos de línea):
     usage: response.usage,
   });
 
+  // Con structured outputs, parsed_output ya viene validado contra el schema.
+  // Solo es null si el modelo se rehúsa o corta por max_tokens.
+  if (response.parsed_output) return response.parsed_output;
+
   const text =
     response.content[0]?.type === "text" ? response.content[0].text : "";
-
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON found");
-    return SummarySchema.parse(JSON.parse(jsonMatch[0]));
-  } catch {
-    return {
-      meetingSummary: text,
-      accountSituation: text,
-      clientSummary:
-        "Tu cuenta sigue activa. Te traemos una actualización completa pronto.",
-    };
-  }
+  return {
+    meetingSummary: text,
+    accountSituation: text,
+    clientSummary:
+      "Tu cuenta sigue activa. Te traemos una actualización completa pronto.",
+  };
 }
