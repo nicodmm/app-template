@@ -20,6 +20,17 @@ const STATUS_LABEL: Record<string, string> = {
   rejected: "Descartado",
 };
 
+/** Fecha de carga en formato dd/mm/aaaa (sin hora). */
+function formatLoadDate(value: Date | string): string {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 interface Props {
   candidates: SelectionCandidate[];
   selectedId: string | null;
@@ -108,6 +119,9 @@ export function CandidateListPanel({ candidates, selectedId, onSelect }: Props) 
                         {candidate.email}
                       </span>
                     )}
+                    <span className="text-[11px] text-muted-foreground">
+                      Cargado {formatLoadDate(candidate.createdAt)}
+                    </span>
                   </button>
                 </li>
               );
