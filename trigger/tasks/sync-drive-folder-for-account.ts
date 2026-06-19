@@ -8,6 +8,7 @@ import {
   listDriveFolderFiles,
 } from "@/lib/google/drive";
 import { importDriveFileForAccount } from "@/lib/google/drive-import";
+import { getAccountIdsForUser } from "@/lib/accounts/account-membership";
 
 interface SyncFolderInput {
   workspaceId: string;
@@ -102,6 +103,23 @@ export const syncDriveFolderForAccount = task({
         accountId: payload.accountId,
       });
       return;
+    }
+
+    // Gate por dueño: si la conexión es personal, solo importar cuando su dueño
+    // es responsable o consultor de ESTA cuenta. Las conexiones de workspace
+    // (Drive compartido) se consideran confiables y no se filtran.
+    if ((conn.scope ?? "personal") === "personal") {
+      const ownerId = conn.connectedByUserId;
+      const allowedAccountIds = ownerId
+        ? await getAccountIdsForUser(payload.workspaceId, ownerId)
+        : new Set<string>();
+      if (!ownerId || !allowedAccountIds.has(acc.id)) {
+        logger.info(
+          "Dueño del Drive no es responsable/consultor de la cuenta — no se importa",
+          { accountId: acc.id, ownerUserId: ownerId ?? null }
+        );
+        return;
+      }
     }
 
     const accessToken = await ensureFreshAccessToken(conn.id);

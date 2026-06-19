@@ -14,6 +14,7 @@ import {
   type AccountMatchOption,
 } from "@/lib/google/account-matching";
 import { importDriveFileForAccount, extractDriveFileText } from "@/lib/google/drive-import";
+import { getAccountIdsForUser } from "@/lib/accounts/account-membership";
 
 interface SyncDriveFolderInput {
   connectionId: string;
@@ -59,10 +60,40 @@ export const syncDriveFolder = task({
         limit: isFirstSync ? HISTORICAL_LIMIT : INCREMENTAL_LIMIT,
       });
 
-      const workspaceAccounts = await db
+      let workspaceAccounts = await db
         .select({ id: accounts.id, name: accounts.name, websiteUrl: accounts.websiteUrl })
         .from(accounts)
         .where(eq(accounts.workspaceId, connection.workspaceId));
+
+      // Gate por dueño: una conexión personal solo puede alimentar las cuentas
+      // donde su dueño es responsable o consultor. Evita que el Drive de una
+      // persona (p.ej. finanzas) derrame reuniones en cuentas ajenas que se
+      // nombren de pasada. Las conexiones de workspace (Drive compartido,
+      // conectado a propósito por un admin) se tratan como confiables.
+      if ((connection.scope ?? "personal") === "personal") {
+        if (!connection.connectedByUserId) {
+          logger.info(
+            "Conexión personal sin dueño identificable — no se importa nada",
+            { connectionId: connection.id }
+          );
+          workspaceAccounts = [];
+        } else {
+          const allowedAccountIds = await getAccountIdsForUser(
+            connection.workspaceId,
+            connection.connectedByUserId
+          );
+          const before = workspaceAccounts.length;
+          workspaceAccounts = workspaceAccounts.filter((a) =>
+            allowedAccountIds.has(a.id)
+          );
+          logger.info("Filtro por dueño aplicado al sync de workspace", {
+            connectionId: connection.id,
+            ownerUserId: connection.connectedByUserId,
+            accountsBefore: before,
+            accountsAfter: workspaceAccounts.length,
+          });
+        }
+      }
 
       const accountOptions: AccountMatchOption[] = workspaceAccounts.map((a) => ({
         id: a.id,
