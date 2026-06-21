@@ -15,6 +15,11 @@ import {
   getScopeMoveTargets,
 } from "@/lib/queries/tareas";
 import { KanbanBoard } from "@/components/tareas/kanban-board";
+import { ExtractTasksDialog } from "@/components/tareas/extract-tasks-dialog";
+import {
+  listAccountTranscriptsForExtraction,
+  listAccountContextDocsForExtraction,
+} from "@/lib/queries/extract-sources";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
@@ -35,11 +40,14 @@ export default async function TareasAccountPage({ params }: PageProps) {
   const account = await getAccountById(accountId, workspace.id, { userId, role: member.role });
   if (!account) notFound();
 
-  const [boardTasks, members, labels] = await Promise.all([
-    getAccountKanbanTasks(accountId),
-    getWorkspaceMembers(workspace.id),
-    listAccountTaskLabels(accountId),
-  ]);
+  const [boardTasks, members, labels, extractTranscripts, extractDocs] =
+    await Promise.all([
+      getAccountKanbanTasks(accountId),
+      getWorkspaceMembers(workspace.id),
+      listAccountTaskLabels(accountId),
+      listAccountTranscriptsForExtraction(accountId),
+      listAccountContextDocsForExtraction(accountId),
+    ]);
 
   const [{ accountIds }, projectIds] = await Promise.all([
     getTaskAccessibleAccountIds(userId, workspace.id),
@@ -59,9 +67,16 @@ export default async function TareasAccountPage({ params }: PageProps) {
         <ChevronLeft size={15} />
         Tareas
       </Link>
-      <div>
-        <h1 className="text-2xl font-semibold">{account.name}</h1>
-        <p className="text-sm text-muted-foreground mt-1">Tablero de tareas</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">{account.name}</h1>
+          <p className="text-sm text-muted-foreground mt-1">Tablero de tareas</p>
+        </div>
+        <ExtractTasksDialog
+          accountId={accountId}
+          transcripts={extractTranscripts}
+          contextDocs={extractDocs}
+        />
       </div>
       <KanbanBoard
         scope={{ kind: "account", accountId }}

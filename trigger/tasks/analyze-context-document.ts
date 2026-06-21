@@ -24,6 +24,18 @@ interface AnalyzeContextDocumentInput {
   contextDocumentId: string;
   accountId: string;
   workspaceId: string;
+  /**
+   * Cuando es true (flujo manual "extraer tareas"), NO borra las extracciones
+   * AI previas: deduplica y solo inserta las tareas genuinamente nuevas
+   * ("sumar sin borrar"). Cuando es false/undefined (auto-import y re-análisis),
+   * mantiene el comportamiento de reemplazar las extracciones previas.
+   */
+  additive?: boolean;
+}
+
+/** Clave de dedup: alfanumérico en minúsculas, recortada. */
+function normalizeForDedup(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 120);
 }
 
 const DOC_TYPE_LABEL: Record<string, string> = {
@@ -124,20 +136,45 @@ ${body.substring(0, 12000)}`,
       return { extracted: 0 };
     }
 
-    // Replace any previous AI extractions for this document so re-analysis
-    // doesn't duplicate rows on retries.
-    await db
-      .delete(tasksTable)
-      .where(
-        and(
-          eq(tasksTable.contextDocumentId, payload.contextDocumentId),
-          eq(tasksTable.source, "ai_extracted")
-        )
-      );
+    let toInsert = parsed.tasks;
 
-    if (parsed.tasks.length > 0) {
+    if (payload.additive) {
+      // Sumar sin borrar: respetar lo existente (aunque el usuario lo haya
+      // movido/editado/completado) y solo agregar lo realmente nuevo.
+      const existing = await db
+        .select({
+          description: tasksTable.description,
+          title: tasksTable.title,
+        })
+        .from(tasksTable)
+        .where(
+          and(
+            eq(tasksTable.contextDocumentId, payload.contextDocumentId),
+            eq(tasksTable.source, "ai_extracted")
+          )
+        );
+      const seen = new Set(
+        existing.map((t) => normalizeForDedup(t.description ?? t.title ?? ""))
+      );
+      toInsert = parsed.tasks.filter(
+        (t) => !seen.has(normalizeForDedup(t.description))
+      );
+    } else {
+      // Comportamiento histórico: reemplazar las extracciones AI previas para
+      // que el re-análisis no duplique filas en reintentos.
+      await db
+        .delete(tasksTable)
+        .where(
+          and(
+            eq(tasksTable.contextDocumentId, payload.contextDocumentId),
+            eq(tasksTable.source, "ai_extracted")
+          )
+        );
+    }
+
+    if (toInsert.length > 0) {
       await db.insert(tasksTable).values(
-        parsed.tasks.map((t) => ({
+        toInsert.map((t) => ({
           accountId: payload.accountId,
           workspaceId: payload.workspaceId,
           contextDocumentId: payload.contextDocumentId,
@@ -153,9 +190,10 @@ ${body.substring(0, 12000)}`,
 
     logger.info("Context document analyzed", {
       contextDocumentId: payload.contextDocumentId,
-      extracted: parsed.tasks.length,
+      additive: payload.additive ?? false,
+      extracted: toInsert.length,
     });
 
-    return { extracted: parsed.tasks.length };
+    return { extracted: toInsert.length };
   },
 });
