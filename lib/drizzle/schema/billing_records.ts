@@ -19,6 +19,8 @@ export const billingRecords = pgTable(
     fxRateUsed: numeric("fx_rate_used", { precision: 14, scale: 4 }),
     ipcUsed: numeric("ipc_used", { precision: 10, scale: 4 }),
     status: text("status").notNull().default("pending"),
+    /** Centro de costos del concepto (sales/marketing/growth/people/innovacion/otro). */
+    centroCostos: text("centro_costos"),
     billedAt: timestamp("billed_at"),
     paidAt: timestamp("paid_at"),
     isAdditional: boolean("is_additional").notNull().default(false),

@@ -16,6 +16,7 @@ import type {
   FinanceAccountCard,
   HonorarioRow,
   CompensationRow,
+  AccountMonthlyStatusRow,
 } from "@/lib/queries/finance";
 
 interface Props {
@@ -25,6 +26,7 @@ interface Props {
   rates: FxRateRow[];
   history: BillingHistoryRow[];
   accounts: FinanceAccountOption[];
+  accountStatuses: AccountMonthlyStatusRow[];
   accountCards: FinanceAccountCard[];
   honorarios: HonorarioRow[];
   compensationRows: CompensationRow[];
@@ -53,6 +55,7 @@ export function FinanzasTabs({
   rates,
   history,
   accounts,
+  accountStatuses,
   accountCards,
   honorarios,
   compensationRows,
@@ -98,6 +101,7 @@ export function FinanzasTabs({
           billing={billing}
           history={history}
           accounts={accounts}
+          accountStatuses={accountStatuses}
         />
       )}
       {tab === "fx" && <FxEditor rates={rates} />}

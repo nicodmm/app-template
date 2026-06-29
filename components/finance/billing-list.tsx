@@ -9,11 +9,13 @@ import {
   AlertTriangle,
   ChevronRight,
   ChevronDown,
+  Download,
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import {
   generateBillingForMonth,
-  setBillingStatus,
+  setAccountBillingStatus,
+  setBillingCentroCostos,
   addBillingCharge,
   deleteBillingCharge,
   setAccountInvoiceCountry,
@@ -22,7 +24,19 @@ import type {
   BillingRow,
   BillingHistoryRow,
   FinanceAccountOption,
+  AccountMonthlyStatusRow,
 } from "@/lib/queries/finance";
+import {
+  BILLING_STATUS_ORDER,
+  BILLING_STATUS_LABELS,
+  CENTRO_COSTOS_ORDER,
+  CENTRO_COSTOS_LABELS,
+  DEFAULT_BILLING_STATUS,
+  isBillingStatus,
+  centroCostosLabel,
+  type BillingStatus,
+  type CentroCostos,
+} from "@/lib/finance/billing-meta";
 
 interface Props {
   year: number;
@@ -30,6 +44,8 @@ interface Props {
   billing: BillingRow[];
   history: BillingHistoryRow[];
   accounts: FinanceAccountOption[];
+  /** Estado de facturación por cuenta para el mes (cuenta/mes). */
+  accountStatuses: AccountMonthlyStatusRow[];
 }
 
 const MONTHS: Record<number, string> = {
@@ -45,12 +61,6 @@ const MONTHS: Record<number, string> = {
   10: "Octubre",
   11: "Noviembre",
   12: "Diciembre",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: "Pendiente",
-  billed: "Facturado",
-  paid: "Cobrado",
 };
 
 const ghostBtn =
@@ -80,11 +90,6 @@ const usdFmt = new Intl.NumberFormat("es-AR", {
 function formatUsd(n: number): string {
   return usdFmt.format(n);
 }
-
-const COUNTRY_LABELS: Record<"AR" | "US", string> = {
-  AR: "Argentina",
-  US: "Estados Unidos",
-};
 
 /**
  * True cuando la fila espera un tipo de cambio (TC) que aún no está cargado.
@@ -138,7 +143,14 @@ function CountryCell({
   );
 }
 
-export function BillingList({ year, month, billing, history, accounts }: Props) {
+export function BillingList({
+  year,
+  month,
+  billing,
+  history,
+  accounts,
+  accountStatuses,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -146,12 +158,32 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
   const [selYear, setSelYear] = useState<string>(String(year));
   const [selMonth, setSelMonth] = useState<string>(String(month));
 
+  // Filtros de la vista "A facturar".
+  const [filterAccount, setFilterAccount] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<BillingStatus | "">("");
+  const [filterCentro, setFilterCentro] = useState<CentroCostos | "">("");
+
+  // Filtro de estado del historial.
+  const [historyStatus, setHistoryStatus] = useState<BillingStatus | "all">("all");
+
   // Add-charge form state.
   const [showCharge, setShowCharge] = useState(false);
   const [chargeAccount, setChargeAccount] = useState<string>(accounts[0]?.id ?? "");
   const [chargeConcept, setChargeConcept] = useState<string>("");
   const [chargeAmount, setChargeAmount] = useState<string>("");
   const [chargeCurrency, setChargeCurrency] = useState<string>("ARS");
+
+  // Estado por cuenta/mes (default pending cuando no hay fila).
+  const statusMap = useMemo(() => {
+    const m = new Map<string, BillingStatus>();
+    for (const s of accountStatuses) {
+      if (isBillingStatus(s.status)) m.set(s.accountId, s.status);
+    }
+    return m;
+  }, [accountStatuses]);
+
+  const statusOf = (accountId: string): BillingStatus =>
+    statusMap.get(accountId) ?? DEFAULT_BILLING_STATUS;
 
   function navigate(y: string, m: string) {
     router.push(`/app/finanzas?year=${y}&month=${m}`);
@@ -175,10 +207,23 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
     });
   }
 
-  function handleStatus(id: string, status: "pending" | "billed" | "paid") {
+  function handleAccountStatus(accountId: string, status: BillingStatus) {
     setError(null);
     startTransition(async () => {
-      const res = await setBillingStatus({ id, status });
+      const res = await setAccountBillingStatus({ accountId, year, month, status });
+      if (!res.success) {
+        setError(res.error ?? "Error al actualizar");
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function handleCentro(id: string, value: string) {
+    setError(null);
+    const centroCostos = value === "" ? null : (value as CentroCostos);
+    startTransition(async () => {
+      const res = await setBillingCentroCostos({ id, centroCostos });
       if (!res.success) {
         setError(res.error ?? "Error al actualizar");
         return;
@@ -235,10 +280,55 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
     });
   }
 
-  const totalArs = billing.reduce((sum, r) => sum + (r.amountArs ?? 0), 0);
-  const totalUsd = billing.reduce((sum, r) => sum + (r.amountUsd ?? 0), 0);
-  const hasPendingFx = billing.some(isTcPending);
-  const maxHistory = history.reduce((m, h) => Math.max(m, h.totalArs), 0);
+  // Filas tras aplicar los filtros (cuenta / estado / centro de costos).
+  const filtered = useMemo(
+    () =>
+      billing.filter((r) => {
+        if (filterAccount && r.accountId !== filterAccount) return false;
+        if (
+          filterStatus &&
+          (statusMap.get(r.accountId) ?? DEFAULT_BILLING_STATUS) !== filterStatus
+        )
+          return false;
+        if (filterCentro && r.centroCostos !== filterCentro) return false;
+        return true;
+      }),
+    [billing, filterAccount, filterStatus, filterCentro, statusMap]
+  );
+
+  const hasFilters = !!(filterAccount || filterStatus || filterCentro);
+
+  const totalArs = filtered.reduce((sum, r) => sum + (r.amountArs ?? 0), 0);
+  const totalUsd = filtered.reduce((sum, r) => sum + (r.amountUsd ?? 0), 0);
+  const hasPendingFx = filtered.some(isTcPending);
+
+  function handleExport() {
+    startTransition(async () => {
+      const XLSX = await import("xlsx");
+      const data = filtered.map((r) => ({
+        Cuenta: r.accountName,
+        País: r.invoiceCountry ?? "",
+        Concepto: r.concept,
+        "Centro de costos": r.centroCostos
+          ? centroCostosLabel(r.centroCostos)
+          : "",
+        Estado: BILLING_STATUS_LABELS[statusOf(r.accountId)],
+        "Monto original": r.amountOriginal,
+        Moneda: r.currencyOriginal,
+        "Monto ARS": r.amountArs ?? "",
+        "Monto USD": r.amountUsd ?? "",
+        Adicional: r.isAdditional ? "Sí" : "No",
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "A facturar");
+      const suffix = hasFilters ? "-filtrado" : "";
+      XLSX.writeFile(
+        wb,
+        `a-facturar-${year}-${String(month).padStart(2, "0")}${suffix}.xlsx`
+      );
+    });
+  }
 
   // Group the per-concept rows into one expandable total per client/account.
   const groups = useMemo(() => {
@@ -254,7 +344,7 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
         hasPending: boolean;
       }
     >();
-    for (const r of billing) {
+    for (const r of filtered) {
       let g = map.get(r.accountId);
       if (!g) {
         g = {
@@ -274,7 +364,7 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
       if (isTcPending(r)) g.hasPending = true;
     }
     return Array.from(map.values());
-  }, [billing]);
+  }, [filtered]);
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggleGroup = (accountId: string) =>
@@ -284,6 +374,16 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
       else next.add(accountId);
       return next;
     });
+
+  // Historial: métrica según el filtro de estado seleccionado.
+  const historyMetric = (h: BillingHistoryRow): { ars: number; usd: number } =>
+    historyStatus === "all"
+      ? { ars: h.totalArs, usd: h.totalUsd }
+      : h.byStatus[historyStatus];
+  const maxHistory = history.reduce(
+    (m, h) => Math.max(m, historyMetric(h).ars),
+    0
+  );
 
   return (
     <div className="space-y-6">
@@ -323,6 +423,15 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={handleExport}
+            disabled={isPending || filtered.length === 0}
+            className={ghostBtn}
+          >
+            <Download size={13} aria-hidden />
+            Descargar Excel
+          </button>
+          <button
+            type="button"
             onClick={() => setShowCharge((v) => !v)}
             disabled={isPending}
             className={ghostBtn}
@@ -340,6 +449,74 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
             {isPending ? "Generando…" : "Generar mes"}
           </button>
         </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] text-muted-foreground">Cuenta</label>
+          <select
+            value={filterAccount}
+            onChange={(e) => setFilterAccount(e.target.value)}
+            className={`${inputClass} w-[180px]`}
+          >
+            <option value="">Todas</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] text-muted-foreground">Estado</label>
+          <select
+            value={filterStatus}
+            onChange={(e) =>
+              setFilterStatus(e.target.value as BillingStatus | "")
+            }
+            className={`${inputClass} w-[170px]`}
+          >
+            <option value="">Todos</option>
+            {BILLING_STATUS_ORDER.map((s) => (
+              <option key={s} value={s}>
+                {BILLING_STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] text-muted-foreground">
+            Centro de costos
+          </label>
+          <select
+            value={filterCentro}
+            onChange={(e) =>
+              setFilterCentro(e.target.value as CentroCostos | "")
+            }
+            className={`${inputClass} w-[150px]`}
+          >
+            <option value="">Todos</option>
+            {CENTRO_COSTOS_ORDER.map((c) => (
+              <option key={c} value={c}>
+                {CENTRO_COSTOS_LABELS[c]}
+              </option>
+            ))}
+          </select>
+        </div>
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={() => {
+              setFilterAccount("");
+              setFilterStatus("");
+              setFilterCentro("");
+            }}
+            className={ghostBtn}
+          >
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -419,10 +596,11 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
           )}
         </div>
 
-        {billing.length === 0 ? (
+        {filtered.length === 0 ? (
           <p className="px-4 py-6 text-sm text-muted-foreground">
-            No hay filas para este mes. Usá “Generar mes” para crearlas a partir
-            de los engagements activos.
+            {hasFilters
+              ? "No hay filas que coincidan con los filtros."
+              : "No hay filas para este mes. Usá “Generar mes” para crearlas a partir de los engagements activos."}
           </p>
         ) : (
           <table className="w-full text-xs">
@@ -430,6 +608,7 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
               <tr className="border-b [border-color:var(--glass-border)]">
                 <th className="px-4 py-2.5 text-left font-semibold text-muted-foreground">Cliente</th>
                 <th className="px-4 py-2.5 text-left font-semibold text-muted-foreground">País</th>
+                <th className="px-4 py-2.5 text-left font-semibold text-muted-foreground">Estado</th>
                 <th className="px-4 py-2.5 text-left font-semibold text-muted-foreground">Conceptos</th>
                 <th className="px-4 py-2.5 text-right font-semibold text-muted-foreground">Total ARS</th>
                 <th className="px-4 py-2.5 text-right font-semibold text-muted-foreground">Total USD</th>
@@ -460,6 +639,27 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
                           accountId={g.accountId}
                           country={g.invoiceCountry}
                         />
+                      </td>
+                      <td className="px-4 py-2">
+                        <select
+                          value={statusOf(g.accountId)}
+                          disabled={isPending}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) =>
+                            handleAccountStatus(
+                              g.accountId,
+                              e.target.value as BillingStatus
+                            )
+                          }
+                          className={inputClass}
+                          aria-label="Estado de la factura"
+                        >
+                          {BILLING_STATUS_ORDER.map((s) => (
+                            <option key={s} value={s}>
+                              {BILLING_STATUS_LABELS[s]}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td className="px-4 py-2 text-muted-foreground">
                         {g.rows.length} concepto{g.rows.length !== 1 ? "s" : ""}
@@ -497,6 +697,22 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
                             )}
                           </td>
                           <td className="px-4 py-1.5" />
+                          <td className="px-4 py-1.5">
+                            <select
+                              value={r.centroCostos ?? ""}
+                              disabled={isPending}
+                              onChange={(e) => handleCentro(r.id, e.target.value)}
+                              className={inputClass}
+                              aria-label="Centro de costos"
+                            >
+                              <option value="">— Centro de costos</option>
+                              {CENTRO_COSTOS_ORDER.map((c) => (
+                                <option key={c} value={c}>
+                                  {CENTRO_COSTOS_LABELS[c]}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
                           <td className="px-4 py-1.5 text-muted-foreground tabular-nums">
                             {formatOriginal(r.amountOriginal, r.currencyOriginal)}
                             {r.amountArs != null ? (
@@ -515,37 +731,18 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-1.5">
-                            <div className="flex items-center justify-end gap-2">
-                              <select
-                                value={r.status}
+                          <td className="px-4 py-1.5 text-right">
+                            {r.isAdditional && (
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(r.id)}
                                 disabled={isPending}
-                                onChange={(e) =>
-                                  handleStatus(
-                                    r.id,
-                                    e.target.value as "pending" | "billed" | "paid"
-                                  )
-                                }
-                                className={inputClass}
+                                aria-label="Eliminar cargo"
+                                className="text-muted-foreground hover:text-destructive disabled:opacity-50"
                               >
-                                {(["pending", "billed", "paid"] as const).map((s) => (
-                                  <option key={s} value={s}>
-                                    {STATUS_LABELS[s]}
-                                  </option>
-                                ))}
-                              </select>
-                              {r.isAdditional && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDelete(r.id)}
-                                  disabled={isPending}
-                                  aria-label="Eliminar cargo"
-                                  className="text-muted-foreground hover:text-destructive disabled:opacity-50"
-                                >
-                                  <Trash2 size={14} aria-hidden />
-                                </button>
-                              )}
-                            </div>
+                                <Trash2 size={14} aria-hidden />
+                              </button>
+                            )}
                           </td>
                           <td className="px-4 py-1.5 text-right tabular-nums text-muted-foreground">
                             {r.amountUsd != null ? formatUsd(r.amountUsd) : "—"}
@@ -558,7 +755,7 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
             </tbody>
             <tfoot>
               <tr className="border-t [border-color:var(--glass-border)]">
-                <td className="px-4 py-2.5 font-semibold" colSpan={3}>
+                <td className="px-4 py-2.5 font-semibold" colSpan={4}>
                   Totales
                 </td>
                 <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
@@ -576,34 +773,54 @@ export function BillingList({ year, month, billing, history, accounts }: Props) 
       {/* History panel */}
       <div className="grid gap-4">
         <GlassCard className="p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-            Historial facturado
-          </h3>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Historial facturado
+            </h3>
+            <select
+              value={historyStatus}
+              onChange={(e) =>
+                setHistoryStatus(e.target.value as BillingStatus | "all")
+              }
+              className={inputClass}
+              aria-label="Estado del historial"
+            >
+              <option value="all">Todos los estados</option>
+              {BILLING_STATUS_ORDER.map((s) => (
+                <option key={s} value={s}>
+                  {BILLING_STATUS_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
           {history.length === 0 ? (
             <p className="text-sm text-muted-foreground">Sin historial aún.</p>
           ) : (
             <ul className="space-y-2">
-              {history.map((h) => (
-                <li key={`${h.year}-${h.month}`} className="flex items-center gap-3">
-                  <span className="w-24 shrink-0 text-xs text-muted-foreground">
-                    {MONTHS[h.month]} {h.year}
-                  </span>
-                  <span className="flex-1 h-2 rounded-full bg-white/30 dark:bg-white/10 overflow-hidden">
-                    <span
-                      className="block h-full rounded-full bg-primary"
-                      style={{
-                        width: `${maxHistory > 0 ? (h.totalArs / maxHistory) * 100 : 0}%`,
-                      }}
-                    />
-                  </span>
-                  <span className="w-32 shrink-0 text-right text-xs tabular-nums">
-                    {formatArs(h.totalArs)}
-                  </span>
-                  <span className="w-28 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                    {usdFmt.format(h.totalUsd)}
-                  </span>
-                </li>
-              ))}
+              {history.map((h) => {
+                const metric = historyMetric(h);
+                return (
+                  <li key={`${h.year}-${h.month}`} className="flex items-center gap-3">
+                    <span className="w-24 shrink-0 text-xs text-muted-foreground">
+                      {MONTHS[h.month]} {h.year}
+                    </span>
+                    <span className="flex-1 h-2 rounded-full bg-white/30 dark:bg-white/10 overflow-hidden">
+                      <span
+                        className="block h-full rounded-full bg-primary"
+                        style={{
+                          width: `${maxHistory > 0 ? (metric.ars / maxHistory) * 100 : 0}%`,
+                        }}
+                      />
+                    </span>
+                    <span className="w-32 shrink-0 text-right text-xs tabular-nums">
+                      {formatArs(metric.ars)}
+                    </span>
+                    <span className="w-28 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                      {usdFmt.format(metric.usd)}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </GlassCard>

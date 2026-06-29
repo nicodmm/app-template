@@ -40,6 +40,7 @@ export * from "./account_consultants";
 export * from "./member_compensation";
 export * from "./fx_rates";
 export * from "./billing_records";
+export * from "./account_billing_status";
 export * from "./task_meeting_mentions";
 export * from "./task_comments";
 export * from "./task_comment_mentions";

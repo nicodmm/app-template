@@ -3,6 +3,7 @@ import { requireUserId, isFinanceAdmin, getCurrentUserId } from "@/lib/auth";
 import { getWorkspaceByUserId } from "@/lib/queries/workspace";
 import {
   getBillingForMonth,
+  getAccountMonthlyStatuses,
   listFxRates,
   getBillingHistory,
   listFinanceAccounts,
@@ -78,6 +79,7 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
 
   const [
     billing,
+    accountStatuses,
     rates,
     history,
     accountsList,
@@ -88,6 +90,7 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
     assumptions,
   ] = await Promise.all([
     getBillingForMonth(workspace.id, year, month),
+    getAccountMonthlyStatuses(workspace.id, year, month),
     listFxRates(workspace.id),
     getBillingHistory(workspace.id),
     listFinanceAccounts(workspace.id),
@@ -130,6 +133,7 @@ export default async function FinanzasPage({ searchParams }: PageProps) {
         rates={rates}
         history={history}
         accounts={accountsList}
+        accountStatuses={accountStatuses}
         accountCards={accountCards}
         honorarios={honorarios}
         compensationRows={compensationRows}

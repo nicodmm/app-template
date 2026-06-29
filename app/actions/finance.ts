@@ -9,10 +9,17 @@ import {
   accountConsultants,
   fxRates,
   billingRecords,
+  accountBillingStatus,
   memberCompensation,
   workspaceMembers,
   financeProjectionAssumptions,
 } from "@/lib/drizzle/schema";
+import {
+  isBillingStatus,
+  isCentroCostos,
+  type BillingStatus,
+  type CentroCostos,
+} from "@/lib/finance/billing-meta";
 import { requireUserId } from "@/lib/auth";
 import { getWorkspaceByUserId, getWorkspaceMember } from "@/lib/queries/workspace";
 import { createAdminClient, FINANCE_DOCS_BUCKET } from "@/lib/supabase/admin";
@@ -426,6 +433,80 @@ export async function setBillingStatus(input: {
       })
       .where(
         and(eq(billingRecords.id, input.id), eq(billingRecords.workspaceId, workspaceId))
+      );
+    revalidatePath("/app/finanzas");
+    return { success: true };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
+/**
+ * Estado de facturación a nivel cuenta/mes (uno por cuenta). Upsert sobre
+ * account_billing_status. billedAt/paidAt se setean según el estado para dejar
+ * trazabilidad (no se usan en la UI todavía, pero quedan disponibles).
+ */
+export async function setAccountBillingStatus(input: {
+  accountId: string;
+  year: number;
+  month: number;
+  status: BillingStatus;
+}): Promise<R> {
+  try {
+    const workspaceId = await requireFinanceAccount(input.accountId);
+    if (input.month < 1 || input.month > 12)
+      return { success: false, error: "Mes inválido" };
+    if (!isBillingStatus(input.status))
+      return { success: false, error: "Estado inválido" };
+    const now = new Date();
+    const billedAt = input.status === "pending" ? null : now;
+    const paidAt = input.status === "paid" ? now : null;
+    await db
+      .insert(accountBillingStatus)
+      .values({
+        workspaceId,
+        accountId: input.accountId,
+        year: input.year,
+        month: input.month,
+        status: input.status,
+        billedAt,
+        paidAt,
+      })
+      .onConflictDoUpdate({
+        target: [
+          accountBillingStatus.accountId,
+          accountBillingStatus.year,
+          accountBillingStatus.month,
+        ],
+        set: { status: input.status, billedAt, paidAt, updatedAt: now },
+      });
+    revalidatePath("/app/finanzas");
+    revalidatePath(`/app/finanzas/${input.accountId}`);
+    return { success: true };
+  } catch (e) {
+    rethrowIfRedirect(e);
+    return { success: false, error: e instanceof Error ? e.message : "Error" };
+  }
+}
+
+/** Centro de costos de un concepto/línea de facturación. */
+export async function setBillingCentroCostos(input: {
+  id: string;
+  centroCostos: CentroCostos | null;
+}): Promise<R> {
+  try {
+    const { workspaceId } = await requireFinanceWorkspace();
+    if (input.centroCostos !== null && !isCentroCostos(input.centroCostos))
+      return { success: false, error: "Centro de costos inválido" };
+    await db
+      .update(billingRecords)
+      .set({ centroCostos: input.centroCostos, updatedAt: new Date() })
+      .where(
+        and(
+          eq(billingRecords.id, input.id),
+          eq(billingRecords.workspaceId, workspaceId)
+        )
       );
     revalidatePath("/app/finanzas");
     return { success: true };

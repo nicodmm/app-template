@@ -36,6 +36,17 @@ const STATUS_LABEL: Record<string, string> = {
   rejected: "Descartado",
 };
 
+/** Fecha de carga en formato dd/mm/aaaa (sin hora). */
+function formatLoadDate(value: Date | string): string {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 interface Props {
   accountId: string;
   searchId: string;
@@ -99,10 +110,13 @@ export function CandidateDetailPanel({ accountId, searchId, candidate }: Props) 
       {/* 1 — Header */}
       <GlassCard className="p-6 flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
             <h2 className="text-2xl font-semibold leading-tight">
               {candidate.firstName} {candidate.lastName}
             </h2>
+            <span className="text-xs text-muted-foreground">
+              Cargado {formatLoadDate(candidate.createdAt)}
+            </span>
           </div>
           <div className="flex shrink-0 gap-2">
             <button

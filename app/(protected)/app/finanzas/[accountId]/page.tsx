@@ -8,8 +8,18 @@ import {
 } from "@/lib/queries/workspace";
 import { getAccountById } from "@/lib/queries/accounts";
 import { db } from "@/lib/drizzle/db";
-import { accountFinance, accountConsultants, users } from "@/lib/drizzle/schema";
-import { eq } from "drizzle-orm";
+import {
+  accountFinance,
+  accountConsultants,
+  accountBillingStatus,
+  users,
+} from "@/lib/drizzle/schema";
+import { and, eq } from "drizzle-orm";
+import {
+  DEFAULT_BILLING_STATUS,
+  isBillingStatus,
+  type BillingStatus,
+} from "@/lib/finance/billing-meta";
 import {
   getAccountTerms,
   getFinanceMembers,
@@ -71,8 +81,15 @@ export default async function AccountFinancePage({
   // Auto-generar la facturación del mes visto (idempotente, preserva estados).
   await runMonthlyBilling(workspace.id, year, month);
 
-  const [financeRows, consultantRows, members, terms, financeMembers, allBilling] =
-    await Promise.all([
+  const [
+    financeRows,
+    consultantRows,
+    members,
+    terms,
+    financeMembers,
+    allBilling,
+    statusRows,
+  ] = await Promise.all([
       db
         .select()
         .from(accountFinance)
@@ -94,9 +111,23 @@ export default async function AccountFinancePage({
       getAccountTerms(accountId),
       getFinanceMembers(workspace.id),
       getBillingForMonth(workspace.id, year, month),
+      db
+        .select({ status: accountBillingStatus.status })
+        .from(accountBillingStatus)
+        .where(
+          and(
+            eq(accountBillingStatus.accountId, accountId),
+            eq(accountBillingStatus.year, year),
+            eq(accountBillingStatus.month, month)
+          )
+        )
+        .limit(1),
     ]);
 
   const finance = financeRows[0] ?? null;
+  const billingStatus: BillingStatus = isBillingStatus(statusRows[0]?.status)
+    ? statusRows[0].status
+    : DEFAULT_BILLING_STATUS;
   const invoiceCountry: "AR" | "US" | null =
     finance?.invoiceCountry === "AR" || finance?.invoiceCountry === "US"
       ? finance.invoiceCountry
@@ -188,6 +219,7 @@ export default async function AccountFinancePage({
           year={year}
           month={month}
           billing={billing}
+          status={billingStatus}
         />
       </GlassCard>
 

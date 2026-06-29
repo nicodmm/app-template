@@ -6,12 +6,19 @@ import {
   financeEngagementPeriods,
   financeFeeShares,
   billingRecords,
+  accountBillingStatus,
   workspaceMembers,
   users,
   fxRates,
   memberCompensation,
 } from "@/lib/drizzle/schema";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import {
+  BILLING_STATUS_ORDER,
+  DEFAULT_BILLING_STATUS,
+  isBillingStatus,
+  type BillingStatus,
+} from "@/lib/finance/billing-meta";
 import {
   convertToArs,
   effectiveFeeCurrency,
@@ -347,6 +354,8 @@ export interface BillingRow {
   amountUsd: number | null;
   /** País de facturación de la cuenta (account_finance.invoice_country). */
   invoiceCountry: "AR" | "US" | null;
+  /** Centro de costos del concepto (key en CENTRO_COSTOS_ORDER) o null. */
+  centroCostos: string | null;
 }
 
 export async function getBillingForMonth(
@@ -364,6 +373,7 @@ export async function getBillingForMonth(
       currencyOriginal: billingRecords.currencyOriginal,
       amountArs: billingRecords.amountArs,
       status: billingRecords.status,
+      centroCostos: billingRecords.centroCostos,
       isAdditional: billingRecords.isAdditional,
       billingRule: financeEngagements.billingRule,
       invoiceCountry: accountFinance.invoiceCountry,
@@ -410,6 +420,7 @@ export async function getBillingForMonth(
       currencyOriginal: r.currencyOriginal,
       amountArs,
       status: r.status,
+      centroCostos: r.centroCostos ?? null,
       isAdditional: r.isAdditional,
       billingRule: r.billingRule ?? null,
       amountUsd,
@@ -418,27 +429,90 @@ export async function getBillingForMonth(
   });
 }
 
+export interface AccountMonthlyStatusRow {
+  accountId: string;
+  status: string;
+}
+
+/**
+ * Estado de facturación por cuenta para un mes (uno por cuenta). Las cuentas sin
+ * fila en account_billing_status no aparecen acá; la UI asume el estado por
+ * defecto (pending / "Facturación Pendiente") en ese caso.
+ */
+export async function getAccountMonthlyStatuses(
+  workspaceId: string,
+  year: number,
+  month: number
+): Promise<AccountMonthlyStatusRow[]> {
+  const rows = await db
+    .select({
+      accountId: accountBillingStatus.accountId,
+      status: accountBillingStatus.status,
+    })
+    .from(accountBillingStatus)
+    .where(
+      and(
+        eq(accountBillingStatus.workspaceId, workspaceId),
+        eq(accountBillingStatus.year, year),
+        eq(accountBillingStatus.month, month)
+      )
+    );
+  return rows.map((r) => ({ accountId: r.accountId, status: r.status }));
+}
+
 export interface BillingHistoryRow {
   year: number;
   month: number;
   totalArs: number;
   totalUsd: number;
+  /** Totales del mes desglosados por estado de facturación (cuenta/mes). */
+  byStatus: Record<BillingStatus, { ars: number; usd: number }>;
+}
+
+function emptyByStatus(): Record<BillingStatus, { ars: number; usd: number }> {
+  return BILLING_STATUS_ORDER.reduce(
+    (acc, s) => {
+      acc[s] = { ars: 0, usd: 0 };
+      return acc;
+    },
+    {} as Record<BillingStatus, { ars: number; usd: number }>
+  );
 }
 
 export async function getBillingHistory(
   workspaceId: string
 ): Promise<BillingHistoryRow[]> {
-  const rows = await db
-    .select({
-      year: billingRecords.year,
-      month: billingRecords.month,
-      amountArs: billingRecords.amountArs,
-      amountOriginal: billingRecords.amountOriginal,
-      currencyOriginal: billingRecords.currencyOriginal,
-      fxRateUsed: billingRecords.fxRateUsed,
-    })
-    .from(billingRecords)
-    .where(eq(billingRecords.workspaceId, workspaceId));
+  const [rows, statusRows] = await Promise.all([
+    db
+      .select({
+        year: billingRecords.year,
+        month: billingRecords.month,
+        accountId: billingRecords.accountId,
+        amountArs: billingRecords.amountArs,
+        amountOriginal: billingRecords.amountOriginal,
+        currencyOriginal: billingRecords.currencyOriginal,
+        fxRateUsed: billingRecords.fxRateUsed,
+      })
+      .from(billingRecords)
+      .where(eq(billingRecords.workspaceId, workspaceId)),
+    db
+      .select({
+        year: accountBillingStatus.year,
+        month: accountBillingStatus.month,
+        accountId: accountBillingStatus.accountId,
+        status: accountBillingStatus.status,
+      })
+      .from(accountBillingStatus)
+      .where(eq(accountBillingStatus.workspaceId, workspaceId)),
+  ]);
+
+  // Estado por cuenta/mes (default pending cuando no hay fila).
+  const statusByAccountMonth = new Map<string, BillingStatus>();
+  for (const s of statusRows) {
+    if (isBillingStatus(s.status)) {
+      statusByAccountMonth.set(`${s.accountId}-${s.year}-${s.month}`, s.status);
+    }
+  }
 
   const map = new Map<string, BillingHistoryRow>();
   for (const r of rows) {
@@ -452,18 +526,32 @@ export async function getBillingHistory(
           ? ars / fx
           : 0;
     const acc =
-      map.get(key) ?? { year: r.year, month: r.month, totalArs: 0, totalUsd: 0 };
+      map.get(key) ??
+      { year: r.year, month: r.month, totalArs: 0, totalUsd: 0, byStatus: emptyByStatus() };
     acc.totalArs += ars;
     acc.totalUsd += usd;
+    const status =
+      statusByAccountMonth.get(`${r.accountId}-${r.year}-${r.month}`) ??
+      DEFAULT_BILLING_STATUS;
+    acc.byStatus[status].ars += ars;
+    acc.byStatus[status].usd += usd;
     map.set(key, acc);
   }
 
   return Array.from(map.values())
-    .map((r) => ({
-      ...r,
-      totalArs: round2(r.totalArs),
-      totalUsd: round2(r.totalUsd),
-    }))
+    .map((r) => {
+      const byStatus = emptyByStatus();
+      for (const s of BILLING_STATUS_ORDER) {
+        byStatus[s] = { ars: round2(r.byStatus[s].ars), usd: round2(r.byStatus[s].usd) };
+      }
+      return {
+        year: r.year,
+        month: r.month,
+        totalArs: round2(r.totalArs),
+        totalUsd: round2(r.totalUsd),
+        byStatus,
+      };
+    })
     .sort((a, b) => a.year - b.year || a.month - b.month);
 }
 

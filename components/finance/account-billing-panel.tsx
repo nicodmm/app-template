@@ -4,12 +4,21 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, AlertTriangle, RefreshCw } from "lucide-react";
 import {
-  setBillingStatus,
+  setAccountBillingStatus,
+  setBillingCentroCostos,
   addBillingCharge,
   deleteBillingCharge,
   generateBillingForMonth,
 } from "@/app/actions/finance";
 import type { BillingRow } from "@/lib/queries/finance";
+import {
+  BILLING_STATUS_ORDER,
+  BILLING_STATUS_LABELS,
+  CENTRO_COSTOS_ORDER,
+  CENTRO_COSTOS_LABELS,
+  type BillingStatus,
+  type CentroCostos,
+} from "@/lib/finance/billing-meta";
 
 const MONTHS: Record<number, string> = {
   1: "Enero",
@@ -24,11 +33,6 @@ const MONTHS: Record<number, string> = {
   10: "Octubre",
   11: "Noviembre",
   12: "Diciembre",
-};
-const STATUS_LABELS: Record<string, string> = {
-  pending: "Pendiente",
-  billed: "Facturado",
-  paid: "Cobrado",
 };
 const arsFmt = new Intl.NumberFormat("es-AR", {
   style: "currency",
@@ -47,9 +51,17 @@ interface Props {
   year: number;
   month: number;
   billing: BillingRow[];
+  /** Estado de facturación de la cuenta para el mes (cuenta/mes). */
+  status: BillingStatus;
 }
 
-export function AccountBillingPanel({ accountId, year, month, billing }: Props) {
+export function AccountBillingPanel({
+  accountId,
+  year,
+  month,
+  billing,
+  status,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -64,10 +76,25 @@ export function AccountBillingPanel({ accountId, year, month, billing }: Props) 
     router.push(`/app/finanzas/${accountId}?year=${y}&month=${m}`);
   }
 
-  function handleStatus(id: string, status: "pending" | "billed" | "paid") {
+  function handleAccountStatus(next: BillingStatus) {
     setError(null);
     startTransition(async () => {
-      const res = await setBillingStatus({ id, status });
+      const res = await setAccountBillingStatus({
+        accountId,
+        year,
+        month,
+        status: next,
+      });
+      if (!res.success) setError(res.error ?? "Error");
+      else router.refresh();
+    });
+  }
+
+  function handleCentro(id: string, value: string) {
+    setError(null);
+    const centroCostos = value === "" ? null : (value as CentroCostos);
+    startTransition(async () => {
+      const res = await setBillingCentroCostos({ id, centroCostos });
       if (!res.success) setError(res.error ?? "Error");
       else router.refresh();
     });
@@ -172,6 +199,26 @@ export function AccountBillingPanel({ accountId, year, month, billing }: Props) 
         </div>
       </div>
 
+      {/* Estado de la factura (cuenta/mes) */}
+      <div className="flex items-center gap-2">
+        <label className="text-[11px] text-muted-foreground">
+          Estado de la factura
+        </label>
+        <select
+          value={status}
+          disabled={isPending}
+          onChange={(e) => handleAccountStatus(e.target.value as BillingStatus)}
+          className={inputClass}
+          aria-label="Estado de la factura"
+        >
+          {BILLING_STATUS_ORDER.map((s) => (
+            <option key={s} value={s}>
+              {BILLING_STATUS_LABELS[s]}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       {showCharge && (
@@ -224,7 +271,7 @@ export function AccountBillingPanel({ accountId, year, month, billing }: Props) 
                 ARS
               </th>
               <th className="py-2 text-left font-semibold text-muted-foreground">
-                Estado
+                Centro de costos
               </th>
               <th className="py-2" />
             </tr>
@@ -267,19 +314,16 @@ export function AccountBillingPanel({ accountId, year, month, billing }: Props) 
                 </td>
                 <td className="py-2">
                   <select
-                    value={r.status}
+                    value={r.centroCostos ?? ""}
                     disabled={isPending}
-                    onChange={(e) =>
-                      handleStatus(
-                        r.id,
-                        e.target.value as "pending" | "billed" | "paid"
-                      )
-                    }
+                    onChange={(e) => handleCentro(r.id, e.target.value)}
                     className={inputClass}
+                    aria-label="Centro de costos"
                   >
-                    {(["pending", "billed", "paid"] as const).map((s) => (
-                      <option key={s} value={s}>
-                        {STATUS_LABELS[s]}
+                    <option value="">— Sin asignar</option>
+                    {CENTRO_COSTOS_ORDER.map((c) => (
+                      <option key={c} value={c}>
+                        {CENTRO_COSTOS_LABELS[c]}
                       </option>
                     ))}
                   </select>
