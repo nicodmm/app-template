@@ -66,24 +66,31 @@ export function CvUploader({ accountId, searchId, candidate }: Props) {
         return;
       }
 
-      const result = await uploadCandidateCv({
-        accountId,
-        searchId,
-        candidateId: candidate.id,
-        fileName: file.name,
-        mimeType: file.type || "application/octet-stream",
-        fileSize: file.size,
-        extractedText: extractedText && extractedText.trim() ? extractedText : null,
-        fileBase64,
-      });
+      try {
+        const result = await uploadCandidateCv({
+          accountId,
+          searchId,
+          candidateId: candidate.id,
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          fileSize: file.size,
+          extractedText: extractedText && extractedText.trim() ? extractedText : null,
+          fileBase64,
+        });
 
-      if (fileInputRef.current) fileInputRef.current.value = "";
+        if (fileInputRef.current) fileInputRef.current.value = "";
 
-      if (!result.success) {
-        setError(result.error ?? "Error al subir el CV");
-        return;
+        if (!result.success) {
+          setError(result.error ?? "Error al subir el CV");
+          return;
+        }
+        router.refresh();
+      } catch {
+        // Un archivo demasiado grande hace que el Server Action rechace a nivel
+        // framework (límite de body). Mostramos el error en vez de tumbar la página.
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        setError("El archivo es demasiado grande para subirlo. Probá con uno más liviano.");
       }
-      router.refresh();
     });
   }
 
